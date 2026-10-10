@@ -94,22 +94,24 @@ const rows = [
 				const fill = row.querySelector("i");
 				if (fill) (fill as HTMLElement).style.width = `${pct}%`;
 
-				// 百分比：今天变化快，多给一位小数
+				// 百分比：今日保留一位小数，本月/本年保留两位
 				const text = row.querySelector("[data-text]");
-				if (text) text.textContent = `${pct.toFixed(kind === "day" ? 3 : 2)}%`;
+				if (text) text.textContent = `${pct.toFixed(kind === "day" ? 1 : 2)}%`;
 
-				// 剩余时间：今天精确到秒，月/年显示还剩几天
+				// 剩余时间：今日只到「时:分」，本月「还剩 X 天 Y 小时」，本年「还剩 X 天」
 				const remain = row.querySelector("[data-remaining]");
 				if (remain && cfg.showRemaining) {
+					const left = Math.max(0, end.getTime() - now.getTime());
 					if (kind === "day") {
-						const left = end.getTime() - now.getTime();
 						remain.textContent = `距明天还有 ${pad(Math.floor(left / 3600000))}:${pad(
 							Math.floor((left % 3600000) / 60000),
-						)}:${pad(Math.floor((left % 60000) / 1000))}`;
+						)}`;
+					} else if (kind === "month") {
+						remain.textContent = `还剩 ${Math.floor(left / 86400000)} 天 ${Math.floor(
+							(left % 86400000) / 3600000,
+						)} 小时`;
 					} else {
-						remain.textContent = `还剩 ${Math.ceil(
-							(end.getTime() - now.getTime()) / 86400000,
-						)} 天`;
+						remain.textContent = `还剩 ${Math.ceil(left / 86400000)} 天`;
 					}
 				}
 			}
