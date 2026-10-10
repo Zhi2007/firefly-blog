@@ -4,44 +4,22 @@
 
 ## 关于本站
 
-- **框架**：[Astro](https://astro.build) —— 全站静态生成，`dist/` 里都是纯 HTML/CSS
-- **主题**：[Firefly](https://github.com/CuteLeaf/Firefly)（作者 [CuteLeaf](https://github.com/CuteLeaf)，基于 [Fuwari](https://github.com/saicaca/fuwari)／作者 [saicaca](https://github.com/saicaca) 二次开发）
-- **托管**：Cloudflare Workers 静态资源，自动 HTTPS、全球 CDN，零服务器成本
-- **搜索**：[Pagefind](https://pagefind.app)
-- **评论**：[Giscus](https://giscus.app)（评论以 GitHub Discussions 的形式保存在仓库里）
-- **统计**：Cloudflare Web Analytics（免费、无 cookie）
-- **看板娘**：[l2d-widget](https://l2d-widget.hacxy.cn)
-- **代码高亮**：[Expressive Code](https://expressive-code.com)；公式：[KaTeX](https://katex.org)
+本站是从 [Firefly](https://github.com/CuteLeaf/Firefly) 主题重建而来的静态博客：Astro 负责构建，产物托管在 Cloudflare Workers 上，全站没有服务器和数据库。搜索、评论、代码高亮、图片优化这些能力都来自开源社区，具体名单与作者见[公告页](/announcement/)。
 
-## 常用链接
+## 我的链接
 
-- 我的 GitHub：<https://github.com/Zhi2007>
+- GitHub：<https://github.com/Zhi2007>
 - 本站源码：<https://github.com/Zhi2007/firefly-blog>
+- 问题反馈：<https://github.com/Zhi2007/firefly-blog/issues>
+- 留言板：<https://my-blog.mc20070831.workers.dev/guestbook/>
 - RSS 订阅：`/rss.xml`
 - 站点地图：`/sitemap-index.xml`
 
-## 开源声明与致谢
+## 开源致谢
 
-本站站在许多开源项目之上运行，向它们的作者致谢（完整清单见仓库根目录的 `CREDITS.md`）：
+本站站在 Astro、Firefly（作者 [CuteLeaf](https://github.com/CuteLeaf)）、Fuwari（作者 [saicaca](https://github.com/saicaca)）、Pagefind、Giscus、Expressive Code、Tailwind CSS、Svelte、KaTeX、Swup、Iconify、l2d-widget、sharp、Cloudflare 等开源项目之上运行，感谢每一位作者。
 
-| 项目 | 作者 / 组织 | 用途 |
-| --- | --- | --- |
-| [Astro](https://astro.build) | withastro 及贡献者 | 静态站点框架（MIT） |
-| [Firefly](https://github.com/CuteLeaf/Firefly) | [CuteLeaf](https://github.com/CuteLeaf) | 本站主题（MIT） |
-| [Fuwari](https://github.com/saicaca/fuwari) | [saicaca](https://github.com/saicaca) | Firefly 的上游主题（MIT） |
-| [Pagefind](https://pagefind.app) | Pagefind / CloudCannon | 站内搜索（MIT） |
-| [Giscus](https://giscus.app) | giscus 及贡献者 | 评论系统（MIT） |
-| [Expressive Code](https://expressive-code.com) | [hippotastic](https://github.com/hippotastic) | 代码块渲染（MIT） |
-| [Tailwind CSS](https://tailwindcss.com) | Tailwind Labs | 样式框架（MIT） |
-| [Svelte](https://svelte.dev) | Svelte 团队及贡献者 | 交互组件（MIT） |
-| [KaTeX](https://katex.org) | Khan Academy | 数学公式（MIT） |
-| [Swup](https://swup.js.org) | swup 团队 | 页面切换动画（MIT） |
-| [Iconify](https://iconify.design) 及各类图标集 | 各图标作者 | 图标（各自许可） |
-| [l2d-widget](https://l2d-widget.hacxy.cn) | [hacxy](https://github.com/hacxy) | Live2D 看板娘 |
-| [sharp](https://sharp.pixelplumbing.com) | Lovell Fuller 及贡献者 | 构建期图片优化 |
-| [Cloudflare Workers](https://workers.cloudflare.com) | Cloudflare | 静态托管与统计 |
-
-> Live2D 模型、字体、音乐等素材的版权归各自原作者所有，本站仅按原项目附带的方式使用。
+**完整名单（含作者、用途与许可）请看[公告页](/announcement/)**，仓库里也有一份 [CREDITS.md](https://github.com/Zhi2007/firefly-blog/blob/main/CREDITS.md)。
 
 ---
 

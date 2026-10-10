@@ -10,6 +10,7 @@ import FontSetup from "@components/features/FontSetup.astro";
 import GithubCardManager from "@components/features/GithubCardManager.astro";
 import MusicManager from "@components/features/MusicManager.astro";
 import MusicPlayerView from "@components/features/MusicPlayerView.astro";
+import FirstVisitAnnouncement from "@components/features/FirstVisitAnnouncement.astro";
 import SakuraEffect from "@components/features/SakuraEffect.astro";
 import TabTitleEffect from "@components/features/TabTitleEffect.astro";
 import WavesEffect from "@components/features/WavesEffect.astro";
@@ -573,6 +574,8 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
     <SakuraEffect />
     <!-- 切换标签页时的标题轮播 -->
     <TabTitleEffect />
+    <!-- 首次访问的公告弹窗（含上游项目致谢），配置见 src/config/announcementConfig.ts -->
+    <FirstVisitAnnouncement />
 
     <!-- Water Waves Effect -->
     <WavesEffect />

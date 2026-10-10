@@ -1,0 +1,154 @@
+---
+// 本站所用开源项目的署名清单
+// 公告弹窗（FirstVisitAnnouncement.astro）与 /announcement/ 页共用，改这一处即可
+interface Credit {
+	name: string;
+	author: string;
+	authorUrl?: string;
+	url: string;
+	use: string;
+}
+
+const credits: Credit[] = [
+	{
+		name: "Astro",
+		author: "withastro 及贡献者",
+		url: "https://astro.build",
+		use: "静态站点框架",
+	},
+	{
+		name: "Firefly",
+		author: "CuteLeaf",
+		authorUrl: "https://github.com/CuteLeaf",
+		url: "https://github.com/CuteLeaf/Firefly",
+		use: "本站主题",
+	},
+	{
+		name: "Fuwari",
+		author: "saicaca",
+		authorUrl: "https://github.com/saicaca",
+		url: "https://github.com/saicaca/fuwari",
+		use: "Firefly 的上游主题",
+	},
+	{
+		name: "Tailwind CSS",
+		author: "Tailwind Labs",
+		url: "https://tailwindcss.com",
+		use: "样式框架",
+	},
+	{
+		name: "Svelte",
+		author: "Svelte 团队及贡献者",
+		url: "https://svelte.dev",
+		use: "交互组件",
+	},
+	{
+		name: "Swup",
+		author: "swup 团队及贡献者",
+		url: "https://swup.js.org",
+		use: "页面切换动画",
+	},
+	{
+		name: "Pagefind",
+		author: "Pagefind / CloudCannon",
+		url: "https://pagefind.app",
+		use: "站内搜索",
+	},
+	{
+		name: "Giscus",
+		author: "giscus 及贡献者",
+		url: "https://giscus.app",
+		use: "评论系统",
+	},
+	{
+		name: "Expressive Code",
+		author: "hippotastic 及贡献者",
+		authorUrl: "https://github.com/hippotastic",
+		url: "https://expressive-code.com",
+		use: "代码块渲染",
+	},
+	{
+		name: "KaTeX",
+		author: "Khan Academy 及贡献者",
+		url: "https://katex.org",
+		use: "数学公式",
+	},
+	{
+		name: "Mermaid",
+		author: "Mermaid 及贡献者",
+		url: "https://mermaid.js.org",
+		use: "图表渲染",
+	},
+	{
+		name: "l2d-widget",
+		author: "hacxy",
+		authorUrl: "https://github.com/hacxy",
+		url: "https://l2d-widget.hacxy.cn",
+		use: "Live2D 看板娘",
+	},
+	{
+		name: "Iconify",
+		author: "Iconify 团队及各图标作者",
+		url: "https://iconify.design",
+		use: "图标",
+	},
+	{
+		name: "sharp",
+		author: "Lovell Fuller 及贡献者",
+		url: "https://sharp.pixelplumbing.com",
+		use: "构建期图片优化",
+	},
+	{
+		name: "Cloudflare Workers",
+		author: "Cloudflare",
+		url: "https://workers.cloudflare.com",
+		use: "站点托管与访问统计",
+	},
+];
+---
+
+<div class="text-sm leading-relaxed">
+	<p class="mb-3 opacity-80">
+		本站构建在这些开源项目之上，在此向每一位作者致谢：
+	</p>
+	<ul class="space-y-2">
+		{
+			credits.map((item) => (
+				<li class="flex flex-wrap items-baseline gap-x-2">
+					<span class="font-medium">{item.name}</span>
+					<span class="opacity-70">by</span>
+					{item.authorUrl ? (
+						<a
+							class="link text-(--primary)"
+							href={item.authorUrl}
+							target="_blank"
+							rel="noopener"
+						>
+							{item.author}
+						</a>
+					) : (
+						<span>{item.author}</span>
+					)}
+					<a
+						class="link text-50 text-xs"
+						href={item.url}
+						target="_blank"
+						rel="noopener"
+					>
+						{item.use} ↗
+					</a>
+				</li>
+			))
+		}
+	</ul>
+	<p class="mt-3 text-xs opacity-70">
+		Live2D 模型、字体、音乐等素材的版权归各自原作者所有，本站仅按原项目附带的方式使用。
+		完整清单见仓库的
+		<a
+			class="link text-(--primary)"
+			href="https://github.com/Zhi2007/firefly-blog/blob/main/CREDITS.md"
+			target="_blank"
+			rel="noopener">CREDITS.md</a
+		>。
+	</p>
+</div>
