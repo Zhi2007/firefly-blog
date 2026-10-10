@@ -378,11 +378,14 @@ async function listMedia() {
 }
 
 async function repoInfo() {
-	const [branch, dirtyOut, remoteOut, logOut] = await Promise.all([
+	const [branch, dirtyOut, remoteOut, logOut, upstreamOut, lastOut] = await Promise.all([
 		git(["rev-parse", "--abbrev-ref", "HEAD"]),
 		git(["status", "--porcelain"]),
 		git(["remote", "get-url", "origin"]),
 		git(["log", "-5", "--pretty=format:%h|%ad|%s", "--date=format:%m-%d %H:%M"]),
+		// 与上游的差距：输出 "落后数<TAB>领先数"
+		git(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"]),
+		git(["log", "-1", "--format=%cI"]),
 	]);
 	const remote = remoteOut.stdout;
 	const repoMatch = remote.match(/github\.com[:/]+([^/]+)\/(.+?)(?:\.git)?$/);
@@ -395,6 +398,13 @@ async function repoInfo() {
 				return { hash, date, subject };
 			})
 		: [];
+	let behind = 0;
+	let ahead = 0;
+	const counts = upstreamOut.stdout.split(/\s+/).filter(Boolean);
+	if (counts.length === 2) {
+		behind = Number(counts[0]) || 0;
+		ahead = Number(counts[1]) || 0;
+	}
 	return {
 		branch: branch.stdout || "unknown",
 		dirty: files.length > 0,
@@ -403,6 +413,9 @@ async function repoInfo() {
 		owner: repoMatch?.[1] || "",
 		repo: repoMatch?.[2]?.replace(/\.git$/, "") || "",
 		commits,
+		ahead,
+		behind,
+		lastCommitAt: lastOut.stdout || "",
 	};
 }
 
@@ -454,6 +467,7 @@ async function publish(message) {
 	if (!staged.stdout) {
 		return { ok: false, dryRun: DRY_RUN_PUBLISH, steps, message: "没有需要提交的改动" };
 	}
+	const changedFiles = staged.stdout.split("\n").filter(Boolean);
 
 	const commit = await git(["commit", "-m", message || "chore: 通过管理后台更新内容"]);
 	steps.push({ name: "git commit", ...commit });
@@ -468,13 +482,72 @@ async function publish(message) {
 		return { ok: true, dryRun: true, steps, message: "演练模式：未真正推送" };
 	}
 
+	// 推送前先对齐远端：如果 GitHub 上有新提交（网页编辑、手机等），先 rebase 再推
+	const fetch = await git(["fetch", "origin"]);
+	steps.push({ name: "git fetch origin", ...fetch });
+	const counts = await git(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"]);
+	const parts = counts.stdout.split(/\s+/).filter(Boolean);
+	const behind = Number(parts[0]) || 0;
+	if (behind > 0) {
+		const pull = await git(["pull", "--rebase", "--autostash"]);
+		steps.push({ name: `git pull --rebase（远端有 ${behind} 个新提交）`, ...pull });
+		if (!pull.ok) {
+			return {
+				ok: false,
+				dryRun: false,
+				steps,
+				message: "远端有冲突，需要手动处理后再发布",
+				files: changedFiles,
+			};
+		}
+	}
+
 	const push = await git(["push"]);
 	steps.push({ name: "git push", ...push });
 	return {
 		ok: push.ok,
 		dryRun: false,
 		steps,
-		message: push.ok ? "已推送，GitHub Actions 会自动构建并部署（约 1 分钟）" : push.stderr || push.message,
+		files: changedFiles,
+		message: push.ok
+			? "已推送到 GitHub，Actions 会自动构建并部署（约 1 分钟）"
+			: push.stderr || push.message,
+	};
+}
+
+/** 从远端同步：把 GitHub 上的新提交拉到本地（本地没有未提交改动时） */
+async function syncFromRemote() {
+	const steps = [];
+	const dirty = await git(["status", "--porcelain"]);
+	if (dirty.stdout) {
+		return {
+			ok: false,
+			steps,
+			message: "本地有未提交改动，先在「发布」页提交（或撤销）后再同步",
+		};
+	}
+	const fetch = await git(["fetch", "origin"]);
+	steps.push({ name: "git fetch origin", ...fetch });
+	if (!fetch.ok) {
+		return { ok: false, steps, message: fetch.stderr || fetch.message };
+	}
+	const counts = await git(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"]);
+	const parts = counts.stdout.split(/\s+/).filter(Boolean);
+	const behind = Number(parts[0]) || 0;
+	const ahead = Number(parts[1]) || 0;
+	if (behind === 0) {
+		return {
+			ok: true,
+			steps,
+			message: ahead > 0 ? `本地有 ${ahead} 个提交还没推送，去「发布」页推送` : "已经和 GitHub 一致",
+		};
+	}
+	const pull = await git(["pull", "--rebase", "--autostash"]);
+	steps.push({ name: `git pull --rebase（拉取 ${behind} 个远端提交）`, ...pull });
+	return {
+		ok: pull.ok,
+		steps,
+		message: pull.ok ? `已同步 GitHub 上的 ${behind} 个新提交` : pull.stderr || pull.message,
 	};
 }
 
@@ -797,6 +870,12 @@ const server = createServer(async (req, res) => {
 				}
 				await fs.writeFile(safeResolve(rel), content ?? "", "utf-8");
 				sendJson(res, 200, { ok: true, path: rel });
+				return;
+			}
+
+			case "/api/sync": {
+				const result = await syncFromRemote();
+				sendJson(res, 200, result);
 				return;
 			}
 

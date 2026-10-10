@@ -129,6 +129,7 @@
 			<span id="repoName" class="muted small"></span>
 			<span id="branchBadge" class="badge"></span>
 			<span id="dirtyBadge" class="badge"></span>
+			<span id="syncBadge" class="badge"></span>
 			<span style="flex:1"></span>
 			<button class="action ghost" id="refreshBtn">刷新状态</button>
 		</header>
@@ -382,14 +383,27 @@
 			<!-- 发布 -->
 			<section class="panel" id="panel-publish">
 				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">同步状态</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnSync">从 GitHub 同步</button>
+					</div>
+					<div id="syncBox" class="small" style="margin-top:8px">加载中…</div>
+					<label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px">
+						<input type="checkbox" id="autoPublish" style="width:auto;margin-top:3px" />
+						<span><b>自动同步</b>：每次保存（文章 / 公告 / 歌单 / 配置 / 上传文件）后，自动提交并推送到 GitHub；<span class="muted">连续操作会合并成一次提交</span></span>
+					</label>
+				</div>
+				<div class="card">
 					<h2>待提交的改动</h2>
 					<div id="diffBox" class="small">加载中…</div>
 				</div>
 				<div class="card">
-					<label>提交说明</label>
+					<label>提交说明（留空则自动生成）</label>
 					<input id="commitMessage" placeholder="例如：feat: 新增一篇文章" />
 					<div class="row" style="margin-top:12px">
-						<button class="action" id="btnPublish">发布（commit + push）</button>
+						<button class="action" id="btnPublish">立即发布（commit + push）</button>
+						<button class="action ghost" id="btnOpenActions">查看部署状态</button>
 						<span class="muted small">推送后 GitHub Actions 自动构建部署，约 1 分钟</span>
 					</div>
 				</div>
@@ -498,6 +512,37 @@
 					} else {
 						$("actionBox").textContent = "暂时取不到 Actions 状态（仓库需为公开，或网络不可达）。";
 					}
+
+					// 同步状态：顶部徽标 + 发布页说明
+					const syncBadge = $("syncBadge");
+					const pending = (data.ahead || 0) + (data.dirty ? 1 : 0);
+					if (pending > 0) {
+						syncBadge.textContent = `待同步 ${pending}`;
+						syncBadge.className = "badge dirty";
+					} else if ((data.behind || 0) > 0) {
+						syncBadge.textContent = `落后远端 ${data.behind}`;
+						syncBadge.className = "badge dirty";
+					} else {
+						syncBadge.textContent = "已同步";
+						syncBadge.className = "badge clean";
+					}
+					const actionState = data.action
+						? { success: "成功", failure: "失败", in_progress: "进行中", queued: "排队中" }[
+								data.action.conclusion || data.action.status
+							] ||
+							data.action.conclusion ||
+							data.action.status
+						: "未知";
+					$("syncBox").innerHTML = `
+						<div>分支 <code>${escapeHtml(data.branch)}</code> ·
+							${data.dirty ? `<b>${data.files.length}</b> 处未提交` : "工作区干净"} ·
+							待推送提交 <b>${data.ahead}</b> · 远端新提交 <b>${data.behind}</b></div>
+						<div style="margin-top:4px">最后提交：${data.lastCommitAt ? new Date(data.lastCommitAt).toLocaleString() : "未知"}</div>
+						<div style="margin-top:4px">最近一次部署：<b>${escapeHtml(actionState)}</b>${
+							data.action
+								? ` · <a href="${data.action.url}" target="_blank" rel="noopener">在 GitHub 查看 →</a>`
+								: ""
+						}</div>`;
 					await loadDiff();
 				} catch (error) {
 					toast(error.message, "err");
@@ -732,6 +777,7 @@
 					currentSlug = payload.slug;
 					await loadPosts();
 					await loadDiff();
+					scheduleAutoPublish(`feat: 更新文章「${payload.frontmatter.title}」`);
 				} catch (error) {
 					toast(error.message, "err");
 				}
@@ -744,6 +790,7 @@
 					$("editorCard").style.display = "none";
 					await loadPosts();
 					await loadDiff();
+					scheduleAutoPublish("chore: 删除文章");
 				} catch (error) {
 					toast(error.message, "err");
 				}
@@ -772,28 +819,19 @@
 						method: "POST",
 						body: { path: $("configSelect").value, content: $("configContent").value },
 					});
-					toast("配置已保存（到「发布」页推送后生效）", "ok");
+					toast("配置已保存（开启自动同步时会自动推送）", "ok");
 					await loadDiff();
+					scheduleAutoPublish(
+						`chore: 更新配置 ${$("configSelect").value.split("/").pop()}`,
+					);
 				} catch (error) {
 					toast(error.message, "err");
 				}
 			});
 
 			$("btnPublish").addEventListener("click", async () => {
-				const message = $("commitMessage").value.trim();
 				if (!confirm("确定提交并推送到 GitHub ？推送后会自动部署。")) return;
-				$("publishOutput").textContent = "正在提交并推送…";
-				try {
-					const result = await api("/api/publish", { method: "POST", body: { message } });
-					$("publishOutput").textContent = result.steps
-						.map((s) => `$ ${s.name}\n${s.stdout || ""}${s.stderr ? `\n${s.stderr}` : ""}`.trim())
-						.join("\n\n");
-					toast(result.message, result.ok ? "ok" : "err");
-					await loadStatus();
-				} catch (error) {
-					toast(error.message, "err");
-					$("publishOutput").textContent = error.message;
-				}
+				await doPublish($("commitMessage").value.trim());
 			});
 
 			// ── 公告 ───────────────────────────────────────────────────────
@@ -892,6 +930,7 @@
 				toast(okMessage || result.message, "ok");
 				await loadAnnouncements();
 				await loadDiff();
+				scheduleAutoPublish("feat: 更新公告");
 			}
 
 			// ── 音乐 ───────────────────────────────────────────────────────
@@ -959,6 +998,7 @@
 				toast(message || result.message, "ok");
 				await loadPlaylist();
 				await loadDiff();
+				scheduleAutoPublish("feat: 更新歌单");
 				if (closeEditor) {
 					songIndex = -1;
 					$("songEditor").style.display = "none";
@@ -1000,6 +1040,7 @@
 				});
 				toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
 				await loadDiff();
+				scheduleAutoPublish(`chore: 上传 ${result.name}`);
 				return result;
 			}
 
@@ -1356,6 +1397,113 @@
 				}
 				await loadMedia();
 			}
+
+			// ── 自动同步（保存后自动 commit + push） ────────────────────────
+			let autoPublishTimer = null;
+			let autoPublishMessage = "";
+			let actionsWatch = null;
+
+			function autoPublishEnabled() {
+				return $("autoPublish").checked;
+			}
+
+			$("autoPublish").checked = localStorage.getItem("admin-auto-publish") === "1";
+			$("autoPublish").addEventListener("change", () => {
+				try {
+					localStorage.setItem("admin-auto-publish", $("autoPublish").checked ? "1" : "0");
+				} catch {
+					// 忽略
+				}
+				toast(
+					$("autoPublish").checked
+						? "已开启自动同步：保存后自动提交并推送到 GitHub"
+						: "已关闭自动同步，改为手动点「立即发布」",
+					"ok",
+				);
+			});
+
+			/** 保存后安排一次自动发布；连续操作（如批量上传）会合并成一次提交 */
+			function scheduleAutoPublish(message) {
+				if (!autoPublishEnabled()) return;
+				autoPublishMessage = message || autoPublishMessage || "chore: 管理后台更新内容";
+				if (autoPublishTimer) clearTimeout(autoPublishTimer);
+				autoPublishTimer = setTimeout(() => {
+					autoPublishTimer = null;
+					const text = autoPublishMessage;
+					autoPublishMessage = "";
+					void doPublish(text);
+				}, 2500);
+			}
+
+			function formatSteps(steps) {
+				return (steps || [])
+					.map((s) => `$ ${s.name}\n${s.stdout || ""}${s.stderr ? `\n${s.stderr}` : ""}`.trim())
+					.join("\n\n");
+			}
+
+			async function doPublish(message) {
+				$("publishOutput").textContent = "正在提交并推送…";
+				try {
+					const result = await api("/api/publish", {
+						method: "POST",
+						body: { message: (message || $("commitMessage").value).trim() },
+					});
+					$("publishOutput").textContent = formatSteps(result.steps) || result.message;
+					toast(result.message, result.ok ? "ok" : "err");
+					await loadStatus();
+					if (result.ok && !result.dryRun) watchActions();
+					return result;
+				} catch (error) {
+					toast(error.message, "err");
+					$("publishOutput").textContent = error.message;
+					return { ok: false };
+				}
+			}
+
+			/** 推送后盯一会儿 Actions，构建结束再提示一次 */
+			function watchActions() {
+				if (actionsWatch) clearInterval(actionsWatch);
+				const startedAt = Date.now();
+				let tries = 0;
+				actionsWatch = setInterval(async () => {
+					tries += 1;
+					const data = await api("/api/status").catch(() => null);
+					const action = data && data.action;
+					const isNew = action && new Date(action.createdAt).getTime() >= startedAt - 60_000;
+					if (isNew && (action.conclusion === "success" || action.conclusion === "failure")) {
+						clearInterval(actionsWatch);
+						actionsWatch = null;
+						toast(
+							action.conclusion === "success"
+								? "✅ 部署完成，线上已更新"
+								: "❌ 部署失败，点「查看部署状态」看日志",
+							action.conclusion === "success" ? "ok" : "err",
+						);
+					} else if (tries > 30) {
+						clearInterval(actionsWatch);
+						actionsWatch = null;
+					}
+				}, 8000);
+			}
+
+			$("btnSync").addEventListener("click", async () => {
+				$("publishOutput").textContent = "正在从 GitHub 同步…";
+				try {
+					const result = await api("/api/sync", { method: "POST", body: {} });
+					$("publishOutput").textContent = formatSteps(result.steps) || result.message;
+					toast(result.message, result.ok ? "ok" : "err");
+					await loadStatus();
+				} catch (error) {
+					toast(error.message, "err");
+					$("publishOutput").textContent = error.message;
+				}
+			});
+
+			$("btnOpenActions").addEventListener("click", () => {
+				const link = $("actionBox").querySelector("a");
+				if (link) window.open(link.getAttribute("href"), "_blank");
+				else toast("暂时取不到部署链接（需要公开仓库且网络可达）", "err");
+			});
 
 			bindEditor();
 			loadStatus();
