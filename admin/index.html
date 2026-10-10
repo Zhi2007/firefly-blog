@@ -121,6 +121,8 @@
 		<nav>
 			<button data-tab="overview" class="active">概览</button>
 			<button data-tab="posts">文章</button>
+			<button data-tab="announce">公告</button>
+			<button data-tab="music">音乐</button>
 			<button data-tab="media">媒体</button>
 			<button data-tab="config">配置</button>
 			<button data-tab="publish">发布</button>
@@ -209,6 +211,110 @@
 							<div class="md-preview" id="mdPreview"></div>
 						</div>
 					</div>
+				</div>
+			</section>
+
+			<!-- 公告 -->
+			<section class="panel" id="panel-announce">
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">公告列表</h2>
+						<span class="muted small">勾选「固定」的那条会作为首访弹窗内容，新公告不会顶掉它</span>
+						<span style="flex:1"></span>
+						<button class="action" id="btnNewAnnounce">新增公告</button>
+					</div>
+					<table>
+						<thead><tr><th>标题</th><th>日期</th><th>类型</th><th>首访弹窗</th></tr></thead>
+						<tbody id="announceBody"></tbody>
+					</table>
+				</div>
+
+				<div class="card" id="announceEditor" style="display:none">
+					<div class="row">
+						<h2 style="margin:0" id="announceEditorTitle">编辑公告</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnCancelAnnounce">关闭</button>
+						<button class="action danger" id="btnDeleteAnnounce">删除</button>
+						<button class="action" id="btnSaveAnnounce">保存</button>
+					</div>
+					<div class="grid" style="margin-top:12px">
+						<div><label>标识 id（唯一，只能用字母数字 . _ -）</label><input id="aId" /></div>
+						<div><label>标题</label><input id="aTitle" /></div>
+						<div><label>发布日期</label><input id="aPublished" placeholder="2026-10-10" /></div>
+						<div><label>弹窗版本号（改动它，访客会重新看到弹窗）</label><input id="aVersion" /></div>
+						<div>
+							<label>类型（决定配色）</label>
+							<select id="aType">
+								<option value="info">info 普通</option>
+								<option value="success">success 完成</option>
+								<option value="warning">warning 提醒</option>
+								<option value="error">error 重要</option>
+							</select>
+						</div>
+						<div style="display:flex;align-items:flex-end">
+							<label style="display:flex;gap:6px;align-items:center;margin:0">
+								<input type="checkbox" id="aPinned" style="width:auto" /> 固定为弹窗公告
+							</label>
+						</div>
+					</div>
+					<div style="margin-top:10px">
+						<label>正文（空行分段，纯文本）</label>
+						<textarea id="aContent" rows="9"></textarea>
+					</div>
+					<div style="margin-top:10px">
+						<label>按钮链接</label>
+						<div id="aLinkRows"></div>
+						<button class="action ghost" id="btnAddLinkRow">添加一个链接</button>
+					</div>
+				</div>
+			</section>
+
+			<!-- 音乐 -->
+			<section class="panel" id="panel-music">
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">歌单</h2>
+						<span class="muted small">列表顺序 = 播放顺序；上传的音频放在 public/assets/music</span>
+						<span style="flex:1"></span>
+						<button class="action" id="btnNewSong">新增歌曲</button>
+					</div>
+					<table>
+						<thead><tr><th>歌曲</th><th>歌手</th><th>音频</th><th>封面/歌词</th><th>试听 / 操作</th></tr></thead>
+						<tbody id="musicBody"></tbody>
+					</table>
+				</div>
+
+				<div class="card" id="songEditor" style="display:none">
+					<div class="row">
+						<h2 style="margin:0" id="songEditorTitle">编辑歌曲</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnCancelSong">关闭</button>
+						<button class="action danger" id="btnDeleteSong">删除</button>
+						<button class="action" id="btnSaveSong">保存</button>
+					</div>
+					<div class="grid" style="margin-top:12px">
+						<div><label>歌名</label><input id="sName" /></div>
+						<div><label>歌手 / 作者</label><input id="sArtist" /></div>
+						<div>
+							<label>音频路径</label>
+							<input id="sUrl" placeholder="/assets/music/xxx.mp3" />
+							<label for="audioUpload" class="action ghost" style="cursor:pointer;margin-top:6px;display:inline-block">上传音频…</label>
+							<input type="file" id="audioUpload" accept="audio/*,.mp3,.m4a,.wav,.flac" style="display:none" />
+						</div>
+						<div>
+							<label>封面路径（可选）</label>
+							<input id="sCover" placeholder="/assets/music/cover/xxx.png" />
+							<label for="coverMusicUpload" class="action ghost" style="cursor:pointer;margin-top:6px;display:inline-block">上传封面…</label>
+							<input type="file" id="coverMusicUpload" accept="image/*" style="display:none" />
+						</div>
+						<div>
+							<label>歌词路径（可选，.lrc）</label>
+							<input id="sLrc" placeholder="/assets/music/lrc/xxx.lrc" />
+							<label for="lrcUpload" class="action ghost" style="cursor:pointer;margin-top:6px;display:inline-block">上传歌词…</label>
+							<input type="file" id="lrcUpload" accept=".lrc,.txt" style="display:none" />
+						</div>
+					</div>
+					<div id="songPreview" class="hint"></div>
 				</div>
 			</section>
 
@@ -558,6 +664,8 @@
 					btn.classList.add("active");
 					$(`panel-${btn.dataset.tab}`).classList.add("active");
 					if (btn.dataset.tab === "posts") await loadPosts();
+					if (btn.dataset.tab === "announce") await loadAnnouncements();
+					if (btn.dataset.tab === "music") await loadPlaylist();
 					if (btn.dataset.tab === "media") await loadMedia();
 					if (btn.dataset.tab === "config") await loadConfigList();
 					if (btn.dataset.tab === "publish") await loadDiff();
@@ -662,6 +770,322 @@
 				} catch (error) {
 					toast(error.message, "err");
 					$("publishOutput").textContent = error.message;
+				}
+			});
+
+			// ── 公告 ───────────────────────────────────────────────────────
+			let announceCache = [];
+			let announceIndex = -1;
+
+			function linkRow(link = {}) {
+				const div = document.createElement("div");
+				div.className = "row";
+				div.style.marginBottom = "6px";
+				div.dataset.linkRow = "1";
+				div.innerHTML = `
+					<input data-link-text placeholder="按钮文字" value="${escapeHtml(link.text || "")}" style="flex:1;min-width:120px" />
+					<input data-link-url placeholder="链接地址，如 /announcement/" value="${escapeHtml(link.url || "")}" style="flex:2;min-width:180px" />
+					<label style="display:flex;gap:4px;align-items:center;margin:0;white-space:nowrap">
+						<input type="checkbox" data-link-external style="width:auto" ${link.external ? "checked" : ""} /> 新窗口
+					</label>
+					<button class="action ghost" data-link-del>删除</button>`;
+				div.querySelector("[data-link-del]").addEventListener("click", () => div.remove());
+				return div;
+			}
+
+			function collectLinks() {
+				return Array.from($("aLinkRows").querySelectorAll("[data-link-row]"))
+					.map((row) => ({
+						text: row.querySelector("[data-link-text]").value.trim(),
+						url: row.querySelector("[data-link-url]").value.trim(),
+						external: row.querySelector("[data-link-external]").checked,
+					}))
+					.filter((link) => link.text && link.url);
+			}
+
+			async function loadAnnouncements() {
+				try {
+					const { items } = await api("/api/announcements");
+					announceCache = items;
+					$("announceBody").innerHTML = items.length
+						? items
+								.map(
+									(item, i) => `<tr class="clickable" data-i="${i}">
+										<td>${escapeHtml(item.title)}<div class="muted small">${escapeHtml(item.id)}</div></td>
+										<td>${escapeHtml(String(item.published || ""))}</td>
+										<td>${escapeHtml(item.type || "info")}</td>
+										<td>${item.pinned ? "✅ 固定" : "—"}</td>
+									</tr>`,
+								)
+								.join("")
+						: '<tr><td colspan="4" class="muted">还没有公告，点右上角「新增公告」</td></tr>';
+					$("announceBody")
+						.querySelectorAll("tr[data-i]")
+						.forEach((tr) =>
+							tr.addEventListener("click", () => openAnnouncement(Number(tr.dataset.i))),
+						);
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			function openAnnouncement(index) {
+				announceIndex = index;
+				const item = announceCache[index] || {};
+				$("aId").value = item.id || `notice-${Date.now().toString(36)}`;
+				$("aTitle").value = item.title || "";
+				$("aPublished").value =
+					String(item.published || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+				$("aVersion").value = item.version || "";
+				$("aType").value = item.type || "info";
+				$("aPinned").checked = item.pinned === true;
+				$("aContent").value = item.content || "";
+				$("aLinkRows").innerHTML = "";
+				(item.links || [{}]).forEach((link) => $("aLinkRows").appendChild(linkRow(link)));
+				$("announceEditor").style.display = "";
+				$("announceEditorTitle").textContent =
+					index >= 0 ? `编辑公告：${item.title || ""}` : "新增公告";
+				$("btnDeleteAnnounce").style.display = index >= 0 ? "" : "none";
+				$("announceEditor").scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+
+			function currentAnnouncement() {
+				return {
+					...(announceCache[announceIndex] || {}),
+					id: $("aId").value.trim(),
+					title: $("aTitle").value.trim(),
+					published: $("aPublished").value.trim(),
+					version: $("aVersion").value.trim(),
+					type: $("aType").value,
+					pinned: $("aPinned").checked,
+					content: $("aContent").value.trim(),
+					links: collectLinks(),
+				};
+			}
+
+			async function saveAnnouncements(items, okMessage) {
+				const result = await api("/api/announcements", { method: "POST", body: { items } });
+				announceCache = result.items;
+				toast(okMessage || result.message, "ok");
+				await loadAnnouncements();
+				await loadDiff();
+			}
+
+			// ── 音乐 ───────────────────────────────────────────────────────
+			let songCache = [];
+			let songIndex = -1;
+
+			/** 把站内公开路径转成仓库路径，用于本地试听 */
+			function publicToRepo(p) {
+				return p.startsWith("/") ? `public${p}` : p;
+			}
+
+			function audioSrc(url) {
+				return `/media-file?token=${TOKEN}&path=${encodeURIComponent(publicToRepo(url))}`;
+			}
+
+			async function loadPlaylist() {
+				try {
+					const { songs } = await api("/api/playlist");
+					songCache = songs;
+					$("musicBody").innerHTML = songs.length
+						? songs
+								.map(
+									(song, i) => `<tr>
+										<td>${escapeHtml(song.name)}</td>
+										<td class="muted small">${escapeHtml(song.artist || "-")}</td>
+										<td class="small">${escapeHtml(song.url)}</td>
+										<td class="small muted">${[song.cover ? "封面" : "", song.lrc ? "歌词" : ""].filter(Boolean).join(" / ") || "-"}</td>
+										<td>
+											<audio controls preload="none" src="${audioSrc(song.url)}" style="height:32px;max-width:180px"></audio>
+											<button class="action ghost" data-edit="${i}">编辑</button>
+											<button class="action ghost" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+											<button class="action ghost" data-down="${i}" ${i === songs.length - 1 ? "disabled" : ""}>↓</button>
+										</td>
+									</tr>`,
+								)
+								.join("")
+						: '<tr><td colspan="5" class="muted">还没有歌曲，点右上角「新增歌曲」上传一首</td></tr>';
+					$("musicBody")
+						.querySelectorAll("[data-edit]")
+						.forEach((btn) => btn.addEventListener("click", () => openSong(Number(btn.dataset.edit))));
+					$("musicBody").querySelectorAll("[data-up]").forEach((btn) =>
+						btn.addEventListener("click", async () => {
+							const i = Number(btn.dataset.up);
+							const next = [...songCache];
+							[next[i - 1], next[i]] = [next[i], next[i - 1]];
+							await saveSongs(next, "顺序已调整", false);
+						}),
+					);
+					$("musicBody").querySelectorAll("[data-down]").forEach((btn) =>
+						btn.addEventListener("click", async () => {
+							const i = Number(btn.dataset.down);
+							const next = [...songCache];
+							[next[i + 1], next[i]] = [next[i], next[i + 1]];
+							await saveSongs(next, "顺序已调整", false);
+						}),
+					);
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			async function saveSongs(songs, message, closeEditor = true) {
+				const result = await api("/api/playlist", { method: "POST", body: { songs } });
+				songCache = result.songs;
+				toast(message || result.message, "ok");
+				await loadPlaylist();
+				await loadDiff();
+				if (closeEditor) {
+					songIndex = -1;
+					$("songEditor").style.display = "none";
+				}
+			}
+
+			function openSong(index) {
+				songIndex = index;
+				const song = songCache[index] || {};
+				$("sName").value = song.name || "";
+				$("sArtist").value = song.artist || "";
+				$("sUrl").value = song.url || "";
+				$("sCover").value = song.cover || "";
+				$("sLrc").value = song.lrc || "";
+				$("songEditor").style.display = "";
+				$("songEditorTitle").textContent = index >= 0 ? `编辑歌曲：${song.name || ""}` : "新增歌曲";
+				$("btnDeleteSong").style.display = index >= 0 ? "" : "none";
+				updateSongPreview();
+				$("songEditor").scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+
+			function updateSongPreview() {
+				const url = $("sUrl").value.trim();
+				$("songPreview").innerHTML = url
+					? `本地试听：<audio controls preload="none" src="${audioSrc(url)}" style="height:32px;vertical-align:middle"></audio>`
+					: "上传音频后这里可以直接试听（保存并发布后线上才生效）";
+			}
+
+			async function uploadTo(dir, file) {
+				const dataBase64 = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(String(reader.result).split(",")[1]);
+					reader.onerror = reject;
+					reader.readAsDataURL(file);
+				});
+				const result = await api("/api/upload", {
+					method: "POST",
+					body: { dir, filename: file.name, dataBase64 },
+				});
+				toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
+				await loadDiff();
+				return result;
+			}
+
+			// 公告按钮
+			$("btnNewAnnounce").addEventListener("click", () => openAnnouncement(-1));
+			$("btnCancelAnnounce").addEventListener("click", () => {
+				$("announceEditor").style.display = "none";
+			});
+			$("btnAddLinkRow").addEventListener("click", () => $("aLinkRows").appendChild(linkRow()));
+			$("btnSaveAnnounce").addEventListener("click", async () => {
+				try {
+					const item = currentAnnouncement();
+					const items = [...announceCache];
+					const isNew = announceIndex < 0;
+					if (isNew) items.unshift(item);
+					else items[announceIndex] = item;
+					await saveAnnouncements(items, isNew ? "公告已新增" : "公告已更新");
+					announceIndex = -1;
+					$("announceEditor").style.display = "none";
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+			$("btnDeleteAnnounce").addEventListener("click", async () => {
+				if (announceIndex < 0) return;
+				const item = announceCache[announceIndex];
+				if (!confirm(`确定删除公告「${item.title}」？`)) return;
+				try {
+					await saveAnnouncements(
+						announceCache.filter((_, i) => i !== announceIndex),
+						"公告已删除",
+					);
+					announceIndex = -1;
+					$("announceEditor").style.display = "none";
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+
+			// 音乐按钮
+			$("btnNewSong").addEventListener("click", () => openSong(-1));
+			$("btnCancelSong").addEventListener("click", () => {
+				$("songEditor").style.display = "none";
+			});
+			$("sUrl").addEventListener("input", updateSongPreview);
+			$("audioUpload").addEventListener("change", async (e) => {
+				const file = (e.target.files || [])[0];
+				if (!file) return;
+				try {
+					const result = await uploadTo("music", file);
+					$("sUrl").value = result.path;
+					if (!$("sName").value.trim()) $("sName").value = file.name.replace(/\.[^.]+$/, "");
+					updateSongPreview();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+				e.target.value = "";
+			});
+			$("coverMusicUpload").addEventListener("change", async (e) => {
+				const file = (e.target.files || [])[0];
+				if (!file) return;
+				try {
+					const result = await uploadTo("music-cover", file);
+					$("sCover").value = result.path;
+				} catch (error) {
+					toast(error.message, "err");
+				}
+				e.target.value = "";
+			});
+			$("lrcUpload").addEventListener("change", async (e) => {
+				const file = (e.target.files || [])[0];
+				if (!file) return;
+				try {
+					const result = await uploadTo("music-lrc", file);
+					$("sLrc").value = result.path;
+				} catch (error) {
+					toast(error.message, "err");
+				}
+				e.target.value = "";
+			});
+			$("btnSaveSong").addEventListener("click", async () => {
+				try {
+					const song = {
+						name: $("sName").value.trim(),
+						artist: $("sArtist").value.trim(),
+						url: $("sUrl").value.trim(),
+						cover: $("sCover").value.trim(),
+						lrc: $("sLrc").value.trim(),
+					};
+					const songs = [...songCache];
+					const isNew = songIndex < 0;
+					if (isNew) songs.push(song);
+					else songs[songIndex] = song;
+					await saveSongs(songs, isNew ? "歌曲已添加" : "歌曲已更新");
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+			$("btnDeleteSong").addEventListener("click", async () => {
+				if (songIndex < 0) return;
+				const song = songCache[songIndex];
+				if (!confirm(`从歌单移除「${song.name}」？（音频文件不会被删除）`)) return;
+				try {
+					await saveSongs(
+						songCache.filter((_, i) => i !== songIndex),
+						"已从歌单移除",
+					);
+				} catch (error) {
+					toast(error.message, "err");
 				}
 			});
 

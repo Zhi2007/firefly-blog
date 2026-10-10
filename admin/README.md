@@ -22,11 +22,24 @@ node admin/server.mjs --port=8899 --no-open
 | --- | --- |
 | **概览** | 仓库/分支/未提交改动、最近提交、最近一次 GitHub Actions 部署状态；本地预览、本地构建、类型检查 |
 | **文章** | 列表 / 新建 / 编辑 / 删除；标题、日期、摘要、标签、分类、封面、草稿、置顶；Markdown 正文 + 实时预览；封面直接上传 |
+| **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾选「固定为弹窗公告」的那条会作为首访弹窗内容；改动「弹窗版本号」会让所有访客重新看到一次弹窗 |
+| **音乐** | 上传音频/封面/歌词并加入歌单，编辑歌曲信息、调整播放顺序、**本地直接试听**；数据写到 `src/config/music-playlist.json` |
 | **媒体** | 分类查看文章图片、音乐、封面、歌词、头像目录；上传（可多选）、复制路径、删除 |
-| **配置** | 直接编辑 `src/config/*` 里的常用配置文件（含 `FooterConfig.html`） |
+| **配置** | 直接编辑 `src/config/*` 里的常用配置文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
 | **发布** | 查看改动 diff、填提交说明、一键 `commit + push`，并显示执行日志 |
 
 发布后 GitHub Actions 会自动构建并部署到 Cloudflare（约 1 分钟），无需在本地安装 pnpm。
+
+## 数据放在哪
+
+为了不让你（或我）去改 TS 源码，公告与歌单的数据被单独抽成了 JSON，管理面板只读写这两个文件：
+
+| 文件 | 内容 | 谁在用 |
+| --- | --- | --- |
+| `src/config/announcements.json` | 公告列表（含固定公告） | `announcementConfig.ts` 导入 → 首访弹窗 / 公告页 / 侧边栏 |
+| `src/config/music-playlist.json` | 歌单 | `musicConfig.ts` 导入 → 悬浮播放器 |
+
+其它配置（站点信息、导航、个人信息…）仍然在 `src/config/*.ts` 里，用「配置」页的编辑器改。
 
 ## 安全说明
 

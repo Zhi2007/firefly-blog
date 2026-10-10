@@ -13,6 +13,7 @@
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,8 @@ const CONFIG_FILES = [
 	"src/config/profileConfig.ts",
 	"src/config/sidebarConfig.ts",
 	"src/config/announcementConfig.ts",
+	"src/config/announcements.json",
+	"src/config/music-playlist.json",
 	"src/config/commentConfig.ts",
 	"src/config/analyticsConfig.ts",
 	"src/config/effectsConfig.ts",
@@ -68,6 +71,83 @@ const MEDIA_URL_PREFIX = {
 
 function mediaUrl(dirKey, name) {
 	return `${MEDIA_URL_PREFIX[dirKey] ?? "/"}${name}`;
+}
+
+// ── 后台直接维护的数据文件 ──────────────────────────────────────────────────
+// 公告与歌单单独存 JSON，由 Admin 读写，避免去改写 TS 源码（改错了会直接构建失败）
+const DATA_FILES = {
+	announcements: "src/config/announcements.json",
+	playlist: "src/config/music-playlist.json",
+};
+
+async function readJsonData(key) {
+	const text = await fs.readFile(safeResolve(DATA_FILES[key]), "utf-8");
+	const value = JSON.parse(text);
+	return Array.isArray(value) ? value : [];
+}
+
+async function writeJsonData(key, value) {
+	// 制表符缩进，和仓库里其它 JSON 保持一致
+	await fs.writeFile(
+		safeResolve(DATA_FILES[key]),
+		`${JSON.stringify(value, null, "\t")}\n`,
+		"utf-8",
+	);
+}
+
+/** 清洗公告数据：校验必填字段、只允许一条固定公告 */
+function sanitizeAnnouncements(input) {
+	if (!Array.isArray(input)) throw new Error("公告数据必须是数组");
+	let pinned = 0;
+	const items = input.map((raw) => {
+		const id = String(raw?.id ?? "").trim();
+		const title = String(raw?.title ?? "").trim();
+		const content = String(raw?.content ?? "").trim();
+		if (!id || !title || !content) throw new Error("每条公告都需要「id / 标题 / 正文」");
+		if (!/^[A-Za-z0-9._-]+$/.test(id)) {
+			throw new Error(`公告 id 只能包含字母、数字、点、下划线、连字符：${id}`);
+		}
+		const item = { id, title, published: String(raw?.published ?? "").trim() || new Date().toISOString().slice(0, 10) };
+		const version = String(raw?.version ?? "").trim();
+		if (version) item.version = version;
+		if (raw?.pinned) {
+			pinned += 1;
+			item.pinned = true;
+		}
+		const type = String(raw?.type ?? "").trim();
+		if (type) item.type = type;
+		item.content = content;
+		const links = (Array.isArray(raw?.links) ? raw.links : [])
+			.filter((l) => l && String(l.text ?? "").trim() && String(l.url ?? "").trim())
+			.map((l) => ({
+				text: String(l.text).trim(),
+				url: String(l.url).trim(),
+				...(l.external ? { external: true } : {}),
+			}));
+		if (links.length > 0) item.links = links;
+		return item;
+	});
+	if (pinned > 1) throw new Error(`固定公告只能有一条，当前勾选了 ${pinned} 条`);
+	return items;
+}
+
+/** 清洗歌单数据：名称与链接必填 */
+function sanitizePlaylist(input) {
+	if (!Array.isArray(input)) throw new Error("歌单数据必须是数组");
+	return input.map((raw) => {
+		const name = String(raw?.name ?? "").trim();
+		const url = String(raw?.url ?? "").trim();
+		if (!name || !url) throw new Error("每首歌都需要「歌名」和「音频路径」");
+		if (!/^(\/|https?:|\.\/)/.test(url)) {
+			throw new Error(`音频路径要以 / 或 http(s) 开头：${url}`);
+		}
+		const song = { name, artist: String(raw?.artist ?? "").trim(), url };
+		const cover = String(raw?.cover ?? "").trim();
+		if (cover) song.cover = cover;
+		const lrc = String(raw?.lrc ?? "").trim();
+		if (lrc) song.lrc = lrc;
+		return song;
+	});
 }
 
 // ── 小工具 ──────────────────────────────────────────────────────────────────
@@ -520,6 +600,86 @@ const server = createServer(async (req, res) => {
 				const file = safeResolve(repoPath);
 				if (await exists(file)) await fs.rm(file, { force: true });
 				sendJson(res, 200, { ok: true });
+				return;
+			}
+
+			case "/api/announcements": {
+				if (req.method === "GET") {
+					sendJson(res, 200, { items: await readJsonData("announcements") });
+					return;
+				}
+				const items = sanitizeAnnouncements(body.items);
+				await writeJsonData("announcements", items);
+				sendJson(res, 200, {
+					ok: true,
+					items,
+					message: `已保存 ${items.length} 条公告${items.some((i) => i.pinned) ? "（含 1 条固定公告）" : "（没有固定公告）"}`,
+				});
+				return;
+			}
+
+			case "/api/playlist": {
+				if (req.method === "GET") {
+					sendJson(res, 200, { songs: await readJsonData("playlist") });
+					return;
+				}
+				const songs = sanitizePlaylist(body.songs);
+				await writeJsonData("playlist", songs);
+				sendJson(res, 200, { ok: true, songs, message: `已保存 ${songs.length} 首歌` });
+				return;
+			}
+
+			case "/media-file": {
+				// 本地试听/预览：把媒体目录里的文件读出来（管理面板不是静态服务器，不能直接开 /assets 路径）
+				const repoPath = url.searchParams.get("path");
+				const allowed = Object.values(MEDIA_DIRS).some((dir) =>
+					repoPath?.startsWith(`${dir}/`),
+				);
+				if (!repoPath || !allowed) {
+					sendJson(res, 400, { error: "只能读取媒体目录里的文件" });
+					return;
+				}
+				const file = safeResolve(repoPath);
+				const stat = await fs.stat(file).catch(() => null);
+				if (!stat || !stat.isFile()) {
+					sendJson(res, 404, { error: "文件不存在" });
+					return;
+				}
+				const types = {
+					".mp3": "audio/mpeg",
+					".m4a": "audio/mp4",
+					".aac": "audio/aac",
+					".wav": "audio/wav",
+					".flac": "audio/flac",
+					".ogg": "audio/ogg",
+					".png": "image/png",
+					".jpg": "image/jpeg",
+					".jpeg": "image/jpeg",
+					".webp": "image/webp",
+					".gif": "image/gif",
+					".lrc": "text/plain; charset=utf-8",
+				};
+				const headers = {
+					"Content-Type":
+						types[path.extname(file).toLowerCase()] || "application/octet-stream",
+					"Accept-Ranges": "bytes",
+					"Cache-Control": "no-store",
+				};
+				const range = req.headers.range;
+				const match = range ? /bytes=(\d*)-(\d*)/.exec(range) : null;
+				if (match) {
+					const start = match[1] ? Number(match[1]) : 0;
+					const end = match[2] ? Number(match[2]) : stat.size - 1;
+					res.writeHead(206, {
+						...headers,
+						"Content-Range": `bytes ${start}-${end}/${stat.size}`,
+						"Content-Length": end - start + 1,
+					});
+					createReadStream(file, { start, end }).pipe(res);
+				} else {
+					res.writeHead(200, { ...headers, "Content-Length": stat.size });
+					createReadStream(file).pipe(res);
+				}
 				return;
 			}
 
