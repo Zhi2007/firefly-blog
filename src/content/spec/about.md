@@ -9,6 +9,7 @@
 ## 我的链接
 
 - GitHub：<https://github.com/Zhi2007>
+- 哔哩哔哩：<https://space.bilibili.com/502912899>
 - 本站源码：<https://github.com/Zhi2007/firefly-blog>
 - 问题反馈：<https://github.com/Zhi2007/firefly-blog/issues>
 - 留言板：<https://my-blog.mc20070831.workers.dev/guestbook/>
