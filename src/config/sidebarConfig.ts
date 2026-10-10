@@ -47,8 +47,8 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：公告组件
 			type: "announcement",
-			// 是否启用该组件
-			enable: true,
+			// 是否启用该组件（已关闭：公告只在顶部导航栏与首访弹窗里展示，不再占侧边栏）
+			enable: false,
 			// 组件位置
 			position: "top",
 			// 是否在文章详情页显示
@@ -245,8 +245,8 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：公告组件
 			type: "announcement",
-			// 是否启用该组件
-			enable: true,
+			// 是否启用该组件（已关闭：公告只在顶部导航栏与首访弹窗里展示，不再占侧边栏）
+			enable: false,
 			// 是否在文章详情页显示
 			showOnPostPage: true,
 		},
