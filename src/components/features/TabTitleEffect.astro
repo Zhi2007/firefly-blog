@@ -1,0 +1,40 @@
+---
+// 切到别的标签页时轮播浏览器标题，回来立刻恢复
+// 配置见 src/config/effectsConfig.ts 的 tabTitleConfig
+---
+
+<script>
+	import { tabTitleConfig } from "@/config";
+
+	if (tabTitleConfig.enable && tabTitleConfig.titles.length > 0) {
+		const w = window as unknown as { __tabTitleBound?: boolean };
+
+		// Swup 切页会重新执行脚本，这里保证事件只绑定一次
+		if (!w.__tabTitleBound) {
+			w.__tabTitleBound = true;
+
+			const cfg = tabTitleConfig;
+			let timer: number | null = null;
+			let index = 0;
+			let titleBeforeHide = document.title;
+
+			// visibilitychange 在切标签、最小化、手机切后台时都会触发
+			document.addEventListener("visibilitychange", () => {
+				if (document.hidden) {
+					titleBeforeHide = document.title;
+					index = 0;
+					document.title = cfg.titles[index++ % cfg.titles.length];
+					timer = window.setInterval(() => {
+						document.title = cfg.titles[index++ % cfg.titles.length];
+					}, cfg.intervalMs);
+				} else {
+					if (timer !== null) {
+						window.clearInterval(timer);
+						timer = null;
+					}
+					document.title = titleBeforeHide;
+				}
+			});
+		}
+	}
+</script>

@@ -1,0 +1,15 @@
+---
+interface Props {
+	token: string;
+}
+
+const { token } = Astro.props;
+---
+
+<!-- Cloudflare Web Analytics：免费、无 cookie，token 在 src/config/analyticsConfig.ts 里配置 -->
+<script
+	is:inline
+	data-swup-ignore-script
+	type="module"
+	src="https://static.cloudflareinsights.com/beacon.min.js"
+	data-cf-beacon={JSON.stringify({ token })}></script>
