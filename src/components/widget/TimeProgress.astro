@@ -98,20 +98,21 @@ const rows = [
 				const text = row.querySelector("[data-text]");
 				if (text) text.textContent = `${pct.toFixed(kind === "day" ? 1 : 2)}%`;
 
-				// 剩余时间：今日只到「时:分」，本月「还剩 X 天 Y 小时」，本年「还剩 X 天」
+				// 剩余时间：统一用「距离下一X还剩」的句式
+				// 今日只到「时:分」，本月「X 天 Y 小时」，本年「X 天」
 				const remain = row.querySelector("[data-remaining]");
 				if (remain && cfg.showRemaining) {
 					const left = Math.max(0, end.getTime() - now.getTime());
 					if (kind === "day") {
-						remain.textContent = `距明天还有 ${pad(Math.floor(left / 3600000))}:${pad(
-							Math.floor((left % 3600000) / 60000),
-						)}`;
+						remain.textContent = `距离下一天还剩 ${pad(
+							Math.floor(left / 3600000),
+						)}:${pad(Math.floor((left % 3600000) / 60000))}`;
 					} else if (kind === "month") {
-						remain.textContent = `还剩 ${Math.floor(left / 86400000)} 天 ${Math.floor(
-							(left % 86400000) / 3600000,
-						)} 小时`;
+						remain.textContent = `距离下一月还剩 ${Math.floor(
+							left / 86400000,
+						)} 天 ${Math.floor((left % 86400000) / 3600000)} 小时`;
 					} else {
-						remain.textContent = `还剩 ${Math.ceil(left / 86400000)} 天`;
+						remain.textContent = `距离下一年还剩 ${Math.ceil(left / 86400000)} 天`;
 					}
 				}
 			}
