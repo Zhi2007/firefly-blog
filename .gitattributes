@@ -1,2 +1,6 @@
 *.js linguist-language=astro
 * text=auto eol=lf
+
+# 批处理文件必须带 CRLF，否则 cmd.exe 解析中文/括号块会出错（放在最后以覆盖上面的 * 规则）
+*.cmd text eol=crlf
+*.bat text eol=crlf
