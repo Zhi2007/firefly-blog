@@ -371,6 +371,11 @@ const managerConfigStr = JSON.stringify({
                 if (ct >= state.lyrics[i].time) idx = i;
                 else break;
             }
+            // 原文与翻译常常共用同一个时间戳，上面的循环会停在该组的最后一行（翻译），
+            // 这里回退到同时间戳的第一行，保证高亮始终落在原文上
+            while (idx > 0 && state.lyrics[idx - 1].time === state.lyrics[idx].time) {
+                idx--;
+            }
             if (idx !== state.currentLrcIndex) {
                 state.currentLrcIndex = idx;
                 emit('fm:lrc-index', { index: idx });
