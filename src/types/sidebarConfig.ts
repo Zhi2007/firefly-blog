@@ -10,6 +10,7 @@ export type WidgetComponentType =
 	| "calendar"
 	| "music"
 	| "siteInfo"
+	| "timeProgress"
 	| "dynamic";
 
 export type WidgetComponentConfig = {

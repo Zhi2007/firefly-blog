@@ -1,7 +1,6 @@
 ---
 import fs from "node:fs";
 import path from "node:path";
-import TimeProgress from "@components/features/TimeProgress.astro";
 import { profileConfig } from "@/config";
 import { url } from "@/utils/url-utils";
 
@@ -40,8 +39,6 @@ try {
 			<div class="mb-2">
 				{customFooterHtml && <div set:html={customFooterHtml} />}
 			</div>
-			<!-- 页脚时间进度（今日 / 本月 / 本年），配置见 src/config/effectsConfig.ts -->
-			<TimeProgress />
 			<div class="mx-0.5 my-2.5 flex gap-x-2 gap-y-2.5 justify-center flex-wrap">
 				&copy; <span id="copyright-year">{currentYear}</span>
 				{profileConfig.name}. All Rights Reserved.
