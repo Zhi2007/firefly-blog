@@ -1,0 +1,27 @@
+# 安全响应头
+#
+# Cloudflare Workers 静态资源会在构建产物里解析这个文件，规则应用到所有静态资源响应
+# （这个文件本身不会被当成资源提供）。
+#
+# 关于「防 DNS 污染/劫持」：域名被解析到假 IP 时，光靠 DNS 没法拦住，
+# 但下面这些头能让浏览器**拒绝**那个假站点：
+#   1) HSTS：强制 HTTPS，且浏览器以后只用 HTTPS 访问，防降级/SSL 剥离
+#   2) CSP（下面以 Report-Only 观察）：限制页面能加载哪些外部来源，防注入
+#   3) nosniff / frame-ancestors：防 MIME 嗅探与点击劫持
+
+/*
+	Strict-Transport-Security: max-age=15552000; includeSubDomains
+	X-Content-Type-Options: nosniff
+	Referrer-Policy: strict-origin-when-cross-origin
+	X-Frame-Options: SAMEORIGIN
+	Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+	X-XSS-Protection: 0
+	Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
+
+# 带内容哈希的构建产物可以长期缓存（文件名变了 URL 就变，安全）
+/_astro/*
+	Cache-Control: public, max-age=31536000, immutable
+
+# 站内搜索的静态索引也带哈希目录，可以缓存
+/pagefind/*
+	Cache-Control: public, max-age=604800
