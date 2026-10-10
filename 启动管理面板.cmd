@@ -1,23 +1,30 @@
 @echo off
-chcp 65001 >nul
-title æ €æµ·åšå®¢ Â· ç®¡ç†åå°
+chcp 936 >nul
+title èÙº£²©¿Í ¡¤ ¹ÜÀíºóÌ¨
 cd /d "%~dp0"
 
 echo.
-echo   æ­£åœ¨å¯åŠ¨æœ¬åœ°ç®¡ç†åå°ï¼Œè¯·ç¨å€™â€¦
-echo   ï¼ˆè¿™ä¸ªé»‘çª—å£è¦ä¸€ç›´å¼€ç€ï¼Œå…³é—­å®ƒå°±ç­‰äºå…³é—­åå°ï¼‰
+echo   ÕıÔÚÆô¶¯±¾µØ¹ÜÀíºóÌ¨£¬ÇëÉÔºò¡­
+echo   £¨Õâ¸ö´°¿ÚÒªÒ»Ö±¿ª×Å£¬¹ØµôËü¾ÍµÈÓÚ¹Ø±ÕºóÌ¨£©
 echo.
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo   [é”™è¯¯] æ²¡æœ‰æ‰¾åˆ° nodeã€‚è¯·å…ˆå®‰è£… Node.jsï¼šhttps://nodejs.org/
+  echo   [´íÎó] Ã»ÓĞÕÒµ½ Node.js£¬ÇëÏÈ°²×°£ºhttps://nodejs.org/
   echo.
   pause
   exit /b 1
 )
 
-node "admin\server.mjs"
+if not exist "admin\server.mjs" (
+  echo   [´íÎó] ÕÒ²»µ½ admin\server.mjs£¬Çë°Ñ±¾ÎÄ¼ş·ÅÔÚÏîÄ¿¸ùÄ¿Â¼ÔÙÔËĞĞ¡£
+  echo.
+  pause
+  exit /b 1
+)
+
+node "admin\server.mjs" %*
 
 echo.
-echo   åå°å·²åœæ­¢ã€‚
+echo   ºóÌ¨ÒÑÍ£Ö¹¡£
 pause
