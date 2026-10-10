@@ -26,7 +26,7 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	playMode: "list",
 
 	// 是否显启用歌词
-	showLyrics: false,
+	showLyrics: true,
 
 	// Meting API 配置（mode 为 "meting" 时使用）
 	meting: {
@@ -48,22 +48,17 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	},
 
 	// 本地音乐列表（mode 为 "local" 时使用）
-	// 加歌示例（把下面三条前面的 // 去掉并改成你自己的信息即可）：
-	// {
-	// 	name: "歌曲名",
-	// 	artist: "歌手",
-	// 	url: "/assets/music/your-song.mp3",
-	// 	cover: "/assets/music/cover/your-cover.jpg",
-	// 	lrc: "/assets/music/lrc/your-song.lrc",
-	// },
-local: {
-	playlist: [
-		{
-			name: "All Eyes On Me",
-			artist: "T.T. STAR; Sunnie; Chaerin; ZENA",
-			url: "/assets/music/All Eyes On Me.mp3",
-			cover: "/assets/music/cover/All Eyes On Me.png",
-			lrc: "/assets/music/lrc/All Eyes On Me.lrc",
-		},
-	],
-},
+	// 再加一首歌：复制下面这一整块（含大括号和逗号）改内容即可，
+	// 注意别忘了文件末尾的 `};`，否则 TypeScript 语法不完整、构建会直接失败。
+	local: {
+		playlist: [
+			{
+				name: "All Eyes On Me",
+				artist: "T.T. STAR; Sunnie; Chaerin; ZENA",
+				url: "/assets/music/all-eyes-on-me.mp3",
+				cover: "/assets/music/cover/all-eyes-on-me.png",
+				lrc: "/assets/music/lrc/all-eyes-on-me.lrc",
+			},
+		],
+	},
+};
