@@ -15,9 +15,19 @@ pnpm install     # 需要 Node ≥ 22.23 与 pnpm
 pnpm dev         # 本地开发：http://localhost:4321
 pnpm build       # 完整构建：LQIP → Astro → 字体子集化 → Pagefind 索引
 pnpm preview     # 预览构建产物
+pnpm admin       # 图形化管理后台（也可双击根目录的「启动管理面板.cmd」）
 ```
 
 > 必须用 **pnpm**（`package.json` 里的 `preinstall` 会拦住 npm/yarn）。首次安装约几百 MB，首次构建约 1–3 分钟。
+
+## 图形化管理后台（推荐）
+
+不想敲命令就用它：写文章、传图片/音乐、改配置、一键发布，全部在浏览器里点。
+
+- **启动**：双击项目根目录的 `启动管理面板.cmd`，或执行 `node admin/server.mjs`
+- **发布**：后台里点一下 = `git commit + push`，之后 GitHub Actions 自动构建并部署（约 1 分钟），本地不需要装 pnpm
+- **安全**：只监听 `127.0.0.1`，每次启动生成一次性访问令牌，不暴露到公网
+- 详细介绍见 [admin/README.md](./admin/README.md)
 
 ## 写一篇文章
 
