@@ -34,7 +34,7 @@ export type TimeProgressConfig = {
 		month: string; // 本月那一行的文字
 		year: string; // 本年那一行的文字
 	};
-	showRemaining: boolean; // true：今天显示「距明天还有 时:分:秒」，本月/本年显示「还剩 N 天」
+	showRemaining: boolean; // true：今日「距明天还有 时:分」，本月「还剩 X 天 Y 小时」，本年「还剩 X 天」
 };
 
 // 切换浏览器标签页时的标题轮播
