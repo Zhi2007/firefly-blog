@@ -70,6 +70,37 @@ function splitNull(buffer, encoding) {
 
 const LRC_TIME = /\[\d{1,2}:\d{1,2}(?:[.:]\d{1,3})?\]/;
 
+// 逐字（karaoke / 增强型 LRC）时间标签：<mm:ss.xx> 或 (mm:ss.xx)
+const KARAOKE_TAG_RE = /[<(]\s*\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\s*[>)]/g;
+// 任意 [mm:ss.xx] 标签
+const TIME_TAG_RE = /\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]/g;
+// 行首时间标签（可连续多条，表示重复段落）
+const LEADING_TIME_RE = /^\s*\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/;
+
+/**
+ * 清洗逐字歌词：保留行首时间标签，去掉 <mm:ss.xx> 以及在正文中间的 [mm:ss.xx]。
+ * 逐字标签只是给播放器做卡拉OK高亮用的，直接显示会把时间文本也带出来。
+ */
+export function cleanLrcText(text) {
+	if (!text) return text;
+	return text
+		.split(/\r?\n/)
+		.map((line) => {
+			const leading = [];
+			let rest = line;
+			for (;;) {
+				const m = LEADING_TIME_RE.exec(rest);
+				if (!m) break;
+				leading.push(m[0].trim());
+				rest = rest.slice(m[0].length);
+			}
+			rest = rest.replace(KARAOKE_TAG_RE, "").replace(TIME_TAG_RE, "").trim();
+			return leading.join("") + rest;
+		})
+		.filter((line) => line.trim() !== "")
+		.join("\n");
+}
+
 function guessLyricsKind(text) {
 	return LRC_TIME.test(text) ? "synced" : "plain";
 }
@@ -336,13 +367,19 @@ function parseMp4(buffer) {
  */
 export function extractAudioMeta(buffer) {
 	const empty = { title: "", artist: "", cover: null, lyrics: null, format: "unknown" };
+	const finish = (meta, format) => {
+		if (meta.lyrics && meta.lyrics.text) {
+			meta.lyrics = { kind: meta.lyrics.kind, text: cleanLrcText(meta.lyrics.text) };
+		}
+		return { ...empty, ...meta, format };
+	};
 	try {
 		const id3 = parseId3(buffer);
-		if (id3) return { ...empty, ...id3, format: "mp3" };
+		if (id3) return finish(id3, "mp3");
 		const flac = parseFlac(buffer);
-		if (flac) return { ...empty, ...flac, format: "flac" };
+		if (flac) return finish(flac, "flac");
 		const mp4 = parseMp4(buffer);
-		if (mp4) return { ...empty, ...mp4, format: "m4a/mp4" };
+		if (mp4) return finish(mp4, "m4a/mp4");
 	} catch {
 		// 遇到坏文件就当没有元数据
 	}

@@ -71,25 +71,41 @@ const managerConfigStr = JSON.stringify({
         return min + ':' + (sec < 10 ? '0' : '') + sec;
     }
 
+    // 行首时间标签（可连续多条，表示同一句歌词重复出现）
+    var LEADING_TIME_RE = /^\s*\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]\s*/;
+    // 逐字（卡拉OK / 增强型 LRC）标签：<mm:ss.xx> 或 (mm:ss.xx)
+    var KARAOKE_TAG_RE = /[<(]\s*\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\s*[>)]/g;
+    // 出现在正文中间的 [mm:ss.xx] 标签
+    var INLINE_TIME_RE = /\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]/g;
+
+    function lrcTime(min, sec, frac) {
+        var value = parseInt(min, 10) * 60 + parseInt(sec, 10);
+        if (frac) {
+            var n = parseInt(frac, 10);
+            value += frac.length === 3 ? n / 1000 : frac.length === 2 ? n / 100 : n / 10;
+        }
+        return value;
+    }
+
     function parseLRC(lrc) {
         if (!lrc) return [];
-        var lines = lrc.split('\n');
         var result = [];
-        var timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/g;
-        lines.forEach(function (line) {
-            var matches = Array.from(line.matchAll(timeReg));
-            if (matches.length > 0) {
-                var text = line.replace(timeReg, '').trim();
-                if (text) {
-                    matches.forEach(function (match) {
-                        var m = parseInt(match[1]);
-                        var s = parseInt(match[2]);
-                        var ms = parseInt(match[3]);
-                        var time = m * 60 + s + ms / (match[3].length === 3 ? 1000 : 100);
-                        result.push({ time: time, text: text });
-                    });
-                }
+        lrc.split('\n').forEach(function (line) {
+            // 1) 只把行首连续的时间标签当作这一句的时间
+            var stamps = [];
+            var rest = line;
+            for (;;) {
+                var match = LEADING_TIME_RE.exec(rest);
+                if (!match) break;
+                stamps.push(lrcTime(match[1], match[2], match[3]));
+                rest = rest.slice(match[0].length);
             }
+            // 2) 清掉逐字标签和正文中间的标签，否则这些时间会被当成歌词文本显示出来
+            var text = rest.replace(KARAOKE_TAG_RE, '').replace(INLINE_TIME_RE, '').trim();
+            if (!text || stamps.length === 0) return;
+            stamps.forEach(function (time) {
+                result.push({ time: time, text: text });
+            });
         });
         return result.sort(function (a, b) { return a.time - b.time; });
     }
