@@ -17,6 +17,7 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -71,6 +72,50 @@ const MEDIA_URL_PREFIX = {
 
 function mediaUrl(dirKey, name) {
 	return `${MEDIA_URL_PREFIX[dirKey] ?? "/"}${name}`;
+}
+
+const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
+
+/**
+ * 从上传的音频里提取封面与歌词并落盘，返回可直接写进歌单的路径。
+ * 有时间戳的歌词直接写成 .lrc；纯文本歌词返回给前端，由前端补上音频时长后再生成。
+ */
+async function extractAndStoreAudio(buffer, audioFileName) {
+	const base = path.basename(audioFileName).replace(/\.[^.]+$/, "");
+	const meta = extractAudioMeta(buffer);
+	let cover = null;
+	let lrc = null;
+
+	if (meta.cover && meta.cover.data?.length > 0) {
+		const coverName = `${base}.${mimeToExt(meta.cover.mime)}`;
+		await fs.mkdir(safeResolve("public/assets/music/cover"), { recursive: true });
+		await fs.writeFile(
+			safeResolve(`public/assets/music/cover/${coverName}`),
+			meta.cover.data,
+		);
+		cover = `/assets/music/cover/${coverName}`;
+	}
+
+	if (meta.lyrics && meta.lyrics.kind === "synced" && meta.lyrics.text.trim()) {
+		const lrcName = `${base}.lrc`;
+		await fs.mkdir(safeResolve("public/assets/music/lrc"), { recursive: true });
+		await fs.writeFile(
+			safeResolve(`public/assets/music/lrc/${lrcName}`),
+			meta.lyrics.text,
+			"utf-8",
+		);
+		lrc = `/assets/music/lrc/${lrcName}`;
+	}
+
+	return {
+		audioFormat: meta.format,
+		extractedTitle: meta.title || "",
+		extractedArtist: meta.artist || "",
+		cover,
+		lrc,
+		plainLyrics:
+			meta.lyrics && meta.lyrics.kind === "plain" ? meta.lyrics.text : null,
+	};
 }
 
 // ── 后台直接维护的数据文件 ──────────────────────────────────────────────────
@@ -574,12 +619,18 @@ const server = createServer(async (req, res) => {
 				await fs.mkdir(path.dirname(target), { recursive: true });
 				const buffer = Buffer.from(dataBase64, "base64");
 				await fs.writeFile(target, buffer);
+				// 音频自动提取封面（APIC/FLAC PICTURE/MP4 covr）与歌词（USLT/SYLT/Vorbis/©lyr）
+				const extracted =
+					dir === "music" && AUDIO_EXT.test(safeName)
+						? await extractAndStoreAudio(buffer, safeName)
+						: {};
 				sendJson(res, 200, {
 					ok: true,
 					name: safeName,
 					bytes: buffer.length,
 					path: mediaUrl(dir, safeName),
 					repoPath: path.posix.join(MEDIA_DIRS[dir], safeName),
+					...extracted,
 				});
 				return;
 			}
@@ -626,6 +677,47 @@ const server = createServer(async (req, res) => {
 				const songs = sanitizePlaylist(body.songs);
 				await writeJsonData("playlist", songs);
 				sendJson(res, 200, { ok: true, songs, message: `已保存 ${songs.length} 首歌` });
+				return;
+			}
+
+			case "/api/save-lyrics": {
+				// 把「无时间戳的歌词」按音频时长铺开成 LRC（前端从 <audio> 拿到时长后调用）
+				const { url: audioUrl, text, duration } = body;
+				if (!audioUrl || !text) {
+					sendJson(res, 400, { error: "缺少音频路径或歌词文本" });
+					return;
+				}
+				const base = path.basename(String(audioUrl)).replace(/\.[^.]+$/, "");
+				const lrc = plainLyricsToLrc(String(text), Number(duration) || 0);
+				if (!lrc) {
+					sendJson(res, 400, { error: "歌词内容为空" });
+					return;
+				}
+				await fs.mkdir(safeResolve("public/assets/music/lrc"), { recursive: true });
+				await fs.writeFile(
+					safeResolve(`public/assets/music/lrc/${base}.lrc`),
+					lrc,
+					"utf-8",
+				);
+				sendJson(res, 200, { ok: true, path: `/assets/music/lrc/${base}.lrc` });
+				return;
+			}
+
+			case "/api/extract-audio": {
+				// 对已经存在的音频重新提取一次（老歌曲也能补上封面/歌词）
+				const repoPath = String(body.repoPath || (body.url ? `public${body.url}` : ""));
+				if (!repoPath.startsWith(`${MEDIA_DIRS.music}/`)) {
+					sendJson(res, 400, { error: "只能处理 public/assets/music 下的音频" });
+					return;
+				}
+				const file = safeResolve(repoPath);
+				const buffer = await fs.readFile(file).catch(() => null);
+				if (!buffer) {
+					sendJson(res, 404, { error: "音频文件不存在" });
+					return;
+				}
+				const extracted = await extractAndStoreAudio(buffer, path.basename(file));
+				sendJson(res, 200, { ok: true, ...extracted });
 				return;
 			}
 

@@ -274,7 +274,7 @@
 				<div class="card">
 					<div class="row">
 						<h2 style="margin:0">歌单</h2>
-						<span class="muted small">列表顺序 = 播放顺序；上传的音频放在 public/assets/music</span>
+						<span class="muted small">列表顺序 = 播放顺序；上传音频会自动提取封面与歌词（读 ID3/FLAC/MP4 标签）</span>
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewSong">新增歌曲</button>
 					</div>
@@ -289,6 +289,7 @@
 						<h2 style="margin:0" id="songEditorTitle">编辑歌曲</h2>
 						<span style="flex:1"></span>
 						<button class="action ghost" id="btnCancelSong">关闭</button>
+						<button class="action ghost" id="btnExtractAudio">从音频重新提取</button>
 						<button class="action danger" id="btnDeleteSong">删除</button>
 						<button class="action" id="btnSaveSong">保存</button>
 					</div>
@@ -980,6 +981,69 @@
 				return result;
 			}
 
+			/** 读取音频时长，用于把「无时间戳歌词」粗略铺开 */
+			function probeDuration(src, timeoutMs = 10000) {
+				return new Promise((resolve) => {
+					const audio = new Audio();
+					const timer = setTimeout(() => resolve(0), timeoutMs);
+					const done = (value) => {
+						clearTimeout(timer);
+						resolve(value);
+					};
+					audio.addEventListener("loadedmetadata", () =>
+						done(Number.isFinite(audio.duration) ? audio.duration : 0),
+					);
+					audio.addEventListener("error", () => done(0));
+					audio.preload = "metadata";
+					audio.src = src;
+				});
+			}
+
+			/** 把后端从音频里提取到的封面/歌词/歌名/歌手填进表单 */
+			async function applyExtracted(result, fallbackName) {
+				const found = [];
+				if (!$("sName").value.trim()) {
+					if (result.extractedTitle) $("sName").value = result.extractedTitle;
+					else if (fallbackName) $("sName").value = fallbackName.replace(/\.[^.]+$/, "");
+				}
+				if (result.extractedArtist && !$("sArtist").value.trim()) {
+					$("sArtist").value = result.extractedArtist;
+				}
+				if (result.extractedTitle || result.extractedArtist) found.push("歌名/歌手");
+				if (result.cover) {
+					$("sCover").value = result.cover;
+					found.push("封面");
+				}
+				if (result.lrc) {
+					$("sLrc").value = result.lrc;
+					found.push("歌词（自带动画时间轴）");
+				} else if (result.plainLyrics) {
+					toast("提取到歌词但没有时间戳，正在读取音频时长做粗略同步…");
+					const audioPath = result.path || $("sUrl").value.trim();
+					const duration = await probeDuration(audioSrc(audioPath));
+					if (duration > 0) {
+						try {
+							const saved = await api("/api/save-lyrics", {
+								method: "POST",
+								body: { url: audioPath, text: result.plainLyrics, duration },
+							});
+							$("sLrc").value = saved.path;
+							found.push("歌词（按音频时长粗略同步）");
+						} catch (error) {
+							toast(`保存歌词失败：${error.message}`, "err");
+						}
+					} else {
+						toast("读不到音频时长，歌词未写入（可另放一份 .lrc）", "err");
+					}
+				}
+				if (found.length > 0) {
+					toast(`已自动提取：${found.join("、")}`, "ok");
+				} else if (result.audioFormat && result.audioFormat !== "unknown") {
+					toast("这个音频文件里没有封面/歌词标签，需要手动填", "");
+				}
+				updateSongPreview();
+			}
+
 			// 公告按钮
 			$("btnNewAnnounce").addEventListener("click", () => openAnnouncement(-1));
 			$("btnCancelAnnounce").addEventListener("click", () => {
@@ -1028,12 +1092,30 @@
 				try {
 					const result = await uploadTo("music", file);
 					$("sUrl").value = result.path;
+					await applyExtracted(result, file.name);
 					if (!$("sName").value.trim()) $("sName").value = file.name.replace(/\.[^.]+$/, "");
 					updateSongPreview();
 				} catch (error) {
 					toast(error.message, "err");
 				}
 				e.target.value = "";
+			});
+			$("btnExtractAudio").addEventListener("click", async () => {
+				const url = $("sUrl").value.trim();
+				if (!url) {
+					toast("请先选择音频文件或填写音频路径", "err");
+					return;
+				}
+				try {
+					toast("正在读取音频文件里的标签…");
+					const result = await api("/api/extract-audio", {
+						method: "POST",
+						body: { url },
+					});
+					await applyExtracted({ ...result, path: url });
+				} catch (error) {
+					toast(error.message, "err");
+				}
 			});
 			$("coverMusicUpload").addEventListener("change", async (e) => {
 				const file = (e.target.files || [])[0];
