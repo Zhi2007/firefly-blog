@@ -68,7 +68,7 @@ export const timeProgressConfig: TimeProgressConfig = {
 		month: "本月进度",
 		year: "本年进度",
 	},
-	// true：显示「距离下一天（时:分）/ 下一月（X 天 Y 小时）/ 下一年（X 天）还剩」
+	// true：显示「距离下一天（X时X分）/ 下一月（X 天 Y 小时）/ 下一年（X 天）还剩」
 	showRemaining: true,
 };
 
