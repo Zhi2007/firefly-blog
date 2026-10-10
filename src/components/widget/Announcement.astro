@@ -5,8 +5,16 @@ import { announcementConfig } from "@/config/announcementConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import type { WidgetComponentConfig } from "@/types/config";
+import {
+	resolvePinnedAnnouncement,
+	splitParagraphs,
+} from "@/utils/announcement-utils";
 
 const config = announcementConfig;
+// 侧边栏展示的是「固定公告」（没有固定公告时是最新一条）
+const item = resolvePinnedAnnouncement(config.items);
+// 侧边栏只放第一段，完整内容点进公告页看
+const preview = item ? splitParagraphs(item.content)[0] : "";
 
 interface Props {
 	class?: string;
@@ -26,40 +34,47 @@ const showTitle = widgetConfig?.showTitle !== false;
   class={className}
   style={style}
 >
-  <div>
-    <!-- 公告栏内容 -->
-    <div class="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-3">
-      {config.content}
-    </div>
-
-    <!-- 可选链接和关闭按钮 -->
-    <div class="flex items-center justify-between gap-3">
+  {
+    item && (
       <div>
-        {
-          config.link && config.link.enable !== false && (
-            <a
-              href={config.link.url}
-              target={config.link.external ? "_blank" : "_self"}
-              rel={config.link.external ? "noopener noreferrer" : undefined}
-              class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
-            >
-              {config.link.text}
-            </a>
-          )
-        }
-      </div>
+        <div class="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="text-sm font-semibold">{item.title}</span>
+          {item.pinned && (
+            <span class="rounded-full bg-(--primary)/12 px-2 py-0.5 text-xs text-(--primary)">
+              已固定
+            </span>
+          )}
+        </div>
 
-      {
-        config.closable && (
-          <button
-            class="btn-regular rounded-lg h-8 w-8 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-            onclick="this.closest('widget-layout').style.display='none'"
-            aria-label={i18n(I18nKey.announcementClose)}
-          >
-            <Icon name="fa7-solid:xmark" class="text-sm" />
-          </button>
-        )
-      }
-    </div>
-  </div>
+        <div class="text-neutral-600 dark:text-neutral-300 leading-relaxed text-sm mb-3">
+          {preview}
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            {config.link && config.link.enable !== false && (
+              <a
+                href={config.link.url}
+                target={config.link.external ? "_blank" : "_self"}
+                rel={config.link.external ? "noopener noreferrer" : undefined}
+                class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
+              >
+                {config.link.text}
+              </a>
+            )}
+          </div>
+
+          {config.closable && (
+            <button
+              class="btn-regular rounded-lg h-8 w-8 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+              onclick="this.closest('widget-layout').style.display='none'"
+              aria-label={i18n(I18nKey.announcementClose)}
+            >
+              <Icon name="fa7-solid:xmark" class="text-sm" />
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 </WidgetLayout>

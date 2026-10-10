@@ -1,0 +1,84 @@
+---
+// 公告列表：/announcement/ 页使用
+// 固定公告（pinned）排最前并带「已固定」标记，其余按日期倒序
+import { Icon } from "astro-icon/components";
+import { announcementConfig } from "@/config/announcementConfig";
+import {
+	getModalStorageValue,
+	splitParagraphs,
+	sortAnnouncements,
+} from "@/utils/announcement-utils";
+
+const items = sortAnnouncements(announcementConfig.items);
+const pinnedKey = items.find((i) => i.pinned)
+	? getModalStorageValue(announcementConfig, items[0])
+	: null;
+
+const typeStyles: Record<string, string> = {
+	info: "border-(--primary)/40",
+	warning: "border-amber-400/60",
+	success: "border-emerald-400/60",
+	error: "border-red-400/60",
+};
+
+const typeIcons: Record<string, string> = {
+	info: "material-symbols:info-outline",
+	warning: "material-symbols:warning-outline",
+	success: "material-symbols:check-circle-outline",
+	error: "material-symbols:error-outline",
+};
+---
+
+<div class="space-y-5">
+	{
+		items.map((item) => (
+			<article
+				class:list={[
+					"card-base rounded-(--radius-large) border-l-4 px-5 py-4",
+					typeStyles[item.type || "info"],
+				]}
+			>
+				<header class="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+					<Icon
+						name={typeIcons[item.type || "info"]}
+						class="text-lg text-(--primary)"
+					/>
+					<h3 class="text-base font-bold">{item.title}</h3>
+					{item.pinned && (
+						<span class="rounded-full bg-(--primary)/12 px-2 py-0.5 text-xs text-(--primary)">
+							已固定 · 首访弹窗展示
+						</span>
+					)}
+					<span class="ml-auto text-xs opacity-60">{item.published}</span>
+				</header>
+
+				<div class="space-y-3 text-sm leading-relaxed opacity-90">
+					{splitParagraphs(item.content).map((paragraph) => (
+						<p>{paragraph}</p>
+					))}
+				</div>
+
+				{item.links && item.links.length > 0 && (
+					<div class="mt-4 flex flex-wrap gap-3">
+						{item.links.map((link) => (
+							<a
+								href={link.url}
+								target={link.external ? "_blank" : "_self"}
+								rel={link.external ? "noopener noreferrer" : undefined}
+								class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium transition-transform active:scale-95"
+							>
+								{link.text}
+							</a>
+						))}
+					</div>
+				)}
+			</article>
+		))
+	}
+</div>
+
+{pinnedKey === null && (
+	<p class="mt-4 text-xs opacity-60">
+		提示：在 src/config/announcementConfig.ts 里给某条公告加上 pinned: true，它就会成为首访弹窗固定展示的公告。
+	</p>
+)}
