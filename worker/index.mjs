@@ -12,6 +12,7 @@
 
 const MEDIA_PREFIX = "/assets/music/";
 const AUDIO_RE = /\.(mp3|m4a|flac|ogg|oga|wav|aac)$/i;
+const COVER_RE = /\/cover\//i;
 
 // 与 public/_headers 保持一致（Worker 返回的响应不会应用 _headers 文件）
 const SECURITY_HEADERS = {
@@ -58,10 +59,10 @@ async function serveMedia(request, env) {
 	headers.set("content-type", upstream.headers.get("content-type") || "application/octet-stream");
 	headers.set("etag", etag);
 	headers.set("accept-ranges", "bytes");
-	headers.set(
-		"cache-control",
-		AUDIO_RE.test(new URL(request.url).pathname) ? "public, max-age=86400" : "public, max-age=3600",
-	);
+	// 音频与封面在歌单里都带内容哈希（?v=），可以放心长缓存；歌词可能随时补，短一点
+	const pathname = new URL(request.url).pathname;
+	const maxAge = AUDIO_RE.test(pathname) ? 86400 : COVER_RE.test(pathname) ? 604800 : 3600;
+	headers.set("cache-control", `public, max-age=${maxAge}`);
 	const lastModified = upstream.headers.get("last-modified");
 	if (lastModified) headers.set("last-modified", lastModified);
 
