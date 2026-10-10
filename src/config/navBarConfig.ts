@@ -16,6 +16,13 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 	// 主页
 	links.push(LinkPresets.Home);
 
+	// 公告（独立页面，见 src/pages/announcement.astro）
+	links.push({
+		name: "公告",
+		url: "/announcement/",
+		icon: "material-symbols:campaign",
+	});
+
 	// 文章及其子菜单
 	links.push({
 		name: "文章",

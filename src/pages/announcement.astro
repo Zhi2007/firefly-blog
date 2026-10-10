@@ -1,0 +1,27 @@
+---
+// 公告页：顶部导航栏「公告」栏目指向这里
+// 正文在 src/content/spec/announcement.md，致谢清单由共用的 ProjectCredits 组件渲染
+import { getEntry, render } from "astro:content";
+import Markdown from "@components/common/Markdown.astro";
+import ProjectCredits from "@components/common/ProjectCredits.astro";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+const entry = await getEntry("spec", "announcement");
+
+if (!entry) {
+	throw new Error("Announcement page content not found");
+}
+
+const { Content } = await render(entry);
+---
+
+<MainGridLayout title="公告" description="本站公告与开源项目致谢">
+  <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+      <Markdown class="mt-2">
+        <Content />
+      </Markdown>
+      <ProjectCredits />
+    </div>
+  </div>
+</MainGridLayout>
