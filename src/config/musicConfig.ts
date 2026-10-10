@@ -56,7 +56,14 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// 	cover: "/assets/music/cover/your-cover.jpg",
 	// 	lrc: "/assets/music/lrc/your-song.lrc",
 	// },
-	local: {
-		playlist: [],
-	},
-};
+local: {
+	playlist: [
+		{
+			name: "All Eyes On Me",
+			artist: "T.T. STAR; Sunnie; Chaerin; ZENA",
+			url: "/assets/music/All Eyes On Me.mp3",
+			cover: "/assets/music/cover/All Eyes On Me.png",
+			lrc: "/assets/music/lrc/All Eyes On Me.lrc",
+		},
+	],
+},
