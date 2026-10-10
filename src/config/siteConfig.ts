@@ -42,7 +42,7 @@ const pages = resolvePageToggles({
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "我的博客",
+	title: "栀海的博客",
 
 	// 站点副标题
 	subtitle: "记录技术、折腾与随想",
@@ -108,7 +108,7 @@ export const siteConfig: SiteConfig = {
 			alt: "我的博客",
 		},
 		// 导航栏标题
-		title: "我的博客",
+		title: "栀海的博客",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 		// 导航菜单对齐方式，left：左对齐，center：居中
