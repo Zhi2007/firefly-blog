@@ -72,8 +72,8 @@ importers:
         specifier: ^3.1.7
         version: 3.1.7
       '@mermanjs/web':
-        specifier: 0.8.0-alpha.3
-        version: 0.8.0-alpha.3
+        specifier: 0.8.0
+        version: 0.8.0
       '@napi-rs/wasm-runtime':
         specifier: ^1.2.2
         version: 1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)
@@ -2003,8 +2003,8 @@ packages:
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
 
-  '@mermanjs/web@0.8.0-alpha.3':
-    resolution: {integrity: sha512-nuZcWWc/I85RWuFraiJp9LbUIC7zEB+hdWic6TSjV26iRgD9tOE+o/MMH48/h5R10lr4uLz5ec7mhFUOgFARjQ==}
+  '@mermanjs/web@0.8.0':
+    resolution: {integrity: sha512-sG/seCKTxScMf5p5ts39ClSrmvHcq9r7KURO6QlwWF76agx3uipqXnd+RCmwxJbkf98gr8Lz/rl0irP0X6257A==}
 
   '@napi-rs/wasm-runtime@1.2.3':
     resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
@@ -7647,8 +7647,8 @@ snapshots:
       hast-util-to-html: 9.0.5
       hast-util-to-text: 4.0.2
       hastscript: 9.0.1
-      postcss: 8.5.26
-      postcss-nested: 6.2.0(postcss@8.5.26)
+      postcss: 8.5.29
+      postcss-nested: 6.2.0(postcss@8.5.29)
       unist-util-visit: 5.1.0
       unist-util-visit-parents: 6.0.2
 
@@ -8024,7 +8024,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mermanjs/web@0.8.0-alpha.3': {}
+  '@mermanjs/web@0.8.0': {}
 
   '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
@@ -11448,6 +11448,11 @@ snapshots:
   postcss-nested@6.2.0(postcss@8.5.26):
     dependencies:
       postcss: 8.5.26
+      postcss-selector-parser: 6.1.4
+
+  postcss-nested@6.2.0(postcss@8.5.29):
+    dependencies:
+      postcss: 8.5.29
       postcss-selector-parser: 6.1.4
 
   postcss-nesting@14.0.1(postcss@8.5.26):
