@@ -16,6 +16,7 @@ pnpm dev         # 本地开发：http://localhost:4321
 pnpm build       # 完整构建：LQIP → Astro → 字体子集化 → Pagefind 索引
 pnpm preview     # 预览构建产物
 pnpm admin       # 图形化管理后台（也可双击根目录的「启动管理面板.cmd」）
+pnpm compress-music   # 把音乐压到 128kbps（体积约降到 1/3，需要 ffmpeg，可加 --dry-run 先看）
 ```
 
 > 必须用 **pnpm**（`package.json` 里的 `preinstall` 会拦住 npm/yarn）。首次安装约几百 MB，首次构建约 1–3 分钟。
