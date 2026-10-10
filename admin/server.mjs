@@ -220,6 +220,28 @@ async function git(gitArgs) {
 	return run("git", gitArgs);
 }
 
+// 网络类报错的特征（代理没开、节点挂掉、被墙等）
+const NETWORK_ERROR_RE =
+	/(proxy|Could not connect|Failed to connect|Failed to fetch|TLS|unexpected eof|timed out|timeout|Connection was reset|Recv failure|RPC failed)/i;
+
+/**
+ * 需要联网的 git 命令：先按仓库配置执行（可能走了代理），
+ * 如果是网络类失败，再自动去掉代理直连重试一次。
+ * 这样不管用户有没有开 Clash，面板里的「发布 / 同步」都能尽量成功。
+ */
+async function gitNet(gitArgs) {
+	const first = await git(gitArgs);
+	if (first.ok) return { ...first, viaDirect: false };
+	const detail = `${first.stderr}\n${first.stdout}\n${first.message}`;
+	if (!NETWORK_ERROR_RE.test(detail)) return { ...first, viaDirect: false };
+	const retry = await git(["-c", "http.proxy=", ...gitArgs]);
+	return {
+		...retry,
+		viaDirect: retry.ok,
+		firstTryError: detail.trim().split("\n").slice(-1)[0] || "",
+	};
+}
+
 /** 把仓库内的相对路径解析成绝对路径，并阻止越界访问 */
 function safeResolve(relative) {
 	const abs = path.resolve(REPO_ROOT, relative);
@@ -484,14 +506,22 @@ async function publish(message) {
 	}
 
 	// 推送前先对齐远端：如果 GitHub 上有新提交（网页编辑、手机等），先 rebase 再推
-	const fetch = await git(["fetch", "origin"]);
-	steps.push({ name: "git fetch origin", ...fetch });
+	const fetched = await gitNet(["fetch", "origin"]);
+	steps.push({
+		name: fetched.viaDirect
+			? "git fetch origin（代理不可用，已自动改用直连）"
+			: "git fetch origin",
+		...fetched,
+	});
 	const counts = await git(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"]);
 	const parts = counts.stdout.split(/\s+/).filter(Boolean);
 	const behind = Number(parts[0]) || 0;
 	if (behind > 0) {
-		const pull = await git(["pull", "--rebase", "--autostash"]);
-		steps.push({ name: `git pull --rebase（远端有 ${behind} 个新提交）`, ...pull });
+		const pull = await gitNet(["pull", "--rebase", "--autostash"]);
+		steps.push({
+			name: `git pull --rebase（远端有 ${behind} 个新提交）${pull.viaDirect ? "（改直连）" : ""}`,
+			...pull,
+		});
 		if (!pull.ok) {
 			return {
 				ok: false,
@@ -503,16 +533,19 @@ async function publish(message) {
 		}
 	}
 
-	const push = await git(["push"]);
-	steps.push({ name: "git push", ...push });
+	const pushed = await gitNet(["push"]);
+	steps.push({
+		name: pushed.viaDirect ? "git push（代理不可用，已自动改用直连）" : "git push",
+		...pushed,
+	});
 	return {
-		ok: push.ok,
+		ok: pushed.ok,
 		dryRun: false,
 		steps,
 		files: changedFiles,
-		message: push.ok
+		message: pushed.ok
 			? "已推送到 GitHub，Actions 会自动构建并部署（约 1 分钟）"
-			: push.stderr || push.message,
+			: pushed.stderr || pushed.message,
 	};
 }
 
@@ -527,10 +560,15 @@ async function syncFromRemote() {
 			message: "本地有未提交改动，先在「发布」页提交（或撤销）后再同步",
 		};
 	}
-	const fetch = await git(["fetch", "origin"]);
-	steps.push({ name: "git fetch origin", ...fetch });
-	if (!fetch.ok) {
-		return { ok: false, steps, message: fetch.stderr || fetch.message };
+	const fetched = await gitNet(["fetch", "origin"]);
+	steps.push({
+		name: fetched.viaDirect
+			? "git fetch origin（代理不可用，已自动改用直连）"
+			: "git fetch origin",
+		...fetched,
+	});
+	if (!fetched.ok) {
+		return { ok: false, steps, message: fetched.stderr || fetched.message };
 	}
 	const counts = await git(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"]);
 	const parts = counts.stdout.split(/\s+/).filter(Boolean);
@@ -543,8 +581,11 @@ async function syncFromRemote() {
 			message: ahead > 0 ? `本地有 ${ahead} 个提交还没推送，去「发布」页推送` : "已经和 GitHub 一致",
 		};
 	}
-	const pull = await git(["pull", "--rebase", "--autostash"]);
-	steps.push({ name: `git pull --rebase（拉取 ${behind} 个远端提交）`, ...pull });
+	const pull = await gitNet(["pull", "--rebase", "--autostash"]);
+	steps.push({
+		name: `git pull --rebase（拉取 ${behind} 个远端提交）${pull.viaDirect ? "（改直连）" : ""}`,
+		...pull,
+	});
 	return {
 		ok: pull.ok,
 		steps,
