@@ -5,5 +5,11 @@
 		"url": "/assets/music/all-eyes-on-me.mp3",
 		"cover": "/assets/music/cover/all-eyes-on-me.png",
 		"lrc": "/assets/music/lrc/all-eyes-on-me.lrc"
+	},
+	{
+		"name": "Colors Flying High",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Colors Flying High.mp3",
+		"cover": "/assets/music/cover/Colors Flying High.jpg"
 	}
 ]
