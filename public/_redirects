@@ -1,0 +1,9 @@
+# Cloudflare Workers 静态资源重定向规则
+# 语法：[source] [destination] [code?]，同一 source 以最上面的规则为准，静态规则要排在动态前面
+
+# 旧站的文章列表页 → 新的归档页
+/blog/ /archive/ 301
+/blog /archive/ 301
+
+# 旧站文章地址 /blog/<slug>/ → 新站 /posts/<slug>/
+/blog/* /posts/:splat 301
