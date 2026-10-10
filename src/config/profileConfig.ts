@@ -9,8 +9,8 @@ export const profileConfig: ProfileConfig = {
 	// 换成自己的头像：把图片放进 src/assets/images/ 后改这里的文件名即可
 	avatar: "assets/images/avatar.avif",
 
-	// 名字
-	name: "Zhi2007",
+	// 名字（页脚版权、文章作者、OG 卡片等处都会用到）
+	name: "栀海",
 
 	// 个人签名
 	bio: "记录技术、折腾与随想",
@@ -26,6 +26,12 @@ export const profileConfig: ProfileConfig = {
 			name: "GitHub",
 			icon: "fa7-brands:github",
 			url: "https://github.com/Zhi2007",
+			showName: false,
+		},
+		{
+			name: "本站源码",
+			icon: "fa7-solid:code-branch",
+			url: "https://github.com/Zhi2007/firefly-blog",
 			showName: false,
 		},
 		{
