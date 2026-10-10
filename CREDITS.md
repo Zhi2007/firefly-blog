@@ -1,6 +1,6 @@
 # 署名与许可 / Credits & Licenses
 
-本站（[栀海的博客](https://my-blog.mc20070831.workers.dev)）建立在以下开源项目与素材之上。感谢每一位作者。
+本站（[栀海的博客](https://zhihaisblog.top)）建立在以下开源项目与素材之上。感谢每一位作者。
 
 ## 主题与框架
 
