@@ -57,9 +57,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
-	// 我的及其子菜单
+	// 栀海及其子菜单
 	links.push({
-		name: "我的",
+		name: "栀海",
 		url: "#",
 		icon: "material-symbols:person",
 		children: [
@@ -111,13 +111,13 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		// 子菜单
 		children: [
 			{
-				name: "我的 GitHub",
+				name: "栀海的 GitHub",
 				url: "https://github.com/Zhi2007",
 				external: true,
 				icon: "fa7-brands:github",
 			},
 			{
-				name: "我的 B 站",
+				name: "栀海的 B 站",
 				url: "https://space.bilibili.com/502912899",
 				external: true,
 				icon: "fa7-brands:bilibili",
@@ -257,7 +257,7 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		pageKey: "sponsor",
 	},
 	About: {
-		name: "关于我",
+		name: "关于栀海",
 		url: "/about/",
 		icon: "material-symbols:person",
 	},

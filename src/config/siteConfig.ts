@@ -105,7 +105,7 @@ export const siteConfig: SiteConfig = {
 		logo: {
 			type: "icon",
 			value: "material-symbols:menu-book",
-			alt: "我的博客",
+			alt: "栀海的博客",
 		},
 		// 导航栏标题
 		title: "栀海的博客",

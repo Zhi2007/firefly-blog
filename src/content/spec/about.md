@@ -1,12 +1,12 @@
-# 关于我
+# 关于栀海
 
-你好，我是 **栀海**。这里是我的个人博客，用来记录技术笔记、折腾过程和一些随想。
+你好，欢迎来到 **栀海** 的博客。这里记录技术笔记、折腾过程和一些随想。
 
 ## 关于本站
 
 本站是从 [Firefly](https://github.com/CuteLeaf/Firefly) 主题重建而来的静态博客：Astro 负责构建，产物托管在 Cloudflare Workers 上，全站没有服务器和数据库。搜索、评论、代码高亮、图片优化这些能力都来自开源社区，具体名单与作者见[公告页](/announcement/)。
 
-## 我的链接
+## 栀海的链接
 
 - GitHub：<https://github.com/Zhi2007>
 - 哔哩哔哩：<https://space.bilibili.com/502912899>
