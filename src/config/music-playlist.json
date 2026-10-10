@@ -12,5 +12,155 @@
 		"url": "/assets/music/Colors Flying High.mp3",
 		"cover": "/assets/music/cover/Colors Flying High.jpg",
 		"lrc": "/assets/music/lrc/Colors Flying High.lrc"
+	},
+	{
+		"name": "在银河中孤独摇摆",
+		"artist": "Chevy; 知更鸟",
+		"url": "/assets/music/在银河中孤独摇摆.mp3",
+		"cover": "/assets/music/cover/在银河中孤独摇摆.jpg",
+		"lrc": "/assets/music/lrc/在银河中孤独摇摆.lrc"
+	},
+	{
+		"name": "云女孩",
+		"artist": "符白牙; SiYFics",
+		"url": "/assets/music/云女孩.mp3",
+		"cover": "/assets/music/cover/云女孩.jpg",
+		"lrc": "/assets/music/lrc/云女孩.lrc"
+	},
+	{
+		"name": "预言 Prophecy",
+		"artist": "雷声 / HOYO-MiX / Gin Wigmore",
+		"url": "/assets/music/预言.mp3",
+		"cover": "/assets/music/cover/预言.jpg",
+		"lrc": "/assets/music/lrc/预言.lrc"
+	},
+	{
+		"name": "優しさの記憶",
+		"artist": "鹿乃",
+		"url": "/assets/music/優しさの記憶.mp3",
+		"cover": "/assets/music/cover/優しさの記憶.jpg",
+		"lrc": "/assets/music/lrc/優しさの記憶.lrc"
+	},
+	{
+		"name": "星と僕らと",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/星と僕らと (tofubeats Remix).mp3",
+		"cover": "/assets/music/cover/星と僕らと (tofubeats Remix).jpg",
+		"lrc": "/assets/music/lrc/星と僕らと (tofubeats Remix).lrc"
+	},
+	{
+		"name": "信仰と存在 (feat. 否)",
+		"artist": "否",
+		"url": "/assets/music/信仰と存在.mp3",
+		"cover": "/assets/music/cover/信仰と存在.jpg",
+		"lrc": "/assets/music/lrc/信仰と存在.lrc"
+	},
+	{
+		"name": "唯有追赶风的方向 (Only By Chasing the Wind)",
+		"artist": "知更鸟 / HOYO-MiX / Chevy",
+		"url": "/assets/music/唯有追赶风的方向.mp3",
+		"cover": "/assets/music/cover/唯有追赶风的方向.jpg",
+		"lrc": "/assets/music/lrc/唯有追赶风的方向.lrc"
+	},
+	{
+		"name": "太空漫步 Space Walk",
+		"artist": "HOYO-MiX",
+		"url": "/assets/music/太空漫步 Space Walk.mp3",
+		"cover": "/assets/music/cover/太空漫步 Space Walk.jpg"
+	},
+	{
+		"name": "Beneath the Mask",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Beneath the Mask.mp3",
+		"cover": "/assets/music/cover/Beneath the Mask.jpg",
+		"lrc": "/assets/music/lrc/Beneath the Mask.lrc"
+	},
+	{
+		"name": "bloom",
+		"artist": "三木谷奈々",
+		"url": "/assets/music/bloom.mp3",
+		"cover": "/assets/music/cover/bloom.png",
+		"lrc": "/assets/music/lrc/bloom.lrc"
+	},
+	{
+		"name": "Dreamland",
+		"artist": "CEM Records / z1on / KYRRIN",
+		"url": "/assets/music/Dreamland.mp3",
+		"cover": "/assets/music/cover/Dreamland.jpg",
+		"lrc": "/assets/music/lrc/Dreamland.lrc"
+	},
+	{
+		"name": "Everything's Alright",
+		"artist": "泽田かおり",
+		"url": "/assets/music/Everything’s Alright.mp3",
+		"cover": "/assets/music/cover/Everything’s Alright.png",
+		"lrc": "/assets/music/lrc/Everything’s Alright.lrc"
+	},
+	{
+		"name": "enchanted love",
+		"artist": "linear ring",
+		"url": "/assets/music/enchanted love.mp3",
+		"cover": "/assets/music/cover/enchanted love.png"
+	},
+	{
+		"name": "Halzion",
+		"artist": "H△G",
+		"url": "/assets/music/Halzion.mp3",
+		"cover": "/assets/music/cover/Halzion.png",
+		"lrc": "/assets/music/lrc/Halzion.lrc"
+	},
+	{
+		"name": "Have a Short Rest",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Have a Short Rest.mp3",
+		"cover": "/assets/music/cover/Have a Short Rest.jpg"
+	},
+	{
+		"name": "Life Goes On",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Life Goes On.mp3",
+		"cover": "/assets/music/cover/Life Goes On.jpg"
+	},
+	{
+		"name": "Life Will Change",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Life Will Change.mp3",
+		"cover": "/assets/music/cover/Life Will Change.jpg",
+		"lrc": "/assets/music/lrc/Life Will Change.lrc"
+	},
+	{
+		"name": "Rivers In the Desert",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Rivers In the Desert.mp3",
+		"cover": "/assets/music/cover/Rivers In the Desert.jpg",
+		"lrc": "/assets/music/lrc/Rivers In the Desert.lrc"
+	},
+	{
+		"name": "Take Over",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Take Over.mp3",
+		"cover": "/assets/music/cover/Take Over.jpg",
+		"lrc": "/assets/music/lrc/Take Over.lrc"
+	},
+	{
+		"name": "Wake Up, Get Up, Get Out There",
+		"artist": "Lyn / 目黒将司",
+		"url": "/assets/music/Wake Up， Get Up， Get Out There.mp3",
+		"cover": "/assets/music/cover/Wake Up， Get Up， Get Out There.jpg",
+		"lrc": "/assets/music/lrc/Wake Up， Get Up， Get Out There.lrc"
+	},
+	{
+		"name": "海滨小城 Seaside Town",
+		"artist": "HOYO-MiX",
+		"url": "/assets/music/海滨小城.mp3",
+		"cover": "/assets/music/cover/海滨小城.jpg",
+		"lrc": "/assets/music/lrc/海滨小城.lrc"
+	},
+	{
+		"name": "今天不是明天 (feat. 兰音Reine)",
+		"artist": "兰音Reine",
+		"url": "/assets/music/今天不是明天.mp3",
+		"cover": "/assets/music/cover/今天不是明天.jpg",
+		"lrc": "/assets/music/lrc/今天不是明天.lrc"
 	}
 ]
