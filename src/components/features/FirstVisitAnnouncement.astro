@@ -108,7 +108,13 @@ const title = modal?.title || announcementConfig.title || "公告";
 			// 事件委托：Swup 换页重建 DOM 后依然有效
 			document.addEventListener("click", (e) => {
 				const target = e.target as HTMLElement | null;
-				if (target?.closest("[data-announce-close]")) close();
+				if (!target) return;
+				if (target.closest("[data-announce-close]")) {
+					close();
+					return;
+				}
+				// 点弹窗外的遮罩空白处也能关闭（移动端没有 ESC 键）
+				if (target.id === "first-visit-announcement") close();
 			});
 			document.addEventListener("keydown", (e) => {
 				if (e.key === "Escape") close();
