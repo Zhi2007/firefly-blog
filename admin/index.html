@@ -106,6 +106,21 @@
 			#toast div.err { border-left-color: var(--err); }
 			#toast div.ok { border-left-color: var(--ok); }
 			.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+			#dropOverlay {
+				position: fixed; inset: 0; z-index: 90; display: none;
+				align-items: center; justify-content: center;
+				background: rgba(0, 0, 0, .45);
+				pointer-events: none; /* 让 drop 事件落到下面的真实元素上 */
+			}
+			#dropOverlay.show { display: flex; }
+			#dropOverlay .drop-box {
+				border: 3px dashed rgba(255, 255, 255, .85); border-radius: 20px;
+				padding: 34px 46px; text-align: center; color: #fff;
+				background: rgba(0, 0, 0, .35);
+			}
+			#dropOverlay strong { display: block; font-size: 20px; margin-bottom: 8px; }
+			[data-drop-dir] { position: relative; }
+			[data-drop-dir].drag-target { outline: 2px dashed var(--primary); outline-offset: 2px; }
 		</style>
 	</head>
 	<body>
@@ -197,7 +212,7 @@
 							<input type="checkbox" id="fPinned" style="width:auto" /> 置顶
 						</label>
 						<span style="flex:1"></span>
-						<label for="coverUpload" class="action ghost" style="cursor:pointer;margin:0">上传封面…</label>
+						<label for="coverUpload" data-drop-dir="post-images" class="action ghost" style="cursor:pointer;margin:0">上传封面…（也可拖进来）</label>
 						<input type="file" id="coverUpload" accept="image/*" style="display:none" />
 					</div>
 					<div class="editor" style="margin-top:14px">
@@ -274,7 +289,7 @@
 				<div class="card">
 					<div class="row">
 						<h2 style="margin:0">歌单</h2>
-						<span class="muted small">列表顺序 = 播放顺序；上传音频会自动提取封面与歌词（读 ID3/FLAC/MP4 标签）</span>
+						<span class="muted small">列表顺序 = 播放顺序；上传音频会自动提取封面与歌词，也可以把文件直接拖到页面上</span>
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewSong">新增歌曲</button>
 					</div>
@@ -337,7 +352,7 @@
 						<label for="mediaUpload" class="action" style="cursor:pointer;margin:0">上传文件…</label>
 						<input type="file" id="mediaUpload" multiple style="display:none" />
 					</div>
-					<div class="hint">上传后记得点「发布」才会出现在线上；路径可点“复制”直接粘到文章或配置里。</div>
+					<div class="hint">上传后记得点「发布」才会出现在线上；路径可点“复制”直接粘到文章或配置里。也可以把文件直接拖到页面上传到当前选中的目录。</div>
 					<table style="margin-top:12px">
 						<thead><tr><th>文件</th><th>大小</th><th>修改时间</th><th>操作</th></tr></thead>
 						<tbody id="mediaBody"></tbody>
@@ -384,6 +399,13 @@
 				</div>
 			</section>
 		</main>
+
+		<div id="dropOverlay">
+			<div class="drop-box">
+				<strong>松开即可上传</strong>
+				<div id="dropHint" class="small"></div>
+			</div>
+		</div>
 
 		<div id="toast"></div>
 
@@ -1170,6 +1192,170 @@
 					toast(error.message, "err");
 				}
 			});
+
+			// ── 拖拽上传 ───────────────────────────────────────────────────
+			const AUDIO_FILE_RE = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
+
+			function activeTab() {
+				const btn = document.querySelector("nav button.active");
+				return btn ? btn.dataset.tab : "overview";
+			}
+
+			function dropTargetLabel(dir) {
+				return (
+					{
+						"post-images": "文章图片（src/content/posts/images）",
+						music: "音乐（public/assets/music）",
+						"music-cover": "音乐封面",
+						"music-lrc": "歌词",
+						avatar: "头像 / 站点图片",
+					}[dir] || dir
+				);
+			}
+
+			/** 按当前标签页推断默认落点 */
+			function defaultDropDir() {
+				const tab = activeTab();
+				if (tab === "music") return "music";
+				if (tab === "media") return $("mediaDir").value;
+				return "post-images";
+			}
+
+			function updateDropHint(dir) {
+				let extra = "";
+				if (dir === "music") extra = "（音频会自动提取封面/歌词并加入歌单）";
+				else if (dir === "post-images") extra = "（文章封面 / 插图）";
+				$("dropHint").textContent = `上传到：${dropTargetLabel(dir)}${extra}`;
+			}
+
+			function clearDragMarks() {
+				document
+					.querySelectorAll("[data-drop-dir].drag-target")
+					.forEach((el) => el.classList.remove("drag-target"));
+			}
+
+			let dragDepth = 0;
+
+			window.addEventListener("dragenter", (e) => {
+				if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+				e.preventDefault();
+				dragDepth += 1;
+				updateDropHint(defaultDropDir());
+				$("dropOverlay").classList.add("show");
+			});
+
+			window.addEventListener("dragover", (e) => {
+				if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+				e.preventDefault();
+				const zone =
+					e.target instanceof Element ? e.target.closest("[data-drop-dir]") : null;
+				clearDragMarks();
+				if (zone) zone.classList.add("drag-target");
+				updateDropHint(zone ? zone.dataset.dropDir : defaultDropDir());
+			});
+
+			window.addEventListener("dragleave", () => {
+				dragDepth -= 1;
+				if (dragDepth <= 0) {
+					dragDepth = 0;
+					$("dropOverlay").classList.remove("show");
+					clearDragMarks();
+				}
+			});
+
+			window.addEventListener("drop", async (e) => {
+				const files = Array.from(e.dataTransfer?.files || []);
+				if (files.length === 0) return;
+				e.preventDefault();
+				dragDepth = 0;
+				$("dropOverlay").classList.remove("show");
+				clearDragMarks();
+				const zone =
+					e.target instanceof Element ? e.target.closest("[data-drop-dir]") : null;
+				await handleDroppedFiles(files, zone ? zone.dataset.dropDir : defaultDropDir());
+			});
+
+			async function handleDroppedFiles(files, dir) {
+				if (dir === "music") {
+					await dropIntoPlaylist(files);
+					return;
+				}
+				let ok = 0;
+				for (const file of files) {
+					try {
+						await uploadTo(dir, file);
+						ok += 1;
+					} catch (error) {
+						toast(`${file.name} 上传失败：${error.message}`, "err");
+					}
+				}
+				if (ok > 0) toast(`已上传 ${ok} 个文件到「${dropTargetLabel(dir)}」`, "ok");
+				// 正开着文章编辑器时，拖一张图顺便填成封面
+				if (
+					dir === "post-images" &&
+					files.length === 1 &&
+					$("editorCard").style.display !== "none" &&
+					/\.(png|jpe?g|webp|avif|gif)$/i.test(files[0].name)
+				) {
+					$("fImage").value = `./images/${files[0].name}`;
+					toast("已顺手填入文章封面路径", "ok");
+				}
+				await loadMedia();
+				await loadDiff();
+			}
+
+			/** 音乐页拖入文件：音频自动提取封面/歌词并直接加进歌单，图片/歌词按类型入库 */
+			async function dropIntoPlaylist(files) {
+				for (const file of files.filter((f) => !AUDIO_FILE_RE.test(f.name))) {
+					const guess = /\.(png|jpe?g|webp|avif|gif)$/i.test(file.name)
+						? "music-cover"
+						: /\.(lrc|txt)$/i.test(file.name)
+							? "music-lrc"
+							: "music";
+					try {
+						await uploadTo(guess, file);
+					} catch (error) {
+						toast(`${file.name} 上传失败：${error.message}`, "err");
+					}
+				}
+
+				const added = [];
+				for (const file of files.filter((f) => AUDIO_FILE_RE.test(f.name))) {
+					try {
+						toast(`正在处理 ${file.name}…`);
+						const result = await uploadTo("music", file);
+						const song = {
+							name: result.extractedTitle || file.name.replace(/\.[^.]+$/, ""),
+							artist: result.extractedArtist || "",
+							url: result.path,
+							cover: result.cover || "",
+							lrc: result.lrc || "",
+						};
+						if (!song.lrc && result.plainLyrics) {
+							const duration = await probeDuration(audioSrc(result.path));
+							if (duration > 0) {
+								const saved = await api("/api/save-lyrics", {
+									method: "POST",
+									body: { url: result.path, text: result.plainLyrics, duration },
+								});
+								song.lrc = saved.path;
+							}
+						}
+						added.push(song);
+						const tags = [song.cover ? "封面" : "", song.lrc ? "歌词" : ""].filter(Boolean);
+						toast(
+							`${file.name} → 已加入歌单${tags.length ? `（含${tags.join("、")}）` : ""}`,
+							"ok",
+						);
+					} catch (error) {
+						toast(`${file.name} 处理失败：${error.message}`, "err");
+					}
+				}
+				if (added.length > 0) {
+					await saveSongs([...songCache, ...added], `已添加 ${added.length} 首歌到歌单`);
+				}
+				await loadMedia();
+			}
 
 			bindEditor();
 			loadStatus();
