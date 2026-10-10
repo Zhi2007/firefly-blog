@@ -4,5 +4,13 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
 		"directory": "./dist"
-	}
+	},
+	// 自有域名：域名已托管在 Cloudflare，部署时会自动创建 DNS 记录并签发证书。
+	// 旧的 my-blog.mc20070831.workers.dev 继续可用。
+	"routes": [
+		{
+			"pattern": "zhihaisblog.top",
+			"custom_domain": true
+		}
+	]
 }
