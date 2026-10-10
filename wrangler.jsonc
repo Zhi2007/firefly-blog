@@ -1,15 +1,23 @@
 {
 	"name": "my-blog",
+	"main": "worker/index.mjs",
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
-		"directory": "./dist"
+		"directory": "./dist",
+		"binding": "ASSETS",
+		// 只有音乐目录走 Worker（为了支持 Range 边下边播），其它请求仍由静态资源直接响应
+		"run_worker_first": ["/assets/music/*"]
 	},
 	// 自有域名：域名已托管在 Cloudflare，部署时会自动创建 DNS 记录并签发证书。
 	// 旧的 my-blog.mc20070831.workers.dev 继续可用。
 	"routes": [
 		{
 			"pattern": "zhihaisblog.top",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.zhihaisblog.top",
 			"custom_domain": true
 		}
 	]
