@@ -1,0 +1,113 @@
+---
+// 悬浮音乐播放器：固定在页面角落（默认左下角），随页面滚动始终可见
+// 复用 features/MusicPlayer.astro 的播放器 UI；播放状态由 MusicPlayerView 里的全局管理器驱动，
+// 这里只是一个固定定位的外壳 + 收起/展开按钮
+// 配置见 src/config/musicConfig.ts 的 floating 字段
+import MusicPlayer from "@/components/features/MusicPlayer.astro";
+import { musicPlayerConfig } from "@/config/musicConfig";
+
+const floating = musicPlayerConfig.floating;
+const enabled = floating?.enable === true;
+const position = floating?.position || "bottom-left";
+---
+
+{
+	enabled && (
+		<div
+			id="floating-music-player"
+			data-position={position}
+			class:list={[
+				"fixed bottom-4 z-[997] flex flex-col",
+				position === "bottom-right" ? "right-4 items-end" : "left-4 items-start",
+			]}
+		>
+			<div
+				id="floating-music-card"
+				class="card-base w-[19rem] max-w-[calc(100vw-2rem)] rounded-(--radius-large) p-3 shadow-xl"
+			>
+				<MusicPlayer id="floating-music-widget" />
+			</div>
+			<button
+				type="button"
+				id="floating-music-toggle"
+				class="btn-plain absolute -top-3 -right-3 h-9 w-9 rounded-full border border-black/10 bg-white/95 text-(--primary) shadow-lg backdrop-blur dark:border-white/15 dark:bg-neutral-800/95"
+				aria-label="收起或展开音乐播放器"
+				title="收起 / 展开音乐播放器"
+			>
+				<span id="floating-music-toggle-icon" class="text-base leading-none">
+					−
+				</span>
+			</button>
+		</div>
+	)
+}
+
+<script>
+	import { musicPlayerConfig } from "@/config/musicConfig";
+
+	if (musicPlayerConfig.floating?.enable) {
+		const STORAGE_KEY = "floating-music-collapsed";
+
+		const readCollapsed = () => {
+			try {
+				const saved = localStorage.getItem(STORAGE_KEY);
+				if (saved !== null) return saved === "1";
+			} catch {
+				// 隐私模式：忽略
+			}
+			// 默认桌面端展开，移动端收成一个小圆钮，避免挡住内容
+			return window.innerWidth < 768;
+		};
+
+		const applyState = (collapsed: boolean) => {
+			const card = document.getElementById("floating-music-card");
+			const btn = document.getElementById("floating-music-toggle");
+			const icon = document.getElementById("floating-music-toggle-icon");
+			if (!card || !btn) return;
+
+			card.style.display = collapsed ? "none" : "";
+			if (icon) icon.textContent = collapsed ? "♪" : "−";
+
+			// 展开时圆钮贴在卡片右上角；收起时它本身就是那个悬浮圆钮
+			btn.classList.toggle("absolute", !collapsed);
+			btn.classList.toggle("-top-3", !collapsed);
+			btn.classList.toggle("-right-3", !collapsed);
+			btn.classList.toggle("h-11", collapsed);
+			btn.classList.toggle("w-11", collapsed);
+		};
+
+		const toggle = () => {
+			const card = document.getElementById("floating-music-card");
+			if (!card) return;
+			const collapsed = card.style.display !== "none";
+			applyState(collapsed);
+			try {
+				localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
+			} catch {
+				// 忽略
+			}
+		};
+
+		// 事件委托 + MutationObserver：Swup 换页重建 DOM 后依然有效
+		document.addEventListener("click", (e) => {
+			const target = e.target as HTMLElement | null;
+			if (target?.closest("#floating-music-toggle")) {
+				e.preventDefault();
+				toggle();
+			}
+		});
+
+		const sync = () => {
+			const root = document.getElementById("floating-music-player");
+			if (!root || root.dataset.ready === "1") return;
+			root.dataset.ready = "1";
+			applyState(readCollapsed());
+		};
+
+		sync();
+		new MutationObserver(sync).observe(document.body, {
+			childList: true,
+			subtree: true,
+		});
+	}
+</script>

@@ -109,8 +109,10 @@ export const live2dWidgetConfig: Live2DWidgetConfig = {
 			y: 0,
 		},
 	],
-	// 显示位置：bottom-left 或 bottom-right
-	position: "bottom-left" as const,
+	// 初始显示位置：bottom-left 或 bottom-right（本站放右下角；可自由拖动，位置记在浏览器本地）
+	position: "bottom-right" as const,
+	// 允许鼠标/触摸拖动看板娘
+	draggable: true,
 	// 画布尺寸（px）
 	size: { width: 200, height: 200 },
 	// 主题色，用于菜单、状态条等 UI 元素的背景色，默认 'rgba(96,165,250,0.9)'

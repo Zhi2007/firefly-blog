@@ -13,8 +13,14 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// 是否在导航栏显示音乐播放器入口
 	showInNavbar: true,
 
-	// 是否在侧边栏显示音乐播放器组件
-	showInSidebar: true,
+	// 是否在侧边栏显示音乐播放器组件（已改为左下角悬浮播放器，见下方 floating）
+	showInSidebar: false,
+
+	// 悬浮播放器：固定在页面左下角，随页面滚动始终可见；右上角圆钮可收起成一个小圆钮
+	floating: {
+		enable: true,
+		position: "bottom-left",
+	},
 
 	// 使用方式："meting" 使用 Meting API（在线歌单），"local" 使用本地音乐列表
 	mode: "local",

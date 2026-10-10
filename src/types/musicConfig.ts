@@ -18,6 +18,12 @@ export type MusicPlayerConfig = {
 	// 是否在侧边栏显示音乐播放器组件
 	showInSidebar?: boolean;
 
+	// 悬浮播放器：固定在页面角落、随页面滚动始终可见（本仓库新增）
+	floating?: {
+		enable?: boolean; // 是否启用悬浮播放器
+		position?: "bottom-left" | "bottom-right"; // 悬浮位置，默认左下角
+	};
+
 	// Meting API 配置
 	meting?: {
 		// Meting API 地址
