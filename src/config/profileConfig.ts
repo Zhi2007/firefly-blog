@@ -29,6 +29,12 @@ export const profileConfig: ProfileConfig = {
 			showName: false,
 		},
 		{
+			name: "哔哩哔哩",
+			icon: "fa7-brands:bilibili",
+			url: "https://space.bilibili.com/502912899",
+			showName: false,
+		},
+		{
 			name: "本站源码",
 			icon: "fa7-solid:code-branch",
 			url: "https://github.com/Zhi2007/firefly-blog",

@@ -117,6 +117,12 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 				icon: "fa7-brands:github",
 			},
 			{
+				name: "我的 B 站",
+				url: "https://space.bilibili.com/502912899",
+				external: true,
+				icon: "fa7-brands:bilibili",
+			},
+			{
 				name: "本站源码",
 				url: "https://github.com/Zhi2007/firefly-blog",
 				external: true,
