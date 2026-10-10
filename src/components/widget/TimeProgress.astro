@@ -57,7 +57,6 @@ const rows = [
 
 	if (timeProgressConfig.enable) {
 		const cfg = timeProgressConfig;
-		const pad = (n: number) => String(n).padStart(2, "0");
 
 		const render = () => {
 			const box = document.getElementById("time-progress");
@@ -99,14 +98,14 @@ const rows = [
 				if (text) text.textContent = `${pct.toFixed(kind === "day" ? 1 : 2)}%`;
 
 				// 剩余时间：统一用「距离下一X还剩」的句式
-				// 今日只到「时:分」，本月「X 天 Y 小时」，本年「X 天」
+				// 今日「X时X分」，本月「X 天 Y 小时」，本年「X 天」
 				const remain = row.querySelector("[data-remaining]");
 				if (remain && cfg.showRemaining) {
 					const left = Math.max(0, end.getTime() - now.getTime());
 					if (kind === "day") {
-						remain.textContent = `距离下一天还剩 ${pad(
-							Math.floor(left / 3600000),
-						)}:${pad(Math.floor((left % 3600000) / 60000))}`;
+						const hours = Math.floor(left / 3600000);
+						const minutes = Math.floor((left % 3600000) / 60000);
+						remain.textContent = `距离下一天还剩 ${hours}时${minutes}分`;
 					} else if (kind === "month") {
 						remain.textContent = `距离下一月还剩 ${Math.floor(
 							left / 86400000,
