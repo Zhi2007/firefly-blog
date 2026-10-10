@@ -20,6 +20,17 @@ pnpm admin       # 图形化管理后台（也可双击根目录的「启动管�
 
 > 必须用 **pnpm**（`package.json` 里的 `preinstall` 会拦住 npm/yarn）。首次安装约几百 MB，首次构建约 1–3 分钟。
 
+## 部署形态（Cloudflare Workers）
+
+静态产物托管在 Cloudflare Workers 上，另有一个极小的 Worker 脚本 `worker/index.mjs`：
+
+- `wrangler.jsonc` 的 `assets.directory = ./dist`，`assets.binding = ASSETS`
+- `assets.run_worker_first = ["/assets/music/*"]`：**只有音乐目录**先经过 Worker，其余请求仍由静态资源直接响应
+- 该 Worker 为音频/封面/歌词实现 `206 Partial Content`（Range）、`Content-Length`、`Accept-Ranges`、ETag 304 与 HEAD
+  —— 因为 Workers 静态资源不返回这些头也不处理 Range，浏览器无法边下边播、无法拖动进度条
+- 域名绑定在 `routes` 里（`zhihaisblog.top` 与 `www.zhihaisblog.top`，`custom_domain: true`），部署时由 Cloudflare 自动建解析并签发证书
+- 安全响应头在 `public/_headers`（HSTS、CSP 观察模式等）；Worker 返回的响应不会应用该文件，所以 `worker/index.mjs` 里重复设置了同样几个头
+
 ## 图形化管理后台（推荐）
 
 不想敲命令就用它：写文章、传图片/音乐、改配置、一键发布，全部在浏览器里点。
