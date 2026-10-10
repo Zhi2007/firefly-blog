@@ -2,8 +2,8 @@
 
 个人博客站点：**Astro + [Firefly](https://github.com/CuteLeaf/Firefly) 主题**，构建产物托管在 **Cloudflare Workers** 静态资源上（自动 HTTPS、全球 CDN、零服务器成本）。
 
-- 线上地址：<https://my-blog.mc20070831.workers.dev>
-- 关于我：<https://my-blog.mc20070831.workers.dev/about/>
+- 线上地址：<https://zhihaisblog.top>
+- 关于我：<https://zhihaisblog.top/about/>
 
 > **署名**：本仓库基于 [CuteLeaf/Firefly](https://github.com/CuteLeaf/Firefly)（MIT，作者 [CuteLeaf](https://github.com/CuteLeaf)）二次开发；Firefly 又源自 [saicaca/fuwari](https://github.com/saicaca/fuwari)（MIT，作者 [saicaca](https://github.com/saicaca)）。
 > 上游原始 README 完整保留在 [UPSTREAM-README.md](./UPSTREAM-README.md)，所有上游项目与素材的署名清单见 [CREDITS.md](./CREDITS.md)，许可证见 [LICENSE](./LICENSE)。
