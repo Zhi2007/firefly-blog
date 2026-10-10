@@ -1,16 +1,22 @@
 import type { MusicPlayerConfig } from "../types/musicConfig";
 
 // 音乐播放器配置
-// 目前关闭（导航栏与侧边栏都不显示）。想启用：把下面两个开关改成 true，
-// 并在 local.playlist 里填自己的音乐文件（文件放 public/assets/music/ 下）。
+//
+// 用本地音乐的三步：
+//   1. 把你的 mp3 放进 public/assets/music/（文件名建议用英文，避免 URL 编码麻烦）
+//   2. 封面图放 public/assets/music/cover/，歌词文件（可选）放 public/assets/music/lrc/
+//   3. 在下面 local.playlist 里按模板加一条，然后用 pnpm dev 或 pnpm build 看效果
+//
+// 提示：单曲文件建议 ≤ 10 MB（Cloudflare 单个静态资源上限 25 MiB），
+//       歌多了会让仓库和部署包变大，介意的话可以改用 mode: "meting" 在线歌单。
 export const musicPlayerConfig: MusicPlayerConfig = {
 	// 是否在导航栏显示音乐播放器入口
-	showInNavbar: false,
+	showInNavbar: true,
 
 	// 是否在侧边栏显示音乐播放器组件
-	showInSidebar: false,
+	showInSidebar: true,
 
-	// 使用方式："meting" 使用 Meting API，"local" 使用本地音乐列表
+	// 使用方式："meting" 使用 Meting API（在线歌单），"local" 使用本地音乐列表
 	mode: "local",
 
 	// 默认音量 (0-1)
@@ -22,10 +28,9 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// 是否显启用歌词
 	showLyrics: false,
 
-	// Meting API 配置
+	// Meting API 配置（mode 为 "meting" 时使用）
 	meting: {
 		// Meting API 地址
-		// 默认使用官方 API，也可以使用自定义 API
 		api: "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r",
 		// 音乐平台：netease=网易云音乐, tencent=QQ音乐, kugou=酷狗音乐, xiami=虾米音乐, baidu=百度音乐
 		server: "netease",
@@ -42,11 +47,15 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 		],
 	},
 
-	// 本地音乐配置（当 mode 为 'local' 时使用）
-	// 1. 支持传入歌词文件的路径
-	// lrc: "/assets/music/lrc/歌词.lrc",
-	// 2. 或者直接填入歌词字符串内容
-	// lrc: "[00:00.00]歌词内容...",
+	// 本地音乐列表（mode 为 "local" 时使用）
+	// 加歌示例（把下面三条前面的 // 去掉并改成你自己的信息即可）：
+	// {
+	// 	name: "歌曲名",
+	// 	artist: "歌手",
+	// 	url: "/assets/music/your-song.mp3",
+	// 	cover: "/assets/music/cover/your-cover.jpg",
+	// 	lrc: "/assets/music/lrc/your-song.lrc",
+	// },
 	local: {
 		playlist: [],
 	},
