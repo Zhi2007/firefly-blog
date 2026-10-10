@@ -67,8 +67,8 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：音乐播放器
 			type: "music",
-			// 是否启用该组件
-			enable: true,
+			// 是否启用该组件（已关闭：改成左下角悬浮播放器，见 musicConfig.floating）
+			enable: false,
 			// 组件位置
 			position: "top",
 			// 是否在文章详情页显示

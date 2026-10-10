@@ -93,6 +93,7 @@ function serializeMenus(menus: Props["config"]["menus"]) {
 	style="position: fixed; z-index: 999;"
 	data-models={JSON.stringify(modelConfigs)}
 	data-position={config.position || "bottom-left"}
+	data-draggable={config.draggable === false ? "false" : "true"}
 	data-size={JSON.stringify(config.size || 300)}
 	data-primary-color={config.primaryColor || ""}
 	data-transition-duration={config.transitionDuration?.toString() || ""}
@@ -226,9 +227,146 @@ function serializeMenus(menus: Props["config"]["menus"]) {
 			}
 
 			createWidget(options);
+
+			// l2d-widget 会把看板娘挂到 body 上，等它出现后再挂拖拽（模型加载是异步的，多试几次）
+			let dragTries = 0;
+			const trySetupDrag = () => {
+				const container = document.getElementById("l2d-widget-container");
+				if (container && container.dataset.draggable !== "false") {
+					if (setupDraggable(container)) return;
+				}
+				if (dragTries++ < 20) window.setTimeout(trySetupDrag, 250);
+			};
+			window.setTimeout(trySetupDrag, 200);
 		} catch (e) {
 			console.error("Failed to initialize Live2D widget:", e);
 		}
+	}
+
+	/**
+	 * 让看板娘可以自由拖动：拖动后位置记在 localStorage，刷新/换页都会回到原处。
+	 * l2d-widget 的根元素是它自己 append 到 body 的固定定位 div（带 canvas 的那个）。
+	 */
+	function setupDraggable(container: HTMLElement): boolean {
+		const STORAGE_KEY = "l2d-widget-position";
+
+		const candidates = Array.from(document.body.children).filter(
+			(el): el is HTMLElement =>
+				el instanceof HTMLElement &&
+				el !== container &&
+				el.style.position === "fixed" &&
+				el.offsetWidth > 40 &&
+				el.offsetHeight > 40,
+		);
+		const root =
+			candidates.find((el) => el.querySelector("canvas")) ||
+			candidates[candidates.length - 1];
+		if (!root) return false;
+
+		root.style.cursor = "grab";
+		root.style.touchAction = "none";
+		root.style.userSelect = "none";
+
+		const clamp = (v: number, min: number, max: number) =>
+			Math.min(Math.max(v, min), max);
+
+		const applyPosition = (left: number, top: number) => {
+			const maxX = Math.max(0, window.innerWidth - root.offsetWidth);
+			const maxY = Math.max(0, window.innerHeight - root.offsetHeight);
+			const x = clamp(left, 0, maxX);
+			const y = clamp(top, 0, maxY);
+			root.style.left = `${x}px`;
+			root.style.top = `${y}px`;
+			root.style.right = "auto";
+			root.style.bottom = "auto";
+		};
+
+		// 恢复上次拖到的位置
+		try {
+			const saved = JSON.parse(
+				localStorage.getItem(STORAGE_KEY) || "null",
+			) as { x?: number; y?: number } | null;
+			if (saved && typeof saved.x === "number" && typeof saved.y === "number") {
+				applyPosition(saved.x, saved.y);
+			}
+		} catch {
+			// 忽略
+		}
+
+		let dragging = false;
+		let moved = false;
+		let pointerId = -1;
+		let startX = 0;
+		let startY = 0;
+		let originLeft = 0;
+		let originTop = 0;
+		let prevTransition = "";
+
+		root.addEventListener("pointerdown", (e) => {
+			if (e.pointerType === "mouse" && e.button !== 0) return;
+			const rect = root.getBoundingClientRect();
+			dragging = true;
+			moved = false;
+			pointerId = e.pointerId;
+			startX = e.clientX;
+			startY = e.clientY;
+			originLeft = rect.left;
+			originTop = rect.top;
+			prevTransition = root.style.transition;
+			root.style.transition = "none";
+		});
+
+		window.addEventListener("pointermove", (e) => {
+			if (!dragging || e.pointerId !== pointerId) return;
+			const dx = e.clientX - startX;
+			const dy = e.clientY - startY;
+			// 小于阈值当作点击（模型本身要点、要出菜单），不要抢
+			if (!moved && Math.hypot(dx, dy) < 4) return;
+			moved = true;
+			root.style.cursor = "grabbing";
+			applyPosition(originLeft + dx, originTop + dy);
+		});
+
+		const finish = () => {
+			if (!dragging) return;
+			dragging = false;
+			root.style.cursor = "grab";
+			root.style.transition = prevTransition;
+			if (moved) {
+				const rect = root.getBoundingClientRect();
+				try {
+					localStorage.setItem(
+						STORAGE_KEY,
+						JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) }),
+					);
+				} catch {
+					// 忽略
+				}
+			}
+		};
+
+		window.addEventListener("pointerup", finish);
+		window.addEventListener("pointercancel", finish);
+
+		// 拖动结束的那一次 click 吞掉，避免误弹出菜单/对话
+		root.addEventListener(
+			"click",
+			(e) => {
+				if (!moved) return;
+				e.stopPropagation();
+				e.preventDefault();
+				moved = false;
+			},
+			true,
+		);
+
+		// 窗口尺寸变化时把看板娘拉回可视范围
+		window.addEventListener("resize", () => {
+			const rect = root.getBoundingClientRect();
+			applyPosition(rect.left, rect.top);
+		});
+
+		return true;
 	}
 
 	// 确保只初始化一次

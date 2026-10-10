@@ -44,7 +44,8 @@ export type Live2DWidgetConfig = {
 				x?: number; // X轴偏移，范围 -2~2，正值向右
 				y?: number; // Y轴偏移，范围 -2~2，正值向上
 		  }[]; // 模型配置，支持单个或多个模型
-	position?: "bottom-left" | "bottom-right"; // 显示位置，默认 "bottom-left"
+	position?: "bottom-left" | "bottom-right"; // 初始显示位置，默认 "bottom-left"（本站设为 bottom-right）
+	draggable?: boolean; // 是否允许鼠标/触摸拖动看板娘，位置会记在浏览器本地，默认 true
 	size?: number | { width: number; height: number }; // 画布尺寸（px），默认 300
 	primaryColor?: string; // 主题色，用于菜单、状态条等 UI 元素
 	transitionDuration?: number; // 入场/退场动画时长（ms），默认 1500
