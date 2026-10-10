@@ -48,6 +48,8 @@ function findFfmpeg() {
 	if (process.env.FFMPEG_PATH) candidates.push(process.env.FFMPEG_PATH);
 	if (process.env.TEMP) {
 		candidates.push(path.join(process.env.TEMP, "fftools", "node_modules", "ffmpeg-static", "ffmpeg.exe"));
+		// 之前用 npmmirror 包临时装的 ffmpeg（@ffmpeg-installer/win32-x64）
+		candidates.push(path.join(process.env.TEMP, "fftools", "package", "ffmpeg.exe"));
 	}
 	try {
 		const which = process.platform === "win32" ? "where" : "which";
