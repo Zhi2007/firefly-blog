@@ -564,13 +564,17 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
     <MusicManager />
     <slot />
 
+    {/* 左下角悬浮音乐播放器（配置见 src/config/musicConfig.ts 的 floating）。
+         注意：必须放在 MusicPlayerView 之前 —— 那个内联脚本在解析到它时用
+         querySelectorAll('.music-player-widget') 一次性初始化页面上已存在的 widget，
+         放在它后面的 widget 永远不会被初始化（表现为识别不到歌曲、点播放没反应）。 */}
+    <FloatingMusicPlayer />
+
     <!-- 播放器视图脚本：必须在 <slot /> 之后（解析到它时所有 widget 的 DOM 要已存在），
          且在 MusicManager 之后（swup 重跑按文档顺序，window.__fireflyMusic 得先就位） -->
     {(musicPlayerConfig.showInNavbar || musicPlayerConfig.showInSidebar !== false) && (
       <MusicPlayerView />
     )}
-    {/* 左下角悬浮音乐播放器，配置见 src/config/musicConfig.ts 的 floating */}
-    <FloatingMusicPlayer />
 
 
     <!-- Sakura Effect -->
