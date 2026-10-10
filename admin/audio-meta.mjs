@@ -122,6 +122,8 @@ function parseId3(buffer) {
 	const size = syncSafeInt(buffer.subarray(6, 10));
 	let offset = 10;
 	const end = Math.min(10 + size, buffer.length);
+	// TXXX / COMM 里的歌词先存着：只有没有标准 USLT/SYLT 时才采用
+	let textCandidate = null;
 
 	// 跳过扩展头 / 未同步
 	if (flags & 0x40 && offset + 4 <= end) {
@@ -165,9 +167,27 @@ function parseId3(buffer) {
 			} catch {
 				// 忽略解析失败的 SYLT
 			}
+		} else if (id === "TXXX") {
+			// 很多国内音乐软件的歌词存在 TXXX 自定义帧里（描述为 LYRICS / UNSYNCEDLYRICS）
+			const encoding = data[0];
+			const split = splitNull(data.subarray(1), encoding);
+			const description = decodeId3Text(split.head, encoding).trim().toUpperCase();
+			const value = decodeId3Text(split.rest, encoding).trim();
+			if (value && /LYRIC/.test(description) && !textCandidate) {
+				textCandidate = { kind: guessLyricsKind(value), text: value };
+			}
+		} else if (id === "COMM") {
+			const encoding = data[0];
+			const split = splitNull(data.subarray(4), encoding); // 编码(1) + 语言(3)
+			const description = decodeId3Text(split.head, encoding).trim().toUpperCase();
+			const value = decodeId3Text(split.rest, encoding).trim();
+			if (value && /LYRIC/.test(description) && !textCandidate) {
+				textCandidate = { kind: guessLyricsKind(value), text: value };
+			}
 		}
 		offset += 10 + frameSize;
 	}
+	if (!result.lyrics && textCandidate) result.lyrics = textCandidate;
 	return result;
 }
 
