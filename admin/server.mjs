@@ -36,6 +36,7 @@ const TOKEN = randomBytes(16).toString("hex");
 // ── 可编辑的配置文件白名单（相对仓库根目录） ────────────────────────────────
 const CONFIG_FILES = [
 	"src/config/siteConfig.ts",
+	"src/config/backgroundWallpaper.ts",
 	"src/config/navBarConfig.ts",
 	"src/config/profileConfig.ts",
 	"src/config/sidebarConfig.ts",

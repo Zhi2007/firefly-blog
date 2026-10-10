@@ -68,22 +68,20 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		dimOpacity: 0.2,
 		// 多视频播放模式："order" 顺序循环，"random" 随机切换（仅当 playerUrl 为数组时生效）
 		playerMode: "random",
-		// 主页横幅文字
+		// 主页横幅文字（想改主页显示的文字，就改这里）
 		homeText: {
 			// 是否启用主页横幅文字
 			enable: true,
 			// 主页横幅主标题
-			title: "Lovely firefly!",
+			title: "栀海的博客",
 			// 主页横幅主标题字体大小
 			titleSize: "4.5rem",
-			// 主页横幅副标题
+			// 主页横幅副标题：开启打字机后会循环显示下面这几条
 			subtitle: [
-				"In Reddened Chrysalis, I Once Rest",
-				"From Shattered Sky, I Free Fall",
-				"Amidst Silenced Stars, I Deep Sleep",
-				"Upon Lighted Fyrefly, I Soon Gaze",
-				"From Undreamt Night, I Thence Shine",
-				"In Finalized Morrow, I Full Bloom",
+				"记录技术、折腾与随想",
+				"把踩过的坑写下来，下次少踩一次",
+				"代码、音乐，还有一点生活",
+				"欢迎随便逛逛～",
 			],
 			// 主页横幅副标题字体大小
 			subtitleSize: "1.5rem",
