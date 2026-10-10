@@ -1,7 +1,18 @@
 ---
-// 页脚时间进度：今日 / 本月 / 本年已过百分比，按访客本地时区实时计算
-// 配置见 src/config/effectsConfig.ts 的 timeProgressConfig
+// 侧边栏「时间进度」组件：今日 / 本月 / 本年已过百分比，按访客本地时区实时计算
+// 组件挂载在 sidebarConfig.ts 的 leftComponents（type: "timeProgress"）
+// 具体文案与开关见 src/config/effectsConfig.ts 的 timeProgressConfig
+import WidgetLayout from "@/components/common/WidgetLayout.astro";
 import { timeProgressConfig } from "@/config";
+import type { WidgetComponentConfig } from "@/types/config";
+
+interface Props {
+	class?: string;
+	style?: string;
+	widgetConfig?: WidgetComponentConfig;
+}
+const { class: className, style, widgetConfig } = Astro.props;
+const showTitle = widgetConfig?.showTitle !== false;
 
 const rows = [
 	{ kind: "day", label: timeProgressConfig.labels.day },
@@ -12,22 +23,32 @@ const rows = [
 
 {
 	timeProgressConfig.enable && (
-		<div
+		<WidgetLayout
+			name={timeProgressConfig.title || "时间进度"}
+			showTitle={showTitle}
 			id="time-progress"
-			class="mb-2 flex flex-col items-center gap-1.5 text-xs text-50"
+			class={className}
+			style={style}
 		>
-			{rows.map((row) => (
-				<div class="flex w-full max-w-md items-center gap-2" data-kind={row.kind}>
-					<span class="w-16 shrink-0 text-right">{row.label}</span>
-					<span class="h-1.5 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
-						<i class="block h-full w-0 rounded-full bg-(--primary) transition-[width] duration-500 ease-linear" />
-					</span>
-					<span class="w-44 shrink-0 text-left tabular-nums" data-text>
-						计算中…
-					</span>
-				</div>
-			))}
-		</div>
+			<div class="space-y-3 pb-1">
+				{rows.map((row) => (
+					<div data-kind={row.kind}>
+						<div class="mb-1.5 flex items-baseline justify-between gap-2">
+							<span class="text-sm text-neutral-600 dark:text-neutral-300">
+								{row.label}
+							</span>
+							<span class="text-xs tabular-nums text-(--primary)" data-text>
+								计算中…
+							</span>
+						</div>
+						<span class="block h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
+							<i class="block h-full w-0 rounded-full bg-(--primary) transition-[width] duration-500 ease-linear" />
+						</span>
+						<span class="mt-1 block text-[11px] opacity-60" data-remaining />
+					</div>
+				))}
+			</div>
+		</WidgetLayout>
 	)
 }
 
@@ -73,22 +94,23 @@ const rows = [
 				const fill = row.querySelector("i");
 				if (fill) (fill as HTMLElement).style.width = `${pct}%`;
 
-				let suffix = "";
-				if (cfg.showRemaining) {
+				// 百分比：今天变化快，多给一位小数
+				const text = row.querySelector("[data-text]");
+				if (text) text.textContent = `${pct.toFixed(kind === "day" ? 3 : 2)}%`;
+
+				// 剩余时间：今天精确到秒，月/年显示还剩几天
+				const remain = row.querySelector("[data-remaining]");
+				if (remain && cfg.showRemaining) {
 					if (kind === "day") {
 						const left = end.getTime() - now.getTime();
-						suffix = ` · 距明天还有 ${pad(Math.floor(left / 3600000))}:${pad(
+						remain.textContent = `距明天还有 ${pad(Math.floor(left / 3600000))}:${pad(
 							Math.floor((left % 3600000) / 60000),
 						)}:${pad(Math.floor((left % 60000) / 1000))}`;
 					} else {
-						suffix = ` · 还剩 ${Math.ceil((end.getTime() - now.getTime()) / 86400000)} 天`;
+						remain.textContent = `还剩 ${Math.ceil(
+							(end.getTime() - now.getTime()) / 86400000,
+						)} 天`;
 					}
-				}
-
-				const text = row.querySelector("[data-text]");
-				// 今天的小数位多一点，看起来是"活的"；月/年变化慢，两位就够
-				if (text) {
-					text.textContent = `${pct.toFixed(kind === "day" ? 3 : 2)}%${suffix}`;
 				}
 			}
 		};

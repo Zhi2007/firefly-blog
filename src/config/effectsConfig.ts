@@ -58,9 +58,11 @@ export const sakuraConfig: SakuraConfig = {
 	zIndex: 100,
 };
 
-// 页脚时间进度（今日 / 本月 / 本年已过百分比，按访客本地时区实时计算）
+// 侧边栏时间进度组件（今日 / 本月 / 本年已过百分比，按访客本地时区实时计算）
+// 组件位置见 sidebarConfig.ts 的 leftComponents
 export const timeProgressConfig: TimeProgressConfig = {
 	enable: true,
+	title: "时间进度",
 	labels: {
 		day: "今日进度",
 		month: "本月进度",

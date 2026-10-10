@@ -27,7 +27,8 @@ export type SakuraConfig = {
 
 // 页脚时间进度（今日 / 本月 / 本年的已过百分比，按访客本地时区计算）
 export type TimeProgressConfig = {
-	enable: boolean; // 是否在页脚显示时间进度
+	enable: boolean; // 是否启用
+	title?: string; // 侧边栏组件标题
 	labels: {
 		day: string; // 今日那一行的文字
 		month: string; // 本月那一行的文字
