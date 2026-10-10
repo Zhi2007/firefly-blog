@@ -1,0 +1,6 @@
+Contact: https://github.com/Zhi2007/firefly-blog/issues
+Contact: mailto:139637626+Zhi2007@users.noreply.github.com
+Expires: 2027-12-31T23:59:59Z
+Preferred-Languages: zh-CN, en
+Canonical: https://zhihaisblog.top/.well-known/security.txt
+Policy: https://zhihaisblog.top/announcement/
