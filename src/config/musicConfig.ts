@@ -1,14 +1,14 @@
 import type { MusicPlayerConfig } from "../types/musicConfig";
+// 歌单单独放在 JSON 里，方便用管理面板（admin/）上传歌曲并增删改，不用手改这份 TS
+import playlist from "./music-playlist.json";
 
 // 音乐播放器配置
 //
-// 用本地音乐的三步：
-//   1. 把你的 mp3 放进 public/assets/music/（文件名建议用英文，避免 URL 编码麻烦）
-//   2. 封面图放 public/assets/music/cover/，歌词文件（可选）放 public/assets/music/lrc/
-//   3. 在下面 local.playlist 里按模板加一条，然后用 pnpm dev 或 pnpm build 看效果
+// 加歌推荐用管理面板的「音乐」页：上传 mp3（可带封面、歌词）即可，会自动写进
+// src/config/music-playlist.json。手动加歌也行：把文件放进 public/assets/music/，
+// 然后在那个 JSON 里加一条。
 //
-// 提示：单曲文件建议 ≤ 10 MB（Cloudflare 单个静态资源上限 25 MiB），
-//       歌多了会让仓库和部署包变大，介意的话可以改用 mode: "meting" 在线歌单。
+// 提示：单曲文件建议 ≤ 10 MB（Cloudflare 单个静态资源上限 25 MiB）。
 export const musicPlayerConfig: MusicPlayerConfig = {
 	// 是否在导航栏显示音乐播放器入口
 	showInNavbar: true,
@@ -53,18 +53,8 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 		],
 	},
 
-	// 本地音乐列表（mode 为 "local" 时使用）
-	// 再加一首歌：复制下面这一整块（含大括号和逗号）改内容即可，
-	// 注意别忘了文件末尾的 `};`，否则 TypeScript 语法不完整、构建会直接失败。
+	// 本地歌单：数据在 src/config/music-playlist.json
 	local: {
-		playlist: [
-			{
-				name: "All Eyes On Me",
-				artist: "T.T. STAR; Sunnie; Chaerin; ZENA",
-				url: "/assets/music/all-eyes-on-me.mp3",
-				cover: "/assets/music/cover/all-eyes-on-me.png",
-				lrc: "/assets/music/lrc/all-eyes-on-me.lrc",
-			},
-		],
+		playlist,
 	},
 };
