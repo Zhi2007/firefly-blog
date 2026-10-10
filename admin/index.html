@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>栀海博客 · 管理后台</title>
+		<style>
+			:root {
+				--primary: oklch(0.7 0.14 250);
+				--bg: #f6f7fb;
+				--card: #ffffff;
+				--text: #1f2430;
+				--muted: #6b7280;
+				--border: rgba(0, 0, 0, 0.08);
+				--ok: #16a34a;
+				--warn: #d97706;
+				--err: #dc2626;
+				--radius: 14px;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--bg: #14161c;
+					--card: #1c1f27;
+					--text: #e6e8ee;
+					--muted: #9aa1af;
+					--border: rgba(255, 255, 255, 0.1);
+				}
+			}
+			* { box-sizing: border-box; }
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--text);
+				font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+			}
+			a { color: var(--primary); }
+			header {
+				position: sticky; top: 0; z-index: 10;
+				display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+				padding: 14px 20px;
+				background: var(--card); border-bottom: 1px solid var(--border);
+			}
+			header h1 { margin: 0; font-size: 16px; }
+			.badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: rgba(0,0,0,.06); }
+			.badge.dirty { background: rgba(217,119,6,.15); color: var(--warn); }
+			.badge.clean { background: rgba(22,163,74,.15); color: var(--ok); }
+			nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 20px 0; }
+			nav button {
+				border: 1px solid var(--border); background: var(--card); color: var(--text);
+				padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+			}
+			nav button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+			main { padding: 16px 20px 60px; max-width: 1400px; margin: 0 auto; }
+			.panel { display: none; }
+			.panel.active { display: block; }
+			.card {
+				background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+				padding: 16px; margin-bottom: 14px;
+			}
+			.card h2 { margin: 0 0 10px; font-size: 15px; }
+			.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+			.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+			label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+			input, select, textarea, button.action {
+				font: inherit; color: var(--text); background: var(--bg);
+				border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; width: 100%;
+			}
+			textarea { resize: vertical; }
+			button.action {
+				background: var(--primary); color: #fff; border-color: var(--primary);
+				cursor: pointer; width: auto; font-weight: 600;
+			}
+			button.action.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+			button.action.danger { background: var(--err); border-color: var(--err); }
+			button.action:disabled { opacity: .5; cursor: not-allowed; }
+			table { width: 100%; border-collapse: collapse; font-size: 13px; }
+			th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+			th { color: var(--muted); font-weight: 600; }
+			tr.clickable:hover { background: rgba(127,127,127,.08); cursor: pointer; }
+			.tag { display: inline-block; padding: 1px 7px; border-radius: 999px; background: rgba(127,127,127,.14); font-size: 12px; margin-right: 4px; }
+			.muted { color: var(--muted); }
+			.small { font-size: 12px; }
+			pre.log {
+				background: #0f1115; color: #d8dee9; padding: 12px; border-radius: 10px;
+				overflow: auto; max-height: 320px; font-size: 12px; white-space: pre-wrap;
+			}
+			.editor { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+			@media (max-width: 900px) { .editor { grid-template-columns: 1fr; } }
+			.md-preview {
+				border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+				overflow: auto; max-height: 620px; background: var(--bg);
+			}
+			.md-preview h1, .md-preview h2, .md-preview h3 { margin: 14px 0 6px; }
+			.md-preview code { background: rgba(127,127,127,.18); padding: 1px 5px; border-radius: 5px; }
+			.md-preview pre { background: #0f1115; color: #d8dee9; padding: 10px; border-radius: 8px; overflow: auto; }
+			.md-preview img { max-width: 100%; border-radius: 8px; }
+			.md-preview blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--primary); color: var(--muted); }
+			#toast {
+				position: fixed; right: 20px; bottom: 20px; z-index: 99;
+				display: flex; flex-direction: column; gap: 8px;
+			}
+			#toast div {
+				background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary);
+				border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.12); max-width: 420px;
+			}
+			#toast div.err { border-left-color: var(--err); }
+			#toast div.ok { border-left-color: var(--ok); }
+			.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>栀海博客 · 管理后台</h1>
+			<span id="repoName" class="muted small"></span>
+			<span id="branchBadge" class="badge"></span>
+			<span id="dirtyBadge" class="badge"></span>
+			<span style="flex:1"></span>
+			<button class="action ghost" id="refreshBtn">刷新状态</button>
+		</header>
+
+		<nav>
+			<button data-tab="overview" class="active">概览</button>
+			<button data-tab="posts">文章</button>
+			<button data-tab="media">媒体</button>
+			<button data-tab="config">配置</button>
+			<button data-tab="publish">发布</button>
+		</nav>
+
+		<main>
+			<!-- 概览 -->
+			<section class="panel active" id="panel-overview">
+				<div class="card">
+					<h2>仓库状态</h2>
+					<div id="statusBox" class="small">加载中…</div>
+					<div class="row" style="margin-top:12px">
+						<button class="action" id="btnPreview">启动本地预览</button>
+						<button class="action ghost" id="btnBuild">本地构建</button>
+						<button class="action ghost" id="btnCheck">类型检查</button>
+					</div>
+					<div class="hint">
+						发布不需要本地构建：点「发布」推送到 GitHub 后，Actions 会自动构建并部署到 Cloudflare（约 1 分钟）。
+					</div>
+				</div>
+				<div class="card">
+					<h2>最近一次自动部署</h2>
+					<div id="actionBox" class="small">加载中…</div>
+				</div>
+				<div class="card">
+					<h2>命令输出</h2>
+					<pre class="log" id="runOutput">（还没有执行过命令）</pre>
+				</div>
+			</section>
+
+			<!-- 文章 -->
+			<section class="panel" id="panel-posts">
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">文章列表</h2>
+						<span style="flex:1"></span>
+						<button class="action" id="btnNewPost">新建文章</button>
+					</div>
+					<table>
+						<thead>
+							<tr><th>标题</th><th>日期</th><th>分类</th><th>标签</th><th>状态</th></tr>
+						</thead>
+						<tbody id="postsBody"></tbody>
+					</table>
+				</div>
+
+				<div class="card" id="editorCard" style="display:none">
+					<div class="row">
+						<h2 style="margin:0" id="editorTitle">编辑文章</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnCancelPost">关闭</button>
+						<button class="action danger" id="btnDeletePost">删除</button>
+						<button class="action" id="btnSavePost">保存</button>
+					</div>
+					<div class="grid" style="margin-top:12px">
+						<div><label>文件名（slug，不含 .md）</label><input id="fSlug" /></div>
+						<div><label>标题</label><input id="fTitle" /></div>
+						<div><label>发布日期</label><input id="fPublished" placeholder="2026-10-10" /></div>
+						<div><label>分类</label><input id="fCategory" /></div>
+						<div><label>标签（逗号分隔）</label><input id="fTags" /></div>
+						<div><label>封面路径</label><input id="fImage" placeholder="./images/xxx.png" /></div>
+					</div>
+					<div style="margin-top:10px">
+						<label>摘要</label>
+						<textarea id="fDescription" rows="2"></textarea>
+					</div>
+					<div class="row" style="margin-top:10px">
+						<label style="display:flex;gap:6px;align-items:center;margin:0">
+							<input type="checkbox" id="fDraft" style="width:auto" /> 草稿
+						</label>
+						<label style="display:flex;gap:6px;align-items:center;margin:0">
+							<input type="checkbox" id="fPinned" style="width:auto" /> 置顶
+						</label>
+						<span style="flex:1"></span>
+						<label for="coverUpload" class="action ghost" style="cursor:pointer;margin:0">上传封面…</label>
+						<input type="file" id="coverUpload" accept="image/*" style="display:none" />
+					</div>
+					<div class="editor" style="margin-top:14px">
+						<div>
+							<label>正文（Markdown）</label>
+							<textarea id="fBody" rows="26" spellcheck="false"
+								style="font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
+						</div>
+						<div>
+							<label>预览</label>
+							<div class="md-preview" id="mdPreview"></div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- 媒体 -->
+			<section class="panel" id="panel-media">
+				<div class="card">
+					<div class="row">
+						<div style="min-width:220px">
+							<label>目录</label>
+							<select id="mediaDir">
+								<option value="post-images">文章图片 src/content/posts/images</option>
+								<option value="music">音乐 public/assets/music</option>
+								<option value="music-cover">音乐封面 public/assets/music/cover</option>
+								<option value="music-lrc">歌词 public/assets/music/lrc</option>
+								<option value="avatar">头像/站点图片 public/assets/images</option>
+							</select>
+						</div>
+						<span style="flex:1"></span>
+						<label for="mediaUpload" class="action" style="cursor:pointer;margin:0">上传文件…</label>
+						<input type="file" id="mediaUpload" multiple style="display:none" />
+					</div>
+					<div class="hint">上传后记得点「发布」才会出现在线上；路径可点“复制”直接粘到文章或配置里。</div>
+					<table style="margin-top:12px">
+						<thead><tr><th>文件</th><th>大小</th><th>修改时间</th><th>操作</th></tr></thead>
+						<tbody id="mediaBody"></tbody>
+					</table>
+				</div>
+			</section>
+
+			<!-- 配置 -->
+			<section class="panel" id="panel-config">
+				<div class="card">
+					<div class="row">
+						<div style="min-width:260px">
+							<label>配置文件</label>
+							<select id="configSelect"></select>
+						</div>
+						<span style="flex:1"></span>
+						<button class="action" id="btnSaveConfig">保存</button>
+					</div>
+					<div class="hint">
+						直接编辑 TS/HTML 配置；保存后到「发布」推送上云。改不熟悉的字段前建议先复制一份内容留底。
+					</div>
+					<textarea id="configContent" rows="30" spellcheck="false"
+						style="margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
+				</div>
+			</section>
+
+			<!-- 发布 -->
+			<section class="panel" id="panel-publish">
+				<div class="card">
+					<h2>待提交的改动</h2>
+					<div id="diffBox" class="small">加载中…</div>
+				</div>
+				<div class="card">
+					<label>提交说明</label>
+					<input id="commitMessage" placeholder="例如：feat: 新增一篇文章" />
+					<div class="row" style="margin-top:12px">
+						<button class="action" id="btnPublish">发布（commit + push）</button>
+						<span class="muted small">推送后 GitHub Actions 自动构建部署，约 1 分钟</span>
+					</div>
+				</div>
+				<div class="card">
+					<h2>发布日志</h2>
+					<pre class="log" id="publishOutput">（还没有发布过）</pre>
+				</div>
+			</section>
+		</main>
+
+		<div id="toast"></div>
+
+		<script>
+			const TOKEN = new URLSearchParams(location.search).get("token") || "";
+			const $ = (id) => document.getElementById(id);
+			let postsCache = [];
+			let currentSlug = null;
+
+			function toast(message, kind = "") {
+				const el = document.createElement("div");
+				el.className = kind;
+				el.textContent = message;
+				$("toast").appendChild(el);
+				setTimeout(() => el.remove(), 4200);
+			}
+
+			async function api(path, options = {}) {
+				const url = new URL(path, location.origin);
+				url.searchParams.set("token", TOKEN);
+				const res = await fetch(url, {
+					method: options.method || "GET",
+					headers: options.body ? { "Content-Type": "application/json" } : undefined,
+					body: options.body ? JSON.stringify(options.body) : undefined,
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok) throw new Error(data.error || `请求失败（${res.status}）`);
+				return data;
+			}
+
+			// ── 极简 Markdown 预览（不依赖任何 CDN，离线可用） ──────────────
+			function escapeHtml(text) {
+				return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+			}
+			function renderMarkdown(markdown) {
+				const blocks = [];
+				let text = escapeHtml(markdown).replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+					blocks.push(`<pre><code>${code.replace(/\n$/, "")}</code></pre>`);
+					return `\u0000${blocks.length - 1}\u0000`;
+				});
+				text = text
+					.replace(/^###### (.*)$/gm, "<h6>$1</h6>")
+					.replace(/^##### (.*)$/gm, "<h5>$1</h5>")
+					.replace(/^#### (.*)$/gm, "<h4>$1</h4>")
+					.replace(/^### (.*)$/gm, "<h3>$1</h3>")
+					.replace(/^## (.*)$/gm, "<h2>$1</h2>")
+					.replace(/^# (.*)$/gm, "<h1>$1</h1>")
+					.replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>")
+					.replace(/^---$/gm, "<hr />")
+					.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
+					.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+					.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+					.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+					.replace(/`([^`]+)`/g, "<code>$1</code>")
+					.replace(/^\s*[-*] (.*)$/gm, "<li>$1</li>")
+					.replace(/^\s*\d+\. (.*)$/gm, "<li>$1</li>");
+				text = text.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ul>$1</ul>");
+				text = text
+					.split(/\n{2,}/)
+					.map((para) => (/^<(h\d|ul|pre|blockquote|hr|img|p)/.test(para.trim()) ? para : `<p>${para.replace(/\n/g, "<br />")}</p>`))
+					.join("\n");
+				return text.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[Number(i)]);
+			}
+
+			// ── 状态 ───────────────────────────────────────────────────────
+			async function loadStatus() {
+				try {
+					const data = await api("/api/status");
+					$("repoName").textContent = data.remote.replace(/^https?:\/\//, "");
+					$("branchBadge").textContent = `分支 ${data.branch}`;
+					const dirty = $("dirtyBadge");
+					dirty.textContent = data.dirty ? `${data.files.length} 处未提交` : "工作区干净";
+					dirty.className = `badge ${data.dirty ? "dirty" : "clean"}`;
+
+					$("statusBox").innerHTML = `
+						<div>仓库目录：<code>${data.repoRoot}</code></div>
+						<div>本地已安装 pnpm：${data.hasPnpm ? "是" : '<span class="muted">否（不影响发布，仅本地预览/构建需要）</span>'}</div>
+						<div style="margin-top:8px">最近提交：</div>
+						<ul style="margin:6px 0 0;padding-left:18px">
+							${data.commits.map((c) => `<li><code>${c.hash}</code> ${c.date} — ${escapeHtml(c.subject)}</li>`).join("")}
+						</ul>`;
+
+					if (data.action) {
+						const map = { success: "成功", failure: "失败", in_progress: "进行中", queued: "排队中" };
+						const state = data.action.conclusion || data.action.status;
+						$("actionBox").innerHTML = `
+							<div>第 ${data.action.number} 次运行：<b>${map[state] || state}</b>
+							（${escapeHtml(data.action.name || "")}）</div>
+							<div style="margin-top:6px"><a href="${data.action.url}" target="_blank" rel="noopener">在 GitHub 查看这次部署 →</a></div>`;
+					} else {
+						$("actionBox").textContent = "暂时取不到 Actions 状态（仓库需为公开，或网络不可达）。";
+					}
+					await loadDiff();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			async function loadDiff() {
+				try {
+					const { stat } = await api("/api/diff");
+					$("diffBox").innerHTML = stat
+						? `<pre class="log" style="background:transparent;color:inherit;padding:0">${escapeHtml(stat)}</pre>`
+						: '<span class="muted">工作区没有未提交的改动</span>';
+				} catch (error) {
+					$("diffBox").textContent = error.message;
+				}
+			}
+
+			// ── 文章 ───────────────────────────────────────────────────────
+			function postRow(post) {
+				const tags = (post.tags || []).map((t) => `<span class="tag">${escapeHtml(String(t))}</span>`).join("");
+				const state = [post.draft ? "草稿" : "已发布", post.pinned ? "置顶" : ""].filter(Boolean).join(" · ");
+				return `<tr class="clickable" data-slug="${post.slug}">
+					<td>${escapeHtml(post.title)}<div class="muted small">${escapeHtml(post.slug)}.md</div></td>
+					<td>${escapeHtml(post.published)}</td>
+					<td>${escapeHtml(post.category || "-")}</td>
+					<td>${tags || "-"}</td>
+					<td>${state}</td>
+				</tr>`;
+			}
+
+			async function loadPosts() {
+				const { posts } = await api("/api/posts");
+				postsCache = posts;
+				$("postsBody").innerHTML = posts.length
+					? posts.map(postRow).join("")
+					: '<tr><td colspan="5" class="muted">还没有文章，点右上角「新建文章」</td></tr>';
+				$("postsBody").querySelectorAll("tr[data-slug]").forEach((tr) => {
+					tr.addEventListener("click", () => openPost(tr.dataset.slug));
+				});
+			}
+
+			function bindEditor() {
+				const update = () => {
+					$("mdPreview").innerHTML = renderMarkdown($("fBody").value);
+				};
+				$("fBody").addEventListener("input", update);
+				update();
+			}
+
+			function fillForm(frontmatter, body, slug) {
+				currentSlug = slug;
+				$("fSlug").value = slug || "";
+				$("fTitle").value = frontmatter.title || "";
+				$("fPublished").value = frontmatter.published ? String(frontmatter.published).slice(0, 10) : new Date().toISOString().slice(0, 10);
+				$("fCategory").value = frontmatter.category || "";
+				$("fTags").value = Array.isArray(frontmatter.tags) ? frontmatter.tags.join(", ") : frontmatter.tags || "";
+				$("fImage").value = frontmatter.image || "";
+				$("fDescription").value = frontmatter.description || "";
+				$("fDraft").checked = frontmatter.draft === true;
+				$("fPinned").checked = frontmatter.pinned === true;
+				$("fBody").value = body || "";
+				$("mdPreview").innerHTML = renderMarkdown(body || "");
+				$("editorCard").style.display = "";
+				$("editorTitle").textContent = slug ? `编辑：${slug}.md` : "新建文章";
+				$("btnDeletePost").style.display = slug ? "" : "none";
+				$("editorCard").scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+
+			async function openPost(slug) {
+				try {
+					const data = await api(`/api/post?slug=${encodeURIComponent(slug)}`);
+					fillForm(data.frontmatter, data.body, slug);
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			function collectForm() {
+				return {
+					slug: $("fSlug").value.trim(),
+					originalSlug: currentSlug,
+					frontmatter: {
+						title: $("fTitle").value.trim(),
+						published: $("fPublished").value.trim(),
+						description: $("fDescription").value.trim(),
+						tags: $("fTags").value.split(",").map((t) => t.trim()).filter(Boolean),
+						category: $("fCategory").value.trim(),
+						image: $("fImage").value.trim(),
+						draft: $("fDraft").checked,
+						pinned: $("fPinned").checked,
+					},
+					body: $("fBody").value,
+				};
+			}
+
+			// ── 媒体 ───────────────────────────────────────────────────────
+			function humanSize(bytes) {
+				if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+				if (bytes > 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+				return `${bytes} B`;
+			}
+
+			async function loadMedia() {
+				const data = await api("/api/media");
+				const dir = $("mediaDir").value;
+				const files = data.files[dir] || [];
+				$("mediaBody").innerHTML = files.length
+					? files
+							.map(
+								(f) => `<tr>
+									<td>${escapeHtml(f.name)}</td>
+									<td>${humanSize(f.size)}</td>
+									<td class="small muted">${new Date(f.updatedAt).toLocaleString()}</td>
+									<td>
+										<button class="action ghost small" data-copy="${f.path}">复制路径</button>
+										<button class="action danger small" data-del="${f.repoPath}">删除</button>
+									</td>
+								</tr>`,
+							)
+							.join("")
+					: '<tr><td colspan="4" class="muted">这个目录还是空的</td></tr>';
+
+				$("mediaBody").querySelectorAll("[data-copy]").forEach((btn) =>
+					btn.addEventListener("click", async () => {
+						await navigator.clipboard.writeText(btn.dataset.copy);
+						toast(`已复制：${btn.dataset.copy}`, "ok");
+					}),
+				);
+				$("mediaBody").querySelectorAll("[data-del]").forEach((btn) =>
+					btn.addEventListener("click", async () => {
+						if (!confirm(`确定删除 ${btn.dataset.del} ？删除后需要发布才会生效。`)) return;
+						try {
+							await api("/api/delete-media", { method: "POST", body: { repoPath: btn.dataset.del } });
+							toast("已删除", "ok");
+							await loadMedia();
+						} catch (error) {
+							toast(error.message, "err");
+						}
+					}),
+				);
+			}
+
+			async function uploadFiles(files, dir) {
+				for (const file of files) {
+					const dataBase64 = await new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(String(reader.result).split(",")[1]);
+						reader.onerror = reject;
+						reader.readAsDataURL(file);
+					});
+					try {
+						const result = await api("/api/upload", {
+							method: "POST",
+							body: { dir, filename: file.name, dataBase64 },
+						});
+						toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
+					} catch (error) {
+						toast(`${file.name} 上传失败：${error.message}`, "err");
+					}
+				}
+				await loadMedia();
+				await loadDiff();
+			}
+
+			// ── 配置 ───────────────────────────────────────────────────────
+			async function loadConfigList() {
+				const { files } = await api("/api/configs");
+				$("configSelect").innerHTML = files.map((f) => `<option value="${f}">${f}</option>`).join("");
+				await loadConfigFile();
+			}
+
+			async function loadConfigFile() {
+				const path = $("configSelect").value;
+				try {
+					const data = await api(`/api/config-file?path=${encodeURIComponent(path)}`);
+					$("configContent").value = data.content;
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			// ── 标签切换与事件 ─────────────────────────────────────────────
+			document.querySelectorAll("nav button").forEach((btn) => {
+				btn.addEventListener("click", async () => {
+					document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+					document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+					btn.classList.add("active");
+					$(`panel-${btn.dataset.tab}`).classList.add("active");
+					if (btn.dataset.tab === "posts") await loadPosts();
+					if (btn.dataset.tab === "media") await loadMedia();
+					if (btn.dataset.tab === "config") await loadConfigList();
+					if (btn.dataset.tab === "publish") await loadDiff();
+				});
+			});
+
+			$("refreshBtn").addEventListener("click", loadStatus);
+
+			$("btnPreview").addEventListener("click", async () => {
+				$("runOutput").textContent = "正在启动本地预览（pnpm dev）…";
+				const result = await api("/api/run", { method: "POST", body: { script: "dev" } });
+				$("runOutput").textContent = `${result.output}\n\n预览地址一般是 http://localhost:4321`;
+				if (result.ok) window.open("http://localhost:4321", "_blank");
+			});
+			$("btnBuild").addEventListener("click", async () => {
+				$("runOutput").textContent = "正在构建…（可能需要 1-3 分钟）";
+				const result = await api("/api/run", { method: "POST", body: { script: "build" } });
+				$("runOutput").textContent = result.output;
+			});
+			$("btnCheck").addEventListener("click", async () => {
+				$("runOutput").textContent = "正在类型检查…";
+				const result = await api("/api/run", { method: "POST", body: { script: "check" } });
+				$("runOutput").textContent = result.output;
+			});
+
+			$("btnNewPost").addEventListener("click", () => {
+				currentSlug = null;
+				fillForm({}, "", "");
+				$("fSlug").value = `post-${new Date().toISOString().slice(0, 10)}`;
+			});
+			$("btnCancelPost").addEventListener("click", () => {
+				$("editorCard").style.display = "none";
+			});
+			$("btnSavePost").addEventListener("click", async () => {
+				try {
+					const payload = collectForm();
+					if (!payload.slug) throw new Error("请填写文件名（slug）");
+					if (!payload.frontmatter.title) throw new Error("请填写标题");
+					const result = await api("/api/save-post", { method: "POST", body: payload });
+					toast(`已保存 ${result.file}`, "ok");
+					currentSlug = payload.slug;
+					await loadPosts();
+					await loadDiff();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+			$("btnDeletePost").addEventListener("click", async () => {
+				if (!currentSlug || !confirm(`确定删除文章 ${currentSlug}.md ？`)) return;
+				try {
+					await api("/api/delete-post", { method: "POST", body: { slug: currentSlug } });
+					toast("已删除", "ok");
+					$("editorCard").style.display = "none";
+					await loadPosts();
+					await loadDiff();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+
+			$("coverUpload").addEventListener("change", async (e) => {
+				const files = Array.from(e.target.files || []);
+				if (!files.length) return;
+				await uploadFiles(files, "post-images");
+				const last = files[files.length - 1].name;
+				$("fImage").value = `./images/${last}`;
+				e.target.value = "";
+			});
+
+			$("mediaDir").addEventListener("change", loadMedia);
+			$("mediaUpload").addEventListener("change", async (e) => {
+				const files = Array.from(e.target.files || []);
+				if (files.length) await uploadFiles(files, $("mediaDir").value);
+				e.target.value = "";
+			});
+
+			$("configSelect").addEventListener("change", loadConfigFile);
+			$("btnSaveConfig").addEventListener("click", async () => {
+				try {
+					await api("/api/config-file", {
+						method: "POST",
+						body: { path: $("configSelect").value, content: $("configContent").value },
+					});
+					toast("配置已保存（到「发布」页推送后生效）", "ok");
+					await loadDiff();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+
+			$("btnPublish").addEventListener("click", async () => {
+				const message = $("commitMessage").value.trim();
+				if (!confirm("确定提交并推送到 GitHub ？推送后会自动部署。")) return;
+				$("publishOutput").textContent = "正在提交并推送…";
+				try {
+					const result = await api("/api/publish", { method: "POST", body: { message } });
+					$("publishOutput").textContent = result.steps
+						.map((s) => `$ ${s.name}\n${s.stdout || ""}${s.stderr ? `\n${s.stderr}` : ""}`.trim())
+						.join("\n\n");
+					toast(result.message, result.ok ? "ok" : "err");
+					await loadStatus();
+				} catch (error) {
+					toast(error.message, "err");
+					$("publishOutput").textContent = error.message;
+				}
+			});
+
+			bindEditor();
+			loadStatus();
+			loadDiff();
+		</script>
+	</body>
+</html>
