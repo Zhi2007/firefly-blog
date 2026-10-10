@@ -8,7 +8,7 @@ image: ./images/cover-demo.png
 pinned: true
 ---
 
-欢迎来到我的博客。
+欢迎来到栀海的博客。
 
 这个站点用 [Astro](https://astro.build) 做静态生成，托管在 Cloudflare Workers 的静态资源服务上。选它的原因很简单：
 

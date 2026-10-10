@@ -50,7 +50,7 @@ export const spineModelConfig: SpineModelConfig = {
 		],
 		// 点击时随机显示的文字消息
 		clickMessages: [
-			"你好呀！我是栀海的小看板娘～",
+			"你好呀！这里是栀海的小看板娘～",
 			"今天也要开心哦！✨",
 			"记得多喝水、早点睡🌙",
 			"有什么想对栀海说的吗？",

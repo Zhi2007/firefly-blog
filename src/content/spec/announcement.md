@@ -6,7 +6,7 @@
 
 这个博客是从 [Firefly](https://github.com/CuteLeaf/Firefly) 主题重建而来 —— Firefly 是 [CuteLeaf](https://github.com/CuteLeaf) 基于 [saicaca](https://github.com/saicaca) 的 [Fuwari](https://github.com/saicaca/fuwari) 二次开发的主题。全站静态生成后托管在 Cloudflare Workers 的静态资源上，没有服务器，也没有数据库。
 
-在此基础上我做了这些改造：
+在此基础上，栀海做了这些改造：
 
 - 修复 katex 的 CJS 入口问题，并把 Vite 固定在 8.3.4（否则加载构建配置会报 `require is not defined`）
 - 新增 Cloudflare Web Analytics 统计组件（原版只支持 GA / Clarity / Umami / 51la）
@@ -15,7 +15,7 @@
 - 加了旧链接重定向（`/blog/*` → `/posts/*`）
 - 站点信息、导航、页面开关、Giscus 评论、本地音乐播放器、Live2D 看板娘等个性化配置
 
-## 我的链接
+## 栀海的链接
 
 - GitHub：<https://github.com/Zhi2007>
 - 哔哩哔哩：<https://space.bilibili.com/502912899>
