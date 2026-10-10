@@ -3,11 +3,14 @@ import type { ProfileConfig } from "../types/profileConfig";
 export const profileConfig: ProfileConfig = {
 	// 头像
 	// 图片路径支持三种格式：
-	// 1. public 目录（以 "/" 开头，不优化）："/assets/images/avatar.webp"
-	// 2. src 目录（不以 "/" 开头，自动优化但会增加构建时间，推荐）："assets/images/avatar.webp"
+	// 1. public 目录（以 "/" 开头，不优化）："/assets/images/avatar-zhi.gif"
+	// 2. src 目录（不以 "/" 开头，自动优化但会增加构建时间，推荐）："assets/images/avatar.avif"
 	// 3. 远程 URL："https://example.com/avatar.jpg"
-	// 换成自己的头像：把图片放进 src/assets/images/ 后改这里的文件名即可
-	avatar: "assets/images/avatar-zhi.png",
+	// 注意：动图（GIF）必须放在 public 并用 "/" 开头的路径，
+	//       走 src 的优化管线会被转成静态 WebP、动画就没了。
+	// 现在的头像是一张 320×426 的 GIF 动图，放在 public/assets/images/avatar-zhi.gif；
+	// 想换回静态图可用 src/assets/images/avatar-zhi.png（改下面这行即可）。
+	avatar: "/assets/images/avatar-zhi.gif",
 
 	// 名字（页脚版权、文章作者、OG 卡片等处都会用到）
 	name: "栀海",
