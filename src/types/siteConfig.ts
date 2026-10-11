@@ -45,6 +45,9 @@ export type SiteConfig = {
 
 	// 页面整体宽度（单位：rem）
 	pageWidth?: number;
+	// 主内容区最大宽度（px）与占屏比：实际宽度 = min(contentWidth px, contentWidthVw vw)，随屏幕自适应
+	contentWidth?: number;
+	contentWidthVw?: number;
 
 	// 卡片样式配置
 	card: {
