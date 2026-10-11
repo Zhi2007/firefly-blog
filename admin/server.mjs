@@ -772,12 +772,15 @@ async function ciStatus() {
 
 	// 逐个提交查 check-runs；某个提交查不到就记 pending，不影响其它提交
 	const runs = [];
+	// sha → check-runs，只有在真的要展示失败详情时才用到（最多 8 条，内存可忽略）
+	const checksBySha = new Map();
 	let firstError = "";
 	for (const entry of entries) {
 		const result = await checkRunsFor(info.owner, info.repo, entry.sha);
 		if (!result.ok && !firstError) firstError = result.error;
 		const checks = result.runs;
 		const conclusion = summarizeConclusion(checks);
+		checksBySha.set(entry.sha, checks);
 		runs.push({
 			sha: entry.sha,
 			shortSha: entry.sha.slice(0, 7),
@@ -793,12 +796,16 @@ async function ciStatus() {
 	const lastFailureIndex = runs.findIndex((r) => FAILURE_CONCLUSIONS.has(r.conclusion));
 	const lastSuccess = lastSuccessIndex >= 0 ? runs[lastSuccessIndex] : null;
 	// 仅当"失败"比任何一次成功都更新时才提示；旧的失败被后续成功覆盖后红条必须消失
-	const lastFailure = lastFailureIndex >= 0 && (lastSuccessIndex < 0 || lastFailureIndex < lastSuccessIndex) ? runs[lastFailureIndex] : null;
+	const failedRun = lastFailureIndex >= 0 && (lastSuccessIndex < 0 || lastFailureIndex < lastSuccessIndex) ? runs[lastFailureIndex] : null;
+	// 失败详情（作业列表 + 日志）只在这个失败真的要展示时才去拉，避免白耗匿名配额
+	const lastFailure = failedRun
+		? await failureDetail(info.owner, info.repo, failedRun, checksBySha.get(failedRun.sha) ?? [])
+		: null;
 	return {
 		ok: true,
 		runs,
 		lastSuccess: lastSuccess ? { sha: lastSuccess.sha, url: lastSuccess.url } : null,
-		lastFailure: lastFailure ? { sha: lastFailure.sha, url: lastFailure.url } : null,
+		lastFailure,
 		...(runs.every((r) => r.conclusion === "unknown") ? { warning: firstError || "没有拿到任何 check-runs（仓库可能未开 Actions，或当前网络不可达）" } : {}),
 	};
 }
