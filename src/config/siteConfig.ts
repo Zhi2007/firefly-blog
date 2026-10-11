@@ -68,7 +68,7 @@ export const siteConfig: SiteConfig = {
 	// 页面整体宽度（单位：rem）
 	// 数值越大可以让页面内容区域更宽
 	// 在使用单侧栏边栏时，建议调低一些宽度以获得更好的视觉效果。
-	pageWidth: 100,
+	pageWidth: 140,
 	// 主内容区宽度：实际取 min(下面两个值)，屏幕越宽自动越宽；≥1280px 屏幕生效
 	contentWidth: 1600, // 最大宽度（px）
 	contentWidthVw: 98, // 最多占屏比例（%）
