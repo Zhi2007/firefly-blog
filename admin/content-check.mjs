@@ -121,8 +121,11 @@ export function splitFrontmatter(text) {
  *   { kind: "plain"|"quoted"|"empty", text, quote? } | { kind: "unterminated-quote", quote }
  *   | { kind: "trailing", text }  —— 引号闭合后还有别的内容（YAML 会报错）
  * 只在「值以引号开头」时才按引号处理：`title: it's ok` 里的撇号不是引号。
+ *
+ * 导出是给 `admin/post-frontmatter.mjs`（保存文章时的外科式改写）用的：体检（只读）与保存（写入）
+ * 必须共用同一套「什么算一个字段」的定义，否则会出现「体检认得出这行、保存时却把它当成别的」。
  */
-function readScalar(rawValue) {
+export function readScalar(rawValue) {
 	const trimmed = rawValue.trim();
 	if (trimmed === "") return { kind: "empty", text: "" };
 	const quote = trimmed[0];
@@ -134,7 +137,7 @@ function readScalar(rawValue) {
 				i++;
 				continue;
 			}
-			if (quote === '"' && trimmed[i - 1] === "\\") continue;
+			if (quote === '"' && isEscaped(trimmed, i)) continue;
 			end = i;
 			break;
 		}
@@ -150,13 +153,27 @@ function readScalar(rawValue) {
 }
 
 /**
+ * 双引号里的这个 `"` 是不是被转义的？
+ * 必须数**连续反斜杠的奇偶**：`\"` 是转义引号，而 `"a\\"`（值本身以反斜杠结尾）里的收尾引号
+ * 前面是**两个**反斜杠 —— 只看「前一个字符是不是 \」会把它误判成未闭合，
+ * 于是一个完全合法的值被读成 `unterminated-quote`（表单显示为空 → 再保存就把这一行删了）。
+ */
+function isEscaped(text, index) {
+	let backslashes = 0;
+	for (let i = index - 1; i >= 0 && text[i] === "\\"; i--) backslashes++;
+	return backslashes % 2 === 1;
+}
+
+/**
  * 扫描 frontmatter 顶层 `key: value`。
  * 返回 { entries, broken, blockLines }：
  *   entries  = [{ key, line, scalar, valueText, continuation }]
  *   broken   = [{ line, text, why: "tab"|"no-colon" }]
  *   blockLines = 块标量（`|` / `>`）占用的行号集合 —— 那些行里的 `[` 或引号都不算 YAML 语法
+ *
+ * 导出（同 readScalar）：`admin/post-frontmatter.mjs` 保存文章时按同一套行模型做外科式改写。
  */
-function scanMapping(bodyLines) {
+export function scanMapping(bodyLines) {
 	const entries = [];
 	const broken = [];
 	const blockLines = new Set();

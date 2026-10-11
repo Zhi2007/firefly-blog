@@ -102,10 +102,10 @@
 
 ```text
 firefly/
-├── admin/                      # ② 零依赖本地管理面板（17 个文件，只用 node: 内置模块）
-│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2536 行）
-│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，155 KB）
-│   ├── README.md               #    面板完整用法（689 行）★ 改面板前必读
+├── admin/                      # ② 零依赖本地管理面板（18 个文件，只用 node: 内置模块）
+│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2535 行）
+│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，156 KB）
+│   ├── README.md               #    面板完整用法（743 行）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
 │   ├── avatar.mjs              #    站点头像：魔数校验 + 可选缩放 → 写新文件并改 profileConfig.avatar
@@ -113,6 +113,7 @@ firefly/
 │   ├── nav.mjs                 #    导航隐藏/改名/排序 → 只写 nav-overrides.json
 │   ├── doctor.mjs              #    体检 10 项（只读；其中 2 项查文章 frontmatter，见 9.11）
 │   ├── content-check.mjs       #    文章 frontmatter 两层校验：YAML 速查（秒级）+ 真实 astro build（权威）
+│   ├── post-frontmatter.mjs    #    保存文章时的 frontmatter 读写共用模型（外科式改写，见 9.12）★ 日期引号事故的根修
 │   ├── backups.mjs             #    写前快照 admin-backups/（保留 40 份）
 │   ├── ci.mjs                  #    GitHub Actions 状态（60s 缓存 / 8s 超时 / 限流识别）
 │   ├── zip.mjs                 #    快照导出 ZIP（store 模式）
@@ -299,9 +300,9 @@ firefly/
 
 | 操作 | 风险 | 安全做法 |
 | --- | --- | --- |
-| 用脚本批量改 frontmatter | 破坏 YAML → 构建失败 | 改前 `pnpm type-check && pnpm build`；或走面板（`/api/save-post` 会 `snapshotBefore`，`server.mjs:1751-1754`） |
-| 直接删文章文件 | 无快照、无回滚 | 面板「文章 → 删除」会先快照（`server.mjs:1773`） |
-| 手工重命名文章 | URL 变了、封面相对路径可能失效 | 面板保存时传 `originalSlug` 会删旧文件（`server.mjs:1754-1757`），并**先校验 slug 正则**（`server.mjs:1742-1745`，这是 `M2` 修的越界删文件漏洞，见第 12 章） |
+| 用脚本批量改 frontmatter | 破坏 YAML → 构建失败 | 改前 `pnpm type-check && pnpm build`；或走面板（`/api/save-post` 会 `snapshotBefore`，`server.mjs:1766`；且保存时不再重写整份 frontmatter，见 9.12） |
+| 直接删文章文件 | 无快照、无回滚 | 面板「文章 → 删除」会先快照（`server.mjs:1793`） |
+| 手工重命名文章 | URL 变了、封面相对路径可能失效 | 面板保存时传 `originalSlug` 会删旧文件（`server.mjs:1772-1774`），并**先校验 slug 正则**（`server.mjs:1753`，这是 `M2` 修的越界删文件漏洞，见第 12 章） |
 | 手工改 `friends.json`/`announcements.json`/`music-playlist.json` | 结构错 → 面板/构建报错 | 优选面板接口；改完跑面板「体检」（`admin/doctor.mjs` 会查引用与必填字段） |
 
 ---
@@ -740,7 +741,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 2 | `/api/status` | GET（POST 也会执行） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测；`changed[]` 是结构化的待提交文件（`{code,path,origin}`） | `:1667-1680` |
 | 3 | `/api/posts` | GET | 否 | 否 | 文章列表；另返回 `dir` / `imagesDir` / `imagesUrlPrefix`（面板显示「文章存在哪、图片放哪」） | `:1681-1691` |
 | 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir` / `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
-| 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`）；返回 `file` | `:1734-1761` |
+| 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`）；**frontmatter 外科式改写**：日期落盘为不带引号的 `YYYY-MM-DD`、非法日期或空 `title` 一律 400（不落盘）、没编辑的行逐字节保留（**9.12 节**）；返回 `file` / `notes[]`（本次顺手规整了哪一行日期） | `:1745-1780` |
 | 6 | `/api/delete-post` | POST | 是（删除） | 是 | slug 正则 + `resolveInside([POSTS_DIR])` | `:1762-1778` |
 | 7 | `/api/media` | GET | 否 | 否 | 返回目录表（`dirs`）与文件列表（每项含 `repoPath` 仓库相对路径） | `:1779-1782` |
 | 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；音频额外抽封面/歌词；返回 `repoPath` | `:1783-1825` |
@@ -966,6 +967,44 @@ published: Expected type `"date"`, received `"string"`
 - 失败用例约 6 秒、成功用例约 12～13 秒；超时默认 90 秒，可用环境变量 `ADMIN_DOCTOR_BUILD_TIMEOUT_MS`（毫秒）覆盖。
 
 **发布时怎么拦住**：`publish()` 先跑 `runDoctor`，只要有任何 `error` 就直接返回 `blocked: true`（不执行任何 git 命令），并且 `message` 里带「文件 → 字段 → 怎么改」；面板「发布日志」区还会用 `filePathBadge()` 把每个文件渲染成可复制 / 可定位的路径徽章 + 「去体检页」按钮（见 `admin/index.html` 的 `renderBlockedDoctor`）。`force: true` 仍是逃生门。
+
+**⚠️ 上面这两项是「发现」，不是「不产生」**：它们拦住的是**已经写坏的**文件。坏数据是面板自己写的 —— 写入侧的根因与修复见 **9.12 节**（同一个事故发生了两次：第一次只加了检查，第二次才修写入路径）。
+
+### 9.12 文章保存：frontmatter 的「外科式改写」（`/api/save-post` + `admin/post-frontmatter.mjs`）
+
+**要解决的问题**（同一个事故的**第二次**发生）：面板保存文章后 frontmatter 里的日期被加上了引号——`published: "2026-10-11"`。YAML 里加了引号就是**字符串**，而 `src/content.config.ts` 的 `posts.published` 是 `z.date()` → `astro build` 直接失败（9.11 / 12.13 节记录了第一次与当时的「只加检查」修法）。用户在面板里给正文加了一行下载链接、点保存，引号就又回来了 —— 因为**写入路径**从来没修过。
+
+**根因（已实测，不是推测）**：旧的 `stringifyPost()` 把整份 frontmatter 用一串模板字符串重写：
+
+```js
+`${k}: ${typeof v === "string" ? `"${v}"` : v}`      // 字符串值一律加引号
+```
+
+于是表单里的日期（`<input type="date">` 给的是 `"2026-10-11"` 这个**字符串**）被写成 `published: "2026-10-11"`。为什么跑的是这条兜底分支：`readYamlModule()` 用 `import("yaml")` 找 `yaml` 包，而它**不在** `package.json` 依赖里、`node_modules/yaml` 也不存在（实测 `ERR_MODULE_NOT_FOUND`），所以永远走手写序列化。同一个函数还带来两个副作用：① 提交上来的 frontmatter 只有表单里那 9 个字段，`lang` / `comment` / `series` / `author` 等**全部被删掉**；② 块列表 `tags:`（`- 测试`）被读成空字符串，写回去就变成 `tags: []`。
+
+**现在的策略（`admin/post-frontmatter.mjs`，零依赖纯函数）**：读目标文件**当前**的原文当基准，**只替换「值真的变了」的字段行**（连同它的续行），其余行原样保留。规则：
+
+| 项 | 行为 |
+| --- | --- |
+| 面板管理的字段 | `title` / `published` / `description` / `tags` / `category` / `image` / `password` / `pinned` / `draft` —— 顺序即新建文章时的写出顺序（与仓库现有文章一致） |
+| 日期字段（`published` / `updated`） | **必须写成不带引号的 `YYYY-MM-DD`**：`published` 由表单提供并在写入前用正则 + 日历双重校验（`published="2026-10-11"` / `2026/10/11` / `2026-13-45` → **400，不落盘**）；已经是 `YYYY-MM-DD` 的行**逐字节保留**，同一天的时间戳（`2026-10-10T10:30:00+08:00`）**不降级**成日期；历史遗留的带引号日期在保存时被顺手规整成不带引号（响应里返回 `notes` 说明改了哪一行）。`updated` 表单里没有，只修「被引号包住的合法日期」 |
+| 值没变的字段 | 整段原样保留 —— 引号风格、块标量（`\|` / `>`）、块列表、行尾注释、字段顺序都不动（**编辑正文不会碰 frontmatter**，实测 4 篇真实文章原样保存后整文件逐字节不变） |
+| 面板不认识的字段 | `lang` / `comment` / `series` / `author` / `passwordHint` / 自定义字段一律**原样保留**，不再被删 |
+| 空值 | 表单里清空的字段 → 删掉那一行（这是用户的操作意图）；文件里本来没有的字段 → 按上表顺序补在末尾，**不重排**已有行 |
+| 需要引号的字符串 | 只有「不加引号会被 YAML 读成别的类型 / 会语法出错」时才加（`a: b`、`#`、`123`、`true`、`2026-10-11` 等），普通中文（`技术`、含 `：`、`、`）不加 —— 与仓库现有文章写法一致 |
+| 同名 key 重复 | 只管理**最后一个**（YAML 的实际取值语义），更早的重复行不替用户删；重复键本身由 9.11 的体检报 error |
+| 落盘编码 | 一律 LF + `---\n<frontmatter>\n---\n\n<body>`（与旧行为一致；正文开头的空行会被吃掉一行） |
+
+**行模型的唯一来源**：`admin/post-frontmatter.mjs` 复用 `admin/content-check.mjs` 导出的 `scanMapping()` / `readScalar()` / `splitFrontmatter()` —— 体检（只读）与保存（写入）对「什么算一个字段、哪些行属于它」必须是同一个定义，否则会出现「体检认得出这行、保存时却把它当成别的」。`parseFrontmatter()` 的兜底解析也换成了同一套（块列表因此能被表单正确回填；旧兜底读不出 `tags:` 的 `- 项目`，表单显示为空 → 保存时就把标签写没了）。
+
+**已知边界**（没做 / 故意不做）：
+
+- **不批量修历史坏数据**：面板不会在你没打开那篇文章时偷偷改它；坏数据由 9.11 的 `content-frontmatter` 报出来，或在你下次保存那篇时被规整。
+- **目标文件真的不存在时只能按表单重写**：如果你在资源管理器里把文件删了再去保存那篇（`originalSlug` 指向的文件不存在），没有原文可当基准，frontmatter 会按表单重建 —— 面板不管理的字段（`lang` / `comment` / `series`…）就没法保留了。
+- 顺带修掉 `content-check.mjs` 的 `readScalar()` 一个**真 bug**：双引号值以反斜杠结尾（`description: "a\\"`，值本身是 `a\`）时，它只看「前一个字符是不是 `\`」，把**收尾引号**误判成被转义 → 报「引号没有闭合」，而且表单回填成空、再保存就把这一行**删掉**。现在按「连续反斜杠的奇偶」判断（奇数才是转义），真实文章与 5 类合法写法零误报，6 类坏写法仍全部报 error。
+- `updated` 以外的「复杂结构」（对象数组，如 `projects` 的 `link:`）不做完整建模；那些字段面板不管理，保存时原样保留。
+- 块标量的值按「折叠空白后比较」判断是否被改过：用 `>` 折行的长描述只要语义没变就不会被重排成一行。
+- **本文档 §9.3 / §3.9 里 `server.mjs:行号` 是写作时的快照，本来就与当前文件有 ±20 行的漂移**（实测：文档写 save-post 在 `:1734` 时，真实行号是 1755）。本次修复让 `admin/server.mjs` 从 2536 行变成 **2535 行**（净减 1 行），save-post 那个 case 现在在 `admin/server.mjs:1745-1780`。核对锚点时**按关键词检索**（`case "/api/save-post"`、`function dateNormalizeNotes`）比按旧行号跳更可靠。
 
 ---
 
@@ -1263,6 +1302,10 @@ pnpm build
 | 修复 | 体检新增两项（9.11 节）：`content-frontmatter`（YAML 层速查，秒级，直接给「第几行 / 哪个字段 / 怎么改」）+ `content-schema`（跑**真实的** `astro build`，用真实 schema 校验并把报错翻成中文）。`publish()` 一见到 error 就拦住（`blocked: true`，不执行任何 git 命令），`message` 与面板「发布日志」都直接列出「文件 → 字段 → 怎么改」 |
 | 关键约束 | **不许另写一套平行 schema**：字段名与类型只有 `src/content.config.ts` 一个来源；YAML 层只查「与 schema 无关」的通用坑（引号 / 日期写法 / 列表写法 / YAML 语法），字段与类型一律由真实构建判定。新增体检项时按附录 E.2 第 12 行同步 |
 | 实测 | 10 类坏 frontmatter 全部在发布前被拦住（含本次事故的原文），4 篇真实文章零误报；失败用例约 6 秒、成功用例约 12～13 秒；跑不起来（没装依赖 / 超时 90 秒）只给 warning，**不阻断发布也不静默通过** |
+| **复发（同一事故第二次）** | 用户在那篇文章里加了一行下载链接、在面板里保存，引号**又回来了** —— 因为这次只修了「发现」，没修「**产生**」。详见 9.12 节 |
+| **根修** | `admin/post-frontmatter.mjs` 取代了旧 `stringifyPost()`：① 日期由写入路径保证是**不带引号**的 `YYYY-MM-DD`（非法日期 400，不落盘）；② 只替换「值真的变了」的字段行，其余行（注释 / 顺序 / 引号风格 / 块标量 / 块列表 / 面板不认识的字段）**逐字节保留**（顺便修掉「保存一次正文就丢 `lang`/`comment`/`series`/`author`」与「块列表 tags 被写成空」）；③ 读（表单回填）与写共用同一套行模型。实测：4 篇真实文章原样保存后整文件逐字节不变；反向用例（`published: "2026-10-11"` 的文章）保存后变成不带引号；夹具里 5 类坏/新/改场景 + 真实 `astro build`（35 页）全绿 |
+
+> **这一节的教训**（写给下一个 agent）：**「拦住坏数据」不等于「不再产生坏数据」**。当年的修法把体检加厚了一层（很有价值，也留住了），但写入端那个 `typeof v === "string" ? '"' + v + '"'` 一直在原处 —— 用户下一次点保存就会复发。修「症状会重现」的 bug 时，必须找到**它被产生出来的那一行代码**。
 
 ---
 
@@ -1357,7 +1400,7 @@ pnpm build
 
 ---
 
-## 附录 A：快问快答（26 条）
+## 附录 A：快问快答（27 条）
 
 | # | 问题 | 答案（含位置） |
 | --- | --- | --- |
@@ -1387,6 +1430,7 @@ pnpm build
 | 24 | **面板能上传友链图标吗？** | **不能**。`public/friends/` 只在 `/media-file` 的**只读**白名单里（`MEDIA_READ_DIRS`），请手工放文件再填路径（9.7 节） |
 | 25 | **我加了新功能，怎么让回访的老访客知道？** | 面板「公告」页顶部「**从最近改动生成更新公告草稿**」：留空起始点 = 自「上次公告」之后（取最后一次改动 `announcements.json` 的提交），也可手填「提交 sha / 天数（如 30）/ 日期 2026-10-01」。点「生成草稿」→ 它会读 `git log`（**只读**）把 `feat:` / `fix:` / `perf:` 分成「新增 / 修复 / 优化」填进下面的表单（`chore:` / `docs:` / 合并提交跳过），**不会自动发布**：确认/删减后点「保存」，再去「发布」页推送即可上线（想让它顶掉首访弹窗就手动勾「固定为弹窗公告」，同时改「弹窗版本号」）。细节与边界见 9.9 节 |
 | 26 | **发布后 CI 红了，但本地看着没事？（`published: Expected type "date", received "string"`）** | 多半是文章 frontmatter 的**类型**问题，最常见就一个：日期被引号包住 —— `published: "2026-10-11"` 在 YAML 里是**字符串**，而 schema 要日期（9.11 节、12.13 节）。**面板现在会在发布前就拦住它**：体检页看 `content-frontmatter`（YAML 速查，秒级，直接告诉你「第几行、哪个字段、怎么改」）与 `content-schema`（跑一次真实 `astro build`，报「期望 date / 实际 string」）。修法：**去掉引号**写成 `published: 2026-10-11`；改完再点「体检」→ 全绿再发。要本地复现 CI 的报错就跑 `node node_modules/astro/bin/astro.mjs build` |
+| 27 | **为什么我在面板里保存一篇文章，日期就变成 `published: "2026-10-11"` 了？（面板自己写出来的坏数据）** | 这是**写入路径**的 bug，不是你的操作问题：旧的面板保存时会用模板字符串重写整份 frontmatter，**给每个字符串值无条件加引号**（日期在表单里就是一个字符串），所以每次保存都会把日期变成 YAML 字符串 → 构建报 `published: Expected type "date", received "string"`。同一个 bug 还会顺手删掉表单里没有的字段（`lang` / `comment` / `series` / `author`）并把块列表 `tags:` 写空。**已修**：`admin/post-frontmatter.mjs` 改成「只改真正变了的字段、其余行逐字节保留」，日期由写入路径保证是**不带引号的 `YYYY-MM-DD`**（非法日期 400 不落盘）。完整根因、规则与实测见 **9.12 节**；如果是**历史遗留**的坏文件，面板下次保存那一篇时会顺手规整并在提示里说明（不会偷偷批量改你的文件，也可用体检的 `content-frontmatter` 逐篇查） |
 
 ---
 
@@ -1570,6 +1614,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 10 | **删除功能（必须反向清理）** | 按 1–9 反向删：文档段落、面板入口（`index.html` 的页签 / 按钮）、`SETTINGS_DEFS` 条目、`CONFIG_FILES` 白名单、CSP 放行、缓存规则、构建步骤、`navBarConfig.ts` 菜单项、`PUBLISH_SCOPE` 前缀。删完跑 `pnpm check-docs`，数字 / 清单对不上就会报 ❌ | ⚠️ 部分（「该删的忘了删」会被数字抓到；「不该删的删错了」抓不到） |
 | 11 | **面板新增展示项 / 接口（只要涉及文件）** | ① **必须复用 `admin/index.html` 的 `filePathBadge()`**（复制 / 已复制反馈 / 打开所在文件夹只有这一份实现，别各页抄一遍）；② 要显示的路径**必须由后端返回**（`fs.readdir` / `git status --porcelain -z` / 实际写入路径 / 快照目录），或按站点约定拼好后**当场 `stat` 核对**，**前端不许自己拼路径**；③ 后端 `stat` 过之后要如实带上 `exists`（不存在就标 ⚠️ 并隐藏「打开文件夹」按钮）；④ 新增 `/api/*` 字段/路由按第 2 行同步（路由数、9.3 表、`POST_BODY_FIELDS`）；⑤ 本文档 9.10 节的覆盖表 + `admin/README.md` 的「路径徽章」一节 | ❌（人工核对；`pnpm check-docs` 只保证路由/页签/配置/字段的数字与清单） |
 | 12 | **新增 / 修改体检项、内容校验规则** | ① **绝对不许另写平行 schema**：字段名与类型的唯一来源是 `src/content.config.ts`；「类型对不对」必须交给**真实构建**（`admin/content-check.mjs` 的 `content-schema`：`node node_modules/astro/bin/astro.mjs build`），YAML 层只允许查「与 schema 无关的通用坑」（引号把值变字符串 / 日期写法 / 列表写法 / YAML 语法）；② 本文档 9.11 节（新检查项要写清「查什么、什么级别、怎么修」）+ 9.3 / 9.4 / 2.3 / 附录 A 第 3 条里的「N 项」计数；③ `admin/README.md` 的「体检（发布前的安全闸）」表 + `README.md` 第 8 章面板表；④ 若有新的写盘产物，必须在 9.3 的「写盘」列如实登记（当前 `content-schema` 写 `.astro/doctor-build/`，**不覆盖 `dist/`**）；⑤ 跑不起来 / 超时必须降级成 `warn`，**既不阻断发布也不静默通过** | ⚠️ 部分（`check-docs` 不数体检项；改写「N 项」的措辞会变成人工核对） |
+| 13 | **新增 / 修改任何「会写文章 frontmatter」的代码**（`/api/save-post`、新建、导入、批量脚本…） | ① **日期字段（`published` / `updated`）必须落盘成不带引号的 `YYYY-MM-DD`** —— 加引号就是 YAML 字符串，而 schema 是 `z.date()`，构建必炸（9.11 / 9.12 / 12.13 记录了这个事故**发生过两次**）；② **不许重写用户没编辑的字段**：值没变的行（注释 / 顺序 / 引号风格 / 块标量 / 块列表 / 面板不认识的字段）必须逐字节保留，「保存一次就丢 `lang`/`comment`/`series`」是旧 bug（9.12）；③ 读（表单回填）与写必须共用 `admin/post-frontmatter.mjs` 的同一套行模型，**不要各写一套 YAML 解析**；④ 加校验要**在写盘之前**失败（400），不要先写坏再让发布时被体检拦住（「拦住坏数据」≠「不再产生坏数据」）；⑤ 同步本文档 9.12 + `admin/README.md` 的「文章编辑器：保存时 frontmatter 怎么处理」；⑥ 改完至少跑：反向用例（`published: "2026-10-11"` 的文件保存后不带引号）+ 「只改正文 → frontmatter 逐字节不变」+ 夹具里真实 `astro build` 成功 | ❌（人工核对；`check-docs` 只保证路由 / 页签 / 配置 / 字段的数字与清单，不检查写入语义） |
 
 > 补充（2026-10-11）：新增 `src/config` 下的**数据文件（JSON）**同样会改变 §4.1 与 §2.3 的文件计数，
 > 必须同步；`pnpm check-docs` 的第 3 组会直接报出来。
@@ -1582,6 +1627,10 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 
 > 补充（2026-10-11）：面板显示的路径统一为**正斜杠**（`src/content/posts/x.md`），Windows 反斜杠在 UI 入口已归一化；
 > `PUBLISH_SCOPE` 已包含 `src/constants`（LQIP 等构建产物数据须随文章一起发布）。
+
+> 补充（2026-10-11）：**改 `admin/server.mjs` 会让本文档里所有 `server.mjs:行号` 锚点漂移**（第 13 行那条
+> 「日期引号」修复让文件从 2536 行变成 2535 行）。数字与清单由 `pnpm check-docs` 兜底，**行号不兜底** ——
+> 改动后请顺手更新你动过的那几行锚点，或在核对时按关键词（如 `case "/api/save-post"`）检索而不是按旧行号跳。
 
 ### E.3 为什么光靠「记得更新」不行（三个真实历史事故）
 

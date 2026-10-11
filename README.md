@@ -175,6 +175,7 @@ firefly/
 │   ├── audio-meta.mjs         # 从 mp3/flac/m4a 读 ID3/Vorbis/ilst 标签、封面、歌词
 │   ├── doctor.mjs             # 体检 10 项：JSON 合法性、引用、文章 frontmatter（YAML 速查 + 真实构建）、站内链接、密钥、大文件、配置矛盾、git
 │   ├── content-check.mjs      # 文章 frontmatter 两层校验：YAML 速查（秒级）+ 真实 astro build（唯一权威）
+│   ├── post-frontmatter.mjs   # 保存文章时的 frontmatter 读写共用模型：日期不带引号、没编辑的行逐字节保留
 │   ├── settings.mjs           # 「站点设置」白名单表单：正则定位 + 写前快照 + 回读校验
 │   ├── nav.mjs                # 导航菜单隐藏/改名/排序 → 只写 nav-overrides.json
 │   ├── backups.mjs            # 写前快照（admin-backups/）与恢复

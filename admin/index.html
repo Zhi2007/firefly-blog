@@ -1311,7 +1311,8 @@
 					originalSlug: currentSlug,
 					frontmatter: {
 						title: $("fTitle").value.trim(),
-						published: $("fPublished").value.trim(),
+						// 日期只提交裸的 YYYY-MM-DD：粘进来的引号一并去掉（后端还会再校验一次）
+						published: $("fPublished").value.trim().replace(/^["']|["']$/g, ""),
 						description: $("fDescription").value.trim(),
 						tags: $("fTags").value.split(",").map((t) => t.trim()).filter(Boolean),
 						category: $("fCategory").value.trim(),
@@ -2475,7 +2476,14 @@
 					const payload = collectForm();
 					if (!payload.slug) throw new Error("请填写文件名（slug）");
 					if (!payload.frontmatter.title) throw new Error("请填写标题");
+					// 日期必须是不带引号的 YYYY-MM-DD：带引号 → YAML 当字符串 → 构建报
+					// published: Expected type "date", received "string"（后端也有同一道校验）
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.frontmatter.published)) {
+						throw new Error("发布日期必须是 YYYY-MM-DD（例如 2026-10-11），不能带引号、不能留空");
+					}
 					const result = await api("/api/save-post", { method: "POST", body: payload });
+					// 后端顺手规整掉的历史坏写法（例如 published: "2026-10-11"）会在 notes 里说明
+					for (const note of result.notes ?? []) toast(note, "ok");
 					toast(`已保存 ${result.file}`, "ok");
 					currentSlug = payload.slug;
 					await loadPosts();
