@@ -297,16 +297,70 @@ function requireIndex(value, length) {
 	return index;
 }
 
+// ── 面板展示：图标落在仓库里的哪个文件 ──────────────────────────────────────
+
+/**
+ * 把每条友链的 `imgurl` 映射成**仓库内相对路径**，并核对文件是否真的存在。
+ *
+ * 只认 `/friends/<文件名>` 这一种写法（`sanitizeFriend` 也只允许站内绝对路径或 http(s) 直链）：
+ * 站点的 web 根就是 `public/`，所以 `/friends/x.png` 一定对应 `public/friends/x.png`。
+ * 其它写法（远程直链、`/assets/...`、子目录、带 `..`）一律返回 null —— **不猜**，
+ * 猜出来的路径会让作者去文件管理器里找一个不存在的位置。
+ *
+ * @returns 与 items 等长的数组，元素为 null 或 { repoPath, exists, size, updatedAt }
+ */
+export async function describeFriendIcons(repoRoot, items) {
+	const out = [];
+	for (const item of Array.isArray(items) ? items : []) {
+		const imgurl = String(item?.imgurl ?? "").trim();
+		const prefix = "/friends/";
+		if (!imgurl.startsWith(prefix)) {
+			out.push(null);
+			continue;
+		}
+		const name = imgurl.slice(prefix.length);
+		// 只允许「public/friends 下的一个文件名」：分隔符、上跳、查询串一律不认
+		if (!/^[^/\\?#]+$/.test(name)) {
+			out.push(null);
+			continue;
+		}
+		const repoPath = `${FRIENDS_PUBLIC_DIR}/${name}`;
+		try {
+			const stat = await fs.stat(path.join(repoRoot, repoPath));
+			out.push({
+				repoPath,
+				exists: stat.isFile(),
+				size: stat.isFile() ? stat.size : null,
+				updatedAt: stat.isFile() ? stat.mtime.toISOString() : null,
+			});
+		} catch {
+			out.push({ repoPath, exists: false, size: null, updatedAt: null });
+		}
+	}
+	return out;
+}
+
 // ── 路由入口：/api/friends ─────────────────────────────────────────────────
 
 /**
- * GET  → { items: [...] }
+ * GET  → { items: [...], file, dir, icons: [...] }
  * POST → { action: "add"|"update"|"delete"|"move"|"toggle", ... } 返回 { ok, items, message, backup }
  */
 export async function handleFriends({ repoRoot, method = "GET", body, snapshotBefore } = {}) {
 	try {
 		if (method === "GET") {
-			return { status: 200, payload: { items: await readFriends(repoRoot) } };
+			const items = await readFriends(repoRoot);
+			// file / dir / icons 都是「面板要显示的真实落盘位置」：前端拿它渲染路径徽章，
+			// 不在前端拼路径（那才会出现编造路径）。
+			return {
+				status: 200,
+				payload: {
+					items,
+					file: FRIENDS_FILE,
+					dir: FRIENDS_PUBLIC_DIR,
+					icons: await describeFriendIcons(repoRoot, items),
+				},
+			};
 		}
 		if (method !== "POST") {
 			return { status: 405, payload: { error: "请用 GET 或 POST 调用 /api/friends" } };

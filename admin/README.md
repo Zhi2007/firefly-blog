@@ -11,6 +11,7 @@
 - [拖拽上传](#拖拽上传)
 - [从音频自动提取封面与歌词](#从音频自动提取封面与歌词)
 - [数据放在哪](#数据放在哪)
+- [文件存在哪：路径徽章](#文件存在哪路径徽章)
 - [站点设置：改 TS 配置也不会改坏](#站点设置改-ts-配置也不会改坏)
 - [站点头像（上传 / 恢复默认）](#站点头像上传--恢复默认)
 - [更新公告草稿（从最近改动生成）](#更新公告草稿从最近改动生成)
@@ -44,15 +45,15 @@ node admin/server.mjs --port=8899 --no-open
 | 标签页 | 功能 |
 | --- | --- |
 | **概览** | 仓库/分支/未提交改动、最近提交、最近一次 GitHub Actions 部署状态；本地预览、本地构建、类型检查 |
-| **文章** | 列表 / 新建 / 编辑 / 删除；标题、日期、摘要、**标签与分类（带候选下拉，可新增）**、封面、草稿、置顶、**密码（加密文章）**；Markdown 正文 + 实时预览 + **实时字数统计**；封面直接上传 |
-| **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾选「固定为弹窗公告」的那条会作为首访弹窗内容；改动「弹窗版本号」会让所有访客重新看到一次弹窗；**「从最近改动生成更新公告草稿」**（读 `git log` 把 `feat:` / `fix:` / `perf:` 整理成中文草稿填进表单，**只产草稿、不自动发布**） |
-| **音乐** | 上传音频/封面/歌词并加入歌单，编辑歌曲信息、调整播放顺序、**本地直接试听**；数据写到 `src/config/music-playlist.json`；**一键压缩**（先试算 / 只压封面 / 音频+封面，后者需确认） |
-| **友链** | 友链列表（图标缩略图 / 站名 / 简介 / 网址 / 权重 / 显示开关），↑↓ 排序、编辑、删除（二次确认）、启用停用；**「从网址抓取」**自动猜标题、简介与图标（结果只填表单、需人工确认后才保存）；数据写到 `src/config/friends.json` |
-| **媒体** | 分类查看文章图片、音乐、封面、歌词、头像目录；上传（可多选）、复制路径、删除；**批量转 WebP**（默认先试算，只新增 `.webp`，绝不删原图）。注意：这里上传到「头像/站点图片」目录只是把文件放进去，**换站点头像请用「站点设置」页的「站点头像」**（它会同时改写 `profileConfig.avatar`） |
+| **文章** | 列表 / 新建 / 编辑 / 删除；标题、日期、摘要、**标签与分类（带候选下拉，可新增）**、封面、草稿、置顶、**密码（加密文章）**；Markdown 正文 + 实时预览 + **实时字数统计**；封面直接上传。每篇显示真实文件路径 `src/content/posts/<文件名>` 与它的 URL；编辑器里显示当前文件、图片目录与正文引用到的图片（见「路径徽章」） |
+| **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾选「固定为弹窗公告」的那条会作为首访弹窗内容；改动「弹窗版本号」会让所有访客重新看到一次弹窗；**「从最近改动生成更新公告草稿」**（读 `git log` 把 `feat:` / `fix:` / `perf:` 整理成中文草稿填进表单，**只产草稿、不自动发布**）；显示数据文件 `src/config/announcements.json` |
+| **音乐** | 上传音频/封面/歌词并加入歌单，编辑歌曲信息、调整播放顺序、**本地直接试听**；数据写到 `src/config/music-playlist.json`；**一键压缩**（先试算 / 只压封面 / 音频+封面，后者需确认）；每首歌显示音频/封面/歌词的真实文件路径 |
+| **友链** | 友链列表（图标缩略图 / 站名 / 简介 / 网址 / 权重 / 显示开关），↑↓ 排序、编辑、删除（二次确认）、启用停用；**「从网址抓取」**自动猜标题、简介与图标（结果只填表单、需人工确认后才保存）；数据写到 `src/config/friends.json`；每个图标显示 `public/friends/<文件名>` |
+| **媒体** | 分类查看文章图片、音乐、封面、歌词、头像目录；上传（可多选）、复制路径、删除；**批量转 WebP**（默认先试算，只新增 `.webp`，绝不删原图）。每条显示 `public/assets/...` 下的仓库相对路径 + 体积。注意：这里上传到「头像/站点图片」目录只是把文件放进去，**换站点头像请用「站点设置」页的「站点头像」**（它会同时改写 `profileConfig.avatar`） |
 | **配置** | 直接编辑 `src/config/*` 里的常用配置文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
-| **站点设置** | **可视化表单**：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像（**头像可在这里直接上传更换 / 恢复默认**，见下文「站点头像」）、壁纸模式与暗度、主页横幅标题、**首页横幅副标题（每行一条）**、显示设置面板各项开关 + **页面开关** + **导航菜单（隐藏/改名/排序）**。写入前自动备份，写完回读校验，不一致立即回滚 |
-| **体检 / 备份** | 一键体检（JSON 合法性、引用是否丢失、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + **导出 ZIP**；**CI 部署状态**（失败时全页红色横幅，直接显示**是哪个 job 的哪个步骤挂了** + 日志片段 + 一键回滚该提交） |
-| **发布** | 同步状态（待推送提交数 / 远端新提交数 / 最后提交时间 / 最近一次部署结果）、**自动同步开关**、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住** |
+| **站点设置** | **可视化表单**：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像（**头像可在这里直接上传更换 / 恢复默认**，见下文「站点头像」）、壁纸模式与暗度、主页横幅标题、**首页横幅副标题（每行一条）**、显示设置面板各项开关 + **页面开关** + **导航菜单（隐藏/改名/排序）**。**每一项都显示它会被写进哪个文件的哪个块/字段**（如 `src/config/siteConfig.ts → navbar.title`，见「路径徽章」）。写入前自动备份，写完回读校验，不一致立即回滚 |
+| **体检 / 备份** | 一键体检（JSON 合法性、引用是否丢失、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + **导出 ZIP**（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**CI 部署状态**（失败时全页红色横幅，直接显示**是哪个 job 的哪个步骤挂了** + 日志片段 + 一键回滚该提交） |
+| **发布** | 同步状态（待推送提交数 / 远端新提交数 / 最后提交时间 / 最近一次部署结果）、**自动同步开关**、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住**；「待提交的改动」逐条显示真实路径与状态码，发布后列出本次提交的文件 |
 
 ## 从 Word / txt 导入文章
 
@@ -590,6 +591,67 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 
 「体检 / 备份」里每个快照旁的**导出 ZIP** 会下载 `admin-backup-<快照id>.zip`（不压缩存储，便于核对），
 走 `/api/backup-export`，快照 id 与每个文件路径都做过越界校验。
+
+## 文件存在哪：路径徽章
+
+面板里**每一类内容都写明它的真实文件路径**，目的只有一个：让你能直接去文件管理器 / 编辑器里找到那个文件，而不是先猜它在哪。
+
+### 长什么样
+
+路径徽章是 `admin/index.html` 里**唯一**的路径显示组件 `filePathBadge(relPath, opts)`，渲染出来是：
+
+```html
+<span class="path-badge" title="src/content/posts/markdown-cheatsheet.md">
+  <code>src/content/posts/markdown-cheatsheet.md</code>
+  <button class="path-btn" data-copy="src/content/posts/markdown-cheatsheet.md" title="复制：…">复制</button>
+  <button class="path-btn" data-reveal="src/content/posts/markdown-cheatsheet.md" title="在资源管理器中定位（仅 Windows…）">📂</button>
+</span>
+```
+
+- **复制**：点「复制」把仓库相对路径写进剪贴板，按钮上显示 **2 秒**「已复制」。复制走三级兜底：`navigator.clipboard.writeText` → `document.execCommand("copy")` → 都不行就把路径**选中**并提示你按 `Ctrl+C`。
+- **📂 打开所在文件夹**：Windows 上用 `explorer /select,"<绝对路径>"` 定位到该文件（目录则打开它）。**只在 Windows 上真正执行**，其它系统返回 `ok:false` 与一句「请手动打开」的说明（不猜别的命令）。文件已删除 / 尚未创建 / 是远程 URL 时**不显示**这个按钮。
+- 视觉上刻意次要：等宽小号字 + 次要颜色 + 可换行，`title` 里放完整值，不抢标题的视觉重心，也不撑破既有表单与表格。
+
+### 哪些页签会显示
+
+| 页签 / 位置 | 显示什么路径 | 来源接口的字段 |
+| --- | --- | --- |
+| 文章列表 | `src/content/posts/<文件名>`（`.md` / `.mdx` 原样）+ 该文 URL | `/api/posts` → `posts[].file` |
+| 文章编辑器 | 当前文件、`src/content/posts/images`、正文 `./images/…` 引用到的图片（逐个核对过） | `/api/post` → `file` / `imagesDir` / `images[]` |
+| 文章编辑器（新建） | 「保存后将写入 `src/content/posts/<slug>.md`（尚未创建）」 | `/api/posts` → `dir` + 输入框里的 slug |
+| 媒体 | 当前目录 + 每个文件的 `public/assets/...`、体积、可引用的站内 URL | `/api/media` → `dirs` / `files[].repoPath` |
+| 公告 | `src/config/announcements.json`（列表卡片与编辑器各一处） | `/api/announcements` → `file` |
+| 音乐 | `src/config/music-playlist.json` + 每首歌音频 / 封面 / 歌词的真实文件 | `/api/playlist` → `file` / `paths[]` |
+| 友链 | `src/config/friends.json`、`public/friends/` + 每个图标的 `public/friends/<文件名>` | `/api/friends` → `file` / `dir` / `icons[]` |
+| 导航菜单 | `src/config/nav-overrides.json`（+「尚未创建」提示）与只读来源 `src/config/navBarConfig.ts` | `/api/nav` → `file` / `fileExists` / `sourceFile` |
+| 站点设置（每一项 / 页面开关 / 横幅副标题） | `文件 → within.key`，如 `src/config/siteConfig.ts → navbar.title`、`src/config/backgroundWallpaper.ts → waves.enable.desktop`、`src/config/siteConfig.ts → resolvePageToggles.<name>` | `/api/settings` → `defs[].file/within/key`、`pageToggle.{file,block}` |
+| 站点头像 | `src/config/profileConfig.ts → avatar` + `public/assets/images/<文件名>` | `/api/avatar` → `config.{file,key}` / `repoPath` / `fileExists` |
+| 体检 / 备份 | `admin-backups/<id>/` 与快照里每个文件的 `rel` | `/api/backups` → `dir` / `files[].rel` |
+| 发布 | 「待提交的改动」逐条 `{状态码, 路径}`；发布后列出本次提交的文件与被跳过的范围外改动 | `/api/diff` → `files[]`；`/api/publish` → `files` / `skipped` |
+
+### 加新页面 / 新展示项时必须遵守
+
+1. **复用 `filePathBadge()`**，不要各页自己拼 HTML —— 复制、已复制反馈、打开文件夹只有这一份实现（`data-copy` / `data-reveal` 由文档级事件委托统一处理，新徽章自动生效）。
+2. **路径只能来自后端**：`fs.readdir` / `git status --porcelain -z` / 实际写入路径（保存后返回的 `file`）/ 快照目录，或按站点约定拼好后**当场 `stat` 核对**（如 `publicUrlToRepoPath` / `describeLocalFiles` / `describeFriendIcons`）。**前端不许自己拼路径** —— 拼错就等于让作者去文件管理器里白找一趟。
+3. **不许编造**：文件不存在就如实标 ⚠️ +「文件不存在」并隐藏「打开文件夹」按钮；还没创建的文件标「（尚未创建）」；远程 URL 只显示 URL 本身。
+4. 添加了新的路径字段，就在上面的表里补一行，并同步 `docs/PROJECT-CONTEXT.md` 第 9.10 节与附录 E.2 第 11 行。
+
+### 新增接口：`/api/reveal`（打开所在文件夹）
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/reveal` | POST | `{ path }` → `{ ok, path, kind: "file"\|"directory", message? }` |
+
+- `path` 是**仓库内相对路径**；越界 → `400`（`{"error":"只能打开仓库内的路径：…"}`），不存在 → `404`。
+- 只接受 POST（GET → 405）；未认证照样 `403`（没有为它放宽任何鉴权）；`POST_BODY_FIELDS` 只放行 `path`（多带字段 → 400）。
+- 拉起方式是 `spawn("explorer.exe", ["/select," + 绝对路径], { detached: true, stdio: "ignore" })` 且 `unref()`：**不阻塞请求**、不建管道、不等它退出（explorer 的退出码通常是 1，等它没有意义）。
+- **仅 Windows**：其它平台返回 HTTP 200 + `{"ok": false, "message": "「打开所在文件夹」只在 Windows 上可用；…"}`，不会去尝试 `open` / `xdg-open` 之类行为不确定的命令。
+- 它**不写盘、不打快照、不碰仓库内容**，只是把文件管理器叫起来。
+
+### 顺带修掉的两个真问题
+
+1. **`git status --porcelain` 的解析错位**：`run()` 会对 stdout 做 `trim()`，而 porcelain 的第一条记录可能是 ` M path`（以空格开头）—— 空格被吃掉后状态码与路径整体错位一个字符（`README.md` → `EADME.md`），`stageForPublish` 里 `git add -- <错路径>` 就会失败，表现为「明明有改动，发布却说没有需要提交的改动」。现在 `run()` 支持 `raw: true`（不 trim），`gitStatusZ()` 与 `stageForPublish` 都用它。
+2. **体检里的 Git 详情全是 `undefined undefined`**：`repoInfo()` 返回的 `files` 是字符串数组，而 `doctor.mjs` 按 `f.status` / `f.file` 取值。现在 `repoInfo()` 另外返回结构化的 `changed[{code,path,origin}]`，体检详情改用它。
 
 ## 安全说明
 

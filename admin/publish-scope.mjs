@@ -36,26 +36,40 @@ export function isInPublishScope(relPath) {
 }
 
 /**
- * 解析 `git status --porcelain -z` 的输出，返回去重后的相对路径数组。
+ * 解析 `git status --porcelain -z` 的输出，返回 `{ path, code, origin }` 列表（保序、不去重）。
  * -z 用 NUL 分隔，能安全处理带空格、单引号、非 ASCII 的文件名（音乐封面里就有）。
- * 重命名/复制会占两条记录（旧、新），这里取**新**路径作为代表。
+ *
+ * 两个必须讲清楚的点（调用方 `/api/diff` 靠它们决定「这条路径还能不能打开 / 断言存在」）：
+ *   - `code` 是 porcelain 的两字符状态码（如 ` M`、`??`、` D`）；含 `D` 表示文件已经不在磁盘上。
+ *   - 重命名 / 复制会占**两条**记录。git 文档（git-status，Porcelain v1 的 -z 段）写明
+ *     「the -> is omitted and the field order is reversed」，也就是第一条是**新**路径、
+ *     第二条才是**旧**路径，所以第二条用 `origin: "old"` 标出来 —— 旧路径在磁盘上已经不存在了。
  */
-export function parsePorcelainZ(text) {
+export function parsePorcelainEntriesZ(text) {
 	const records = String(text || "").split("\0").filter((s) => s.length > 0);
 	const out = [];
-	let skipNext = false;
+	let pendingOld = false;
 	for (const rec of records) {
-		if (skipNext) {
-			skipNext = false;
-			out.push(normalizeRelPath(rec));
+		if (pendingOld) {
+			pendingOld = false;
+			out.push({ path: normalizeRelPath(rec), code: "R ", origin: "old" });
 			continue;
 		}
 		const code = rec.slice(0, 2);
 		const p = rec.slice(3);
-		if (code[0] === "R" || code[0] === "C") skipNext = true;
-		out.push(normalizeRelPath(p));
+		// R = rename、C = copy：下一条记录是「旧路径」
+		if (code[0] === "R" || code[0] === "C") pendingOld = true;
+		out.push({ path: normalizeRelPath(p), code, origin: "new" });
 	}
-	return [...new Set(out)];
+	return out;
+}
+
+/**
+ * 解析 `git status --porcelain -z` 的输出，返回去重后的相对路径数组。
+ * 是 parsePorcelainEntriesZ 的「只要路径」投影，两处口径永远一致。
+ */
+export function parsePorcelainZ(text) {
+	return [...new Set(parsePorcelainEntriesZ(text).map((entry) => entry.path))];
 }
 
 /**
@@ -65,7 +79,9 @@ export function parsePorcelainZ(text) {
  * @returns {{ staged: string[], skipped: string[], result: object }}
  */
 export async function stageForPublish(git, repoRoot) {
-	const status = await git(["status", "--porcelain", "-z", "--untracked-files=all"]);
+	// raw: true 是**必须**的：porcelain 的第一条记录可能以空格开头（` M path`），
+	// 一旦被 trim 掉，状态码与路径就会错位一个字符，`git add -- <错路径>` 直接失败。
+	const status = await git(["status", "--porcelain", "-z", "--untracked-files=all"], { raw: true });
 	if (!status.ok) return { staged: [], skipped: [], result: status };
 	const changed = parsePorcelainZ(status.stdout);
 	const staged = changed.filter(isInPublishScope);

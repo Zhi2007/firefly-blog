@@ -326,7 +326,12 @@ export async function runDoctor(repoRoot, options = {}) {
 			summary: info
 				? `${info.dirty ? `${info.files?.length ?? 0} 处未提交` : "工作区干净"}·待推送 ${info.ahead ?? 0}·落后 ${info.behind ?? 0}`
 				: "取不到 Git 状态",
-			details: info?.dirty ? (info.files ?? []).map((f) => `${f.status} ${f.file}`) : [],
+			// changed 是结构化的 { code, path }（server.mjs 的 repoInfo）；
+			// 早期这里读的是 info.files 里的字符串的 f.status / f.file，结果所有详情都渲染成
+			// “undefined undefined” —— 文件路径必须如实显示，所以改用它。
+			details: info?.dirty
+				? (info.changed ?? []).map((f) => `${f.code ?? ""} ${f.path ?? ""}`.trim())
+				: [],
 		});
 	}
 

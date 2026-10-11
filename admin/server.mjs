@@ -10,7 +10,7 @@
  *   node admin/server.mjs --port=8899 --no-open
  */
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -33,7 +33,7 @@ import {
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { AVATAR_DEFAULT, applyAvatar, describeAvatar, restoreDefaultAvatar } from "./avatar.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
-import { PUBLISH_SCOPE, stageForPublish } from "./publish-scope.mjs";
+import { PUBLISH_SCOPE, parsePorcelainEntriesZ, stageForPublish } from "./publish-scope.mjs";
 // CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
 import {
 	CI_CACHE_TTL_MS,
@@ -57,7 +57,7 @@ import { handleFriends, handleFriendsFetch } from "./friends.mjs";
 import { COMPRESS_DIRS, compressImages } from "./media-compress.mjs";
 import { MAX_IMPORT_BYTES, convertToMarkdown } from "./import-doc.mjs";
 import { handleNav } from "./nav.mjs";
-import { SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
+import { PAGE_BLOCK, PAGE_FILE, PAGE_PREFIX, SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
 import { createZip } from "./zip.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -280,18 +280,28 @@ function sanitizePlaylist(input) {
 }
 
 // ── 小工具 ──────────────────────────────────────────────────────────────────
+/**
+ * 跑一个子进程并收集输出。
+ *
+ * `raw: true` 表示**不 trim** stdout —— 这不是洁癖：`git status --porcelain` 的第一条记录
+ * 可能是 ` M path`（以空格开头），trim 会把那个空格吃掉，于是「状态码 + 路径」整体错位一个字符
+ * （`README.md` 会变成 `EADME.md`），发布时 `git add -- <错路径>` 就会失败。
+ */
 function run(cmd, cmdArgs, options = {}) {
+	const { raw, ...execOptions } = options;
 	return new Promise((resolve) => {
 		execFile(
 			cmd,
 			cmdArgs,
-			{ cwd: REPO_ROOT, maxBuffer: 32 * 1024 * 1024, ...options },
+			{ cwd: REPO_ROOT, maxBuffer: 32 * 1024 * 1024, ...execOptions },
 			(error, stdout, stderr) => {
+				const out = stdout || "";
+				const err = stderr || "";
 				resolve({
 					ok: !error,
 					code: error?.code ?? 0,
-					stdout: (stdout || "").trim(),
-					stderr: (stderr || "").trim(),
+					stdout: raw ? out : out.trim(),
+					stderr: raw ? err : err.trim(),
 					message: error?.message || "",
 				});
 			},
@@ -299,8 +309,13 @@ function run(cmd, cmdArgs, options = {}) {
 	});
 }
 
-async function git(gitArgs) {
-	return run("git", gitArgs);
+async function git(gitArgs, options) {
+	return run("git", gitArgs, options);
+}
+
+/** `git status --porcelain -z`：必须保留原始字节（见 run 的 raw 说明） */
+async function gitStatusZ() {
+	return git(["status", "--porcelain", "-z", "--untracked-files=all"], { raw: true });
 }
 
 /**
@@ -650,6 +665,86 @@ async function exists(p) {
 	}
 }
 
+// ── 「这个值落在哪个真实文件里」─────────────────────────────────────────────
+//
+// 面板上每一处路径都必须来自后端：要么是 fs.readdir / git 返回的，要么是按**站点约定**拼出来
+// 并当场 stat 核对过的。这一组小函数就是后半句的公共实现，前端只负责显示，绝不自己拼路径。
+
+/**
+ * 站内公开路径 → 仓库相对路径。
+ * 站点的 web 根是 `public/`（`astro` 的约定），所以 `/assets/music/a.mp3` 就是
+ * `public/assets/music/a.mp3`。只认「以单个 / 开头」的写法；远程 URL、`//` 协议相对、
+ * 相对路径一律返回 null（**不猜**）。
+ */
+function publicUrlToRepoPath(url) {
+	const text = String(url ?? "").trim();
+	if (!text.startsWith("/") || text.startsWith("//")) return null;
+	return `public${text.replace(/\\/g, "/")}`;
+}
+
+/**
+ * 核对一组「站内公开路径」各自对应的真实文件。
+ * @param urls 待核对的 URL（可以是 null / 远程 URL —— 那些返回 null，不显示路径徽章）
+ * @returns 与 urls 等长的数组，元素为 null 或 { repoPath, exists, size }
+ */
+async function describeLocalFiles(urls) {
+	const out = [];
+	for (const url of urls) {
+		const repoPath = publicUrlToRepoPath(url);
+		if (!repoPath) {
+			out.push(null);
+			continue;
+		}
+		let abs;
+		try {
+			// 必须在仓库内才认（`/../etc/passwd` 这类写法直接判为「没有本地文件」）
+			abs = resolveInside(repoPath);
+		} catch {
+			out.push(null);
+			continue;
+		}
+		const stat = await fs.stat(abs).catch(() => null);
+		out.push({
+			repoPath,
+			exists: Boolean(stat?.isFile()),
+			size: stat?.isFile() ? stat.size : null,
+		});
+	}
+	return out;
+}
+
+/**
+ * 「打开所在文件夹」：Windows 上用 `explorer /select,<绝对路径>` 选中该文件（目录则打开它）。
+ *
+ * 三个刻意的写法：
+ *   1. 用 `spawn` 而不是 `execFile`+回调等待：explorer 会自己活得比请求久（而且退出码通常是 1），
+ *      等它只会把接口挂住。`detached: true` + `unref()` 让子进程与本次请求彻底脱钩。
+ *   2. `stdio: "ignore"`：不建管道（受限环境里建管道会 EPERM），也不需要它的输出。
+ *   3. 同步抛错（例如环境不允许起子进程）在这里接住并返回可读中文，绝不让它冒到最外层变 500。
+ *
+ * 非 Windows 一律返回 ok:false + 说明：宁可不做，也不要拉起一个行为不确定的命令。
+ */
+function revealInExplorer(abs) {
+	if (process.platform !== "win32") {
+		return {
+			ok: false,
+			message: "「打开所在文件夹」只在 Windows 上可用；其它系统请在文件管理器里手动定位：",
+		};
+	}
+	try {
+		const child = spawn("explorer.exe", [`/select,${abs}`], {
+			detached: true,
+			stdio: "ignore",
+		});
+		// 拉起失败（缺 explorer.exe）也不能变成未捕获异常：错误已经按 ok:false 回给前端了
+		child.on("error", () => {});
+		child.unref();
+		return { ok: true };
+	} catch (error) {
+		return { ok: false, message: `没能拉起资源管理器：${error?.message ?? error}` };
+	}
+}
+
 async function readYamlModule() {
 	try {
 		const mod = await import("yaml");
@@ -736,6 +831,56 @@ async function stringifyPost(frontmatter, body) {
 	return `---\n${yamlText}\n---\n\n${body.replace(/^\s*\n/, "")}`;
 }
 
+/**
+ * 从文章正文里找出它引用的**本地图片**，并逐个核对真实文件。
+ *
+ * 只认 `./images/<文件名>` 这一种写法 —— 面板把「文章图片」的引用前缀固定成了
+ * `MEDIA_URL_PREFIX["post-images"]`（见该常量的注释），正文里就该这么写。
+ * 其它写法（远程 URL、`/assets/...`、子目录、`../`）一律**不猜**：猜出来的路径只会让作者去找一个不存在的位置。
+ *
+ * 正则刻意带一个「后面必须紧跟收尾符」的断言（`)` / 引号 / `>`，中间可以有一个
+ * Markdown 标题 `"…"`）：文件名里出现空格时 markdown 本身就已经坏了，这时**宁可不列出**，
+ * 也不要截出一段半截文件名去 stat —— 那会显示一个编造的路径。
+ *
+ * 不存在的引用也会返回（`exists: false`）——「文章引用了它，但文件不在」本身就是有用的信息，
+ * 面板会如实标出来，而不是假装它存在。
+ * @returns [{ ref, repoPath, exists, size }]
+ */
+async function postImages(markdown) {
+	const dir = MEDIA_DIRS["post-images"];
+	const prefix = MEDIA_URL_PREFIX["post-images"];
+	const found = [];
+	const seen = new Set();
+	const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	// `(?<![\w./-])`：前缀前面不能紧跟路径字符，否则 `../images/x.png` 会因为其中**含有**
+	// `./images/` 而被误判成 `./images/x.png`（那就等于把一个上跳路径显示成了仓库内路径）。
+	// 结尾断言 `[)"'>]|$`：正文里是 `](./images/x.png)` / `"…"` / `>` 收尾，
+	// 而 frontmatter 的 `image` 是**裸路径**（后面什么都没有），所以必须允许行尾。
+	const pattern = new RegExp(
+		`(?<![\\w./-])${escapedPrefix}([^)"'\\s>]+)(?=\\s*(?:["'][^"']*["']\\s*)?(?:[)"'>]|$))`,
+		"g",
+	);
+	for (const match of String(markdown ?? "").matchAll(pattern)) {
+		const raw = match[1];
+		// 只允许「images 目录下的一个文件名」：带 / 或 ? 或 # 的写法不认（可能是子目录或查询串）
+		if (!/^[^/\\?#]+$/.test(raw)) continue;
+		const repoPath = path.posix.join(dir, raw);
+		if (seen.has(repoPath)) continue;
+		seen.add(repoPath);
+		let existsLocal = false;
+		let size = null;
+		try {
+			const stat = await fs.stat(resolveInside(repoPath, [dir]));
+			existsLocal = stat.isFile();
+			if (existsLocal) size = stat.size;
+		} catch {
+			existsLocal = false;
+		}
+		found.push({ ref: `${prefix}${raw}`, repoPath, exists: existsLocal, size });
+	}
+	return found.sort((a, b) => a.repoPath.localeCompare(b.repoPath));
+}
+
 async function listPosts() {
 	const dir = safeResolve(POSTS_DIR);
 	if (!(await exists(dir))) return [];
@@ -818,7 +963,7 @@ async function listMedia() {
 async function repoInfo() {
 	const [branch, dirtyOut, remoteOut, logOut, upstreamOut, lastOut] = await Promise.all([
 		git(["rev-parse", "--abbrev-ref", "HEAD"]),
-		git(["status", "--porcelain"]),
+		gitStatusZ(),
 		git(["remote", "get-url", "origin"]),
 		git(["log", "-5", "--pretty=format:%h|%ad|%s", "--date=format:%m-%d %H:%M"]),
 		// 与上游的差距：输出 "落后数<TAB>领先数"
@@ -827,9 +972,10 @@ async function repoInfo() {
 	]);
 	const remote = remoteOut.stdout;
 	const repoMatch = remote.match(/github\.com[:/]+([^/]+)\/(.+?)(?:\.git)?$/);
-	const files = dirtyOut.stdout
-		? dirtyOut.stdout.split("\n").filter(Boolean)
-		: [];
+	// changed 是结构化的「状态码 + 路径」（前端与体检报告都靠它显示真实文件路径）；
+	// files 保留成可读的单行文本，只是为了让「未提交改动有几处」这类计数继续成立。
+	const changed = parsePorcelainEntriesZ(dirtyOut.stdout).filter((entry) => entry.path);
+	const files = changed.map((entry) => `${entry.code} ${entry.path}`);
 	const commits = logOut.stdout
 		? logOut.stdout.split("\n").map((line) => {
 				const [hash, date, subject] = line.split("|");
@@ -847,6 +993,8 @@ async function repoInfo() {
 		branch: branch.stdout || "unknown",
 		dirty: files.length > 0,
 		files,
+		// 结构化的改动列表（{ code, path, origin }）：面板用它显示「待提交的真实文件路径」
+		changed,
 		remote,
 		owner: repoMatch?.[1] || "",
 		repo: repoMatch?.[2]?.replace(/\.git$/, "") || "",
@@ -1421,6 +1569,8 @@ const POST_BODY_FIELDS = {
 	"/api/avatar": ["filename", "dataBase64", "restore"],
 	"/api/run": ["script"],
 	"/api/diff": [],
+	// 只读 + 拉起资源管理器（不写盘）；path 必须落在仓库内且真实存在
+	"/api/reveal": ["path"],
 	"/api/status": [],
 	"/api/media": [],
 	"/api/posts": [],
@@ -1529,7 +1679,14 @@ const server = createServer(async (req, res) => {
 				return;
 			}
 			case "/api/posts":
-				sendJson(res, 200, { posts: await listPosts() });
+				// dir / imagesDir 一并回给前端：面板要显示「文章存在哪、它的图片放哪」，
+				// 路径以后端为准（前端不拼），新建文章时的目标路径也从这里取。
+				sendJson(res, 200, {
+					posts: await listPosts(),
+					dir: POSTS_DIR,
+					imagesDir: MEDIA_DIRS["post-images"],
+					imagesUrlPrefix: MEDIA_URL_PREFIX["post-images"],
+				});
 				return;
 
 			case "/api/post": {
@@ -1551,7 +1708,26 @@ const server = createServer(async (req, res) => {
 				}
 				const raw = await fs.readFile(safeResolve(file), "utf-8");
 				const { frontmatter, body: md } = await parseFrontmatter(raw);
-				sendJson(res, 200, { slug, file, frontmatter, body: md, raw });
+				// 正文里引用的图片 + frontmatter.image（封面）都算「这篇文章用到的图片」，
+				// 两者都逐个核对过真实文件；role 让面板区分「封面」与「正文引用」。
+				const bodyImages = await postImages(md);
+				const coverImage = typeof frontmatter?.image === "string" ? frontmatter.image : "";
+				const coverImages = coverImage ? await postImages(coverImage) : [];
+				const coverPaths = new Set(coverImages.map((item) => item.repoPath));
+				const images = [...bodyImages, ...coverImages.filter((item) => !bodyImages.some((b) => b.repoPath === item.repoPath))]
+					.map((item) => ({ ...item, role: coverPaths.has(item.repoPath) ? "cover" : "body" }))
+					.sort((a, b) => a.repoPath.localeCompare(b.repoPath));
+				sendJson(res, 200, {
+					slug,
+					file,
+					dir: POSTS_DIR,
+					imagesDir: MEDIA_DIRS["post-images"],
+					imagesUrlPrefix: MEDIA_URL_PREFIX["post-images"],
+					images,
+					frontmatter,
+					body: md,
+					raw,
+				});
 				return;
 			}
 
@@ -1669,7 +1845,8 @@ const server = createServer(async (req, res) => {
 
 			case "/api/announcements": {
 				if (req.method === "GET") {
-					sendJson(res, 200, { items: await readJsonData("announcements") });
+					// file：公告数据真实落在哪（前端渲染路径徽章用，不在前端拼）
+					sendJson(res, 200, { items: await readJsonData("announcements"), file: DATA_FILES.announcements });
 					return;
 				}
 				// 先自己卡类型：sanitizeAnnouncements 抛的是普通 Error，会让整条链路变成 500
@@ -1705,7 +1882,21 @@ const server = createServer(async (req, res) => {
 
 			case "/api/playlist": {
 				if (req.method === "GET") {
-					sendJson(res, 200, { songs: await readJsonData("playlist") });
+					const songs = await readJsonData("playlist");
+					// paths：每首歌的音频 / 封面 / 歌词各自对应哪个真实文件（后端 stat 核对过）。
+					// 只对「以 / 开头的站内路径」给路径；远程 URL 与填错的路径返回 null / exists:false。
+					const localFiles = await describeLocalFiles(
+						songs.flatMap((song) => [song?.url, song?.cover, song?.lrc]),
+					);
+					sendJson(res, 200, {
+						songs,
+						file: DATA_FILES.playlist,
+						paths: songs.map((_, index) => ({
+							url: localFiles[index * 3] ?? null,
+							cover: localFiles[index * 3 + 1] ?? null,
+							lrc: localFiles[index * 3 + 2] ?? null,
+						})),
+					});
 					return;
 				}
 				if (!Array.isArray(body.songs)) {
@@ -1892,7 +2083,9 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 200, {
 						values: readSettings(REPO_ROOT),
 						defs: SETTINGS_DEFS,
-						pagePrefix: "pages.",
+						pagePrefix: PAGE_PREFIX,
+						// 页面开关写在哪：文件 + 块名（与 SETTINGS_DEFS 的 file/within/key 同一套口径）
+						pageToggle: { file: PAGE_FILE, block: PAGE_BLOCK },
 					});
 					return;
 				}
@@ -2217,8 +2410,59 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/api/diff": {
-				const staged = await git(["diff", "--stat"]);
-				sendJson(res, 200, { stat: staged.stdout });
+				const [stat, status] = await Promise.all([
+					git(["diff", "--stat"]),
+					// -z + raw：路径里带空格 / 单引号 / 非 ASCII（音乐封面就有）也不会解析错，
+					// 第一条记录的前导空格也不会被 trim 吃掉（见 gitStatusZ 的注释）
+					gitStatusZ(),
+				]);
+				// files 是结构化的「待提交路径 + 状态码」：面板按它渲染路径徽章。
+				// code 含 D、或 origin === "old"（重命名前的旧路径）表示磁盘上已经没有这个文件，
+				// 面板不会对它显示「打开所在文件夹」，校验脚本也据此决定要不要断言存在。
+				const files = parsePorcelainEntriesZ(status.stdout).filter((entry) => entry.path);
+				sendJson(res, 200, { stat: stat.stdout, files });
+				return;
+			}
+
+			/**
+			 * 「打开所在文件夹」（可选能力，只在 Windows 上真正执行）：
+			 *   - 认证走面板统一入口（Cookie / 头 / ?token=），没有额外放宽；
+			 *   - 目标必须落在**仓库内**（resolveInside），且必须真实存在；
+			 *   - 只接受 POST（避免被 <img>/<a> 这类 GET 顺带触发），不阻塞请求（见 revealInExplorer）；
+			 *   - 非 Windows 返回 ok:false + 中文说明，绝不猜测性地拉起别的命令。
+			 */
+			case "/api/reveal": {
+				if (req.method !== "POST") {
+					sendJson(res, 405, { error: "请用 POST 调用 /api/reveal" });
+					return;
+				}
+				const rel = String(body.path ?? "")
+					.trim()
+					.replace(/\\/g, "/")
+					.replace(/^\.\//, "");
+				if (!rel) {
+					sendJson(res, 400, { error: "缺少要打开的路径（path）" });
+					return;
+				}
+				let abs;
+				try {
+					abs = resolveInside(rel);
+				} catch {
+					sendJson(res, 400, { error: `只能打开仓库内的路径：${rel}` });
+					return;
+				}
+				const stat = await fs.stat(abs).catch(() => null);
+				if (!stat) {
+					sendJson(res, 404, { error: `仓库里没有这个路径：${rel}` });
+					return;
+				}
+				const revealed = revealInExplorer(abs);
+				sendJson(res, 200, {
+					ok: revealed.ok,
+					path: rel,
+					kind: stat.isDirectory() ? "directory" : "file",
+					...(revealed.message ? { message: `${revealed.message}${rel}` } : {}),
+				});
 				return;
 			}
 
