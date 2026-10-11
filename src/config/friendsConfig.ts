@@ -42,7 +42,7 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "噗呲先生",
-		imgurl: "https://api.iowen.cn/favicon/www.91biu.work.png",
+		imgurl: "/friends/91biu.work.svg",
 		desc: "差生工具多",
 		siteurl: "https://www.91biu.work/",
 		tags: ["友链"],
@@ -78,7 +78,7 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "PanDaTech's Blog",
-		imgurl: "https://api.iowen.cn/favicon/www.pandadatech.cn.png",
+		imgurl: "/friends/pandadatech.webp",
 		desc: "PanDaTech's Blog - 愿此行，终抵群星。分享个人技术经验，培养个人爱好，创造新的人生。",
 		siteurl: "https://www.pandadatech.cn/",
 		tags: ["友链"],
@@ -213,8 +213,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "莫离然然资源站",
-		imgurl: "https://api.iowen.cn/favicon/moliranran.com.png",
-		desc: "（简介待补充）",
+		imgurl: "/friends/moliranran.com.jpeg",
+		desc: "欢迎来到 莫离然然的下载站",
 		siteurl: "https://moliranran.com:5245/",
 		tags: ["友链"],
 		weight: 20,
