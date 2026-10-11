@@ -18,6 +18,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
+import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
+import { runDoctor } from "./doctor.mjs";
+import { SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -133,6 +136,7 @@ async function readJsonData(key) {
 }
 
 async function writeJsonData(key, value) {
+	await snapshotBefore(DATA_FILES[key], `保存 ${key}`);
 	// 制表符缩进，和仓库里其它 JSON 保持一致
 	await fs.writeFile(
 		safeResolve(DATA_FILES[key]),
@@ -247,6 +251,20 @@ function safeResolve(relative) {
 	const abs = path.resolve(REPO_ROOT, relative);
 	if (!abs.startsWith(REPO_ROOT)) throw new Error(`路径越界: ${relative}`);
 	return abs;
+}
+
+/**
+ * 写操作之前的快照：把原文件另存到 admin-backups/（已 gitignore，不会提交也不会发布）。
+ * 备份失败不阻断保存，但会把警告返回给前端。
+ */
+async function snapshotBefore(rels, reason) {
+	try {
+		const list = (Array.isArray(rels) ? rels : [rels]).filter(Boolean);
+		for (const rel of list) safeResolve(rel); // 越界直接抛错
+		return await createSnapshot(REPO_ROOT, list, { reason });
+	} catch (error) {
+		return { id: null, warning: `快照失败：${error?.message ?? error}` };
+	}
 }
 
 async function exists(p) {
@@ -481,8 +499,24 @@ async function findPnpm() {
 	return null;
 }
 
-async function publish(message) {
+async function publish(message, options = {}) {
 	const steps = [];
+
+	// 发布前把关：体检发现 error 级问题就先拦住（前端可以带 force 跳过）
+	if (!options.force) {
+		const report = await runDoctor(REPO_ROOT, { gitInfo: repoInfo });
+		const errors = report.checks.filter((c) => c.level === "error");
+		if (errors.length > 0) {
+			return {
+				ok: false,
+				blocked: true,
+				steps,
+				report,
+				message: `体检发现 ${errors.length} 个必须先修的问题，已阻止发布：${errors.map((e) => e.title).join("；")}`,
+			};
+		}
+	}
+
 	const add = await git(["add", "-A"]);
 	steps.push({ name: "git add -A", ...add });
 
@@ -694,6 +728,10 @@ const server = createServer(async (req, res) => {
 				const content = await stringifyPost(frontmatter || {}, md || "");
 				const target = safeResolve(`${POSTS_DIR}/${slug}.md`);
 				await fs.mkdir(path.dirname(target), { recursive: true });
+				await snapshotBefore(
+					[`${POSTS_DIR}/${slug}.md`, originalSlug ? `${POSTS_DIR}/${originalSlug}.md` : null],
+					"保存文章",
+				);
 				await fs.writeFile(target, content, "utf-8");
 				if (originalSlug && originalSlug !== slug) {
 					const oldFile = safeResolve(`${POSTS_DIR}/${originalSlug}.md`);
@@ -710,6 +748,7 @@ const server = createServer(async (req, res) => {
 					return;
 				}
 				const file = safeResolve(`${POSTS_DIR}/${slug}.md`);
+				await snapshotBefore(`${POSTS_DIR}/${slug}.md`, "删除文章");
 				if (await exists(file)) await fs.rm(file, { force: true });
 				sendJson(res, 200, { ok: true });
 				return;
@@ -910,6 +949,7 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "不在可编辑白名单内" });
 					return;
 				}
+				await snapshotBefore(rel, "保存配置文件");
 				await fs.writeFile(safeResolve(rel), content ?? "", "utf-8");
 				sendJson(res, 200, { ok: true, path: rel });
 				return;
@@ -922,7 +962,45 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/api/publish": {
-				const result = await publish(body.message);
+				const result = await publish(body.message, { force: body.force === true });
+				sendJson(res, 200, result);
+				return;
+			}
+
+			case "/api/doctor": {
+				const report = await runDoctor(REPO_ROOT, { gitInfo: repoInfo });
+				sendJson(res, 200, report);
+				return;
+			}
+
+			case "/api/settings": {
+				if (req.method !== "POST") {
+					sendJson(res, 200, {
+						values: readSettings(REPO_ROOT),
+						defs: SETTINGS_DEFS,
+						pagePrefix: "pages.",
+					});
+					return;
+				}
+				const patch = body?.values && typeof body.values === "object" ? body.values : body;
+				const result = await applySettings(REPO_ROOT, patch, async (rel) => {
+					await snapshotBefore(rel, "修改站点设置");
+				});
+				sendJson(res, 200, {
+					ok: true,
+					...result,
+					message: `已更新 ${result.changed.length} 项设置（改动前的版本已自动备份）`,
+				});
+				return;
+			}
+
+			case "/api/backups": {
+				sendJson(res, 200, { backups: await listSnapshots(REPO_ROOT) });
+				return;
+			}
+
+			case "/api/restore": {
+				const result = await restoreSnapshot(REPO_ROOT, body.id, body.rel);
 				sendJson(res, 200, result);
 				return;
 			}
