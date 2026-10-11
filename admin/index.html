@@ -304,6 +304,24 @@
 			<section class="panel" id="panel-announce">
 				<div class="card">
 					<div class="row">
+						<h2 style="margin:0">从最近改动生成更新公告草稿</h2>
+						<span class="muted small">只读 git 历史：生成草稿填进下面的表单，不会自动发布</span>
+					</div>
+					<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+						<input id="draftSince" placeholder="起始点（可留空）：提交 sha / 天数（如 30）/ 日期 2026-10-01" style="flex:2;min-width:260px" />
+						<input id="draftLimit" type="number" min="1" max="200" value="20" title="最多取多少条提交（只在判断不出「上次公告」、退化成「最近 N 条」时生效；其余情况上限 200）" style="width:100px" />
+						<button class="action" id="btnGenDraft">生成草稿</button>
+					</div>
+					<div id="draftHint" class="muted small" style="margin-top:8px">
+						留空 = 自「上次公告」之后（取最后一次改动 <code>announcements.json</code> 的提交）；只统计
+						<code>feat:</code> / <code>fix:</code> / <code>perf:</code>，跳过合并提交与
+						<code>chore:</code> / <code>docs:</code> / <code>style:</code> / <code>ci:</code>。
+					</div>
+					<div id="draftWarnings" class="small" style="margin-top:8px"></div>
+				</div>
+
+				<div class="card">
+					<div class="row">
 						<h2 style="margin:0">公告列表</h2>
 						<span class="muted small">勾选「固定」的那条会作为首访弹窗内容，新公告不会顶掉它</span>
 						<span style="flex:1"></span>
@@ -2127,6 +2145,66 @@
 				scheduleAutoPublish("feat: 更新公告");
 			}
 
+			// ── 更新公告草稿（只读 git 历史 → 填表单；绝不自动发布） ────────
+			let draftPending = false;
+
+			/** 把草稿区间与 warnings 显示在按钮下方（全部走 escapeHtml，外来的提交说明不进 innerHTML） */
+			function renderDraftWarnings(warnings, message) {
+				const lines = [];
+				if (message) lines.push(message);
+				for (const warn of warnings || []) lines.push(`⚠️ ${warn}`);
+				$("draftWarnings").innerHTML = lines
+					.map((line) => `<div style="margin-top:4px">${escapeHtml(line)}</div>`)
+					.join("");
+			}
+
+			async function generateAnnouncementDraft() {
+				const since = $("draftSince").value.trim();
+				const limit = $("draftLimit").value.trim();
+				// 草稿是「新建一条公告」，会覆盖编辑器里正在填的内容 —— 正在编辑已有公告时先问一句
+				if (announceIndex >= 0 && $("announceEditor").style.display !== "none") {
+					if (!confirm("生成草稿会把当前编辑中的公告表单替换成新草稿（不会保存任何东西），继续？")) return;
+				}
+				const query = new URLSearchParams();
+				if (since) query.set("since", since);
+				if (limit) query.set("limit", limit);
+				const suffix = query.toString();
+				$("btnGenDraft").disabled = true;
+				$("draftWarnings").innerHTML = "";
+				try {
+					const data = await api(`/api/announcement-draft${suffix ? `?${suffix}` : ""}`);
+					const rangeText = `区间：${data.range?.label || "（未知）"}；读到 ${data.range?.fetched ?? 0} 条提交`;
+					if (!data.hasDraft) {
+						// 明确告知「没有可用的提交」，而不是塞一条空公告进表单
+						renderDraftWarnings(data.warnings, `${rangeText} —— ${data.message}`);
+						toast(data.message || "没有可用的提交，未生成草稿", "err");
+						return;
+					}
+					// 新建（index = -1）：草稿只是预填，用户确认/删减后再点「保存」
+					draftPending = true;
+					openAnnouncement(-1);
+					$("aId").value = data.draft.id;
+					$("aTitle").value = data.draft.title;
+					$("aPublished").value = data.draft.published;
+					$("aVersion").value = data.draft.version || "";
+					$("aType").value = data.draft.type || "info";
+					$("aPinned").checked = data.draft.pinned === true;
+					$("aContent").value = data.draft.content;
+					$("aLinkRows").innerHTML = "";
+					(data.draft.links || [{}]).forEach((link) => $("aLinkRows").appendChild(linkRow(link)));
+					renderDraftWarnings(
+						data.warnings,
+						`${rangeText} —— ${data.message}`,
+					);
+					toast(`已生成草稿（${data.stats.used} 条要点），确认或删减后点「保存」`, "ok");
+				} catch (error) {
+					renderDraftWarnings([], `生成失败：${error.message}`);
+					toast(error.message, "err");
+				} finally {
+					$("btnGenDraft").disabled = false;
+				}
+			}
+
 			// ── 音乐 ───────────────────────────────────────────────────────
 			let songCache = [];
 			let songIndex = -1;
@@ -2303,6 +2381,7 @@
 
 			// 公告按钮
 			$("btnNewAnnounce").addEventListener("click", () => openAnnouncement(-1));
+			$("btnGenDraft").addEventListener("click", generateAnnouncementDraft);
 			$("btnCancelAnnounce").addEventListener("click", () => {
 				$("announceEditor").style.display = "none";
 			});
@@ -2315,6 +2394,11 @@
 					if (isNew) items.unshift(item);
 					else items[announceIndex] = item;
 					await saveAnnouncements(items, isNew ? "公告已新增" : "公告已更新");
+					// 草稿保存成功：明确告诉用户「还差最后一步」，否则他会以为已经上线了
+					if (draftPending) {
+						draftPending = false;
+						toast("草稿已保存为公告。去「发布」页点「立即发布」推送，回访的老访客才能看到", "ok");
+					}
 					announceIndex = -1;
 					$("announceEditor").style.display = "none";
 				} catch (error) {
