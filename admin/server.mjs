@@ -17,6 +17,19 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// 更新公告草稿：真正会出错的规则（提交解析 / 分组 / Markdown 转义 / 参数校验）都在这个纯函数文件里，
+// 这里只负责「跑 git log（只读）+ 拼 HTTP 响应」
+import {
+	COMMIT_LOG_FORMAT,
+	MAX_FETCH,
+	buildAnnouncementDraft,
+	daysAgoIsoDate,
+	describeRangeLabel,
+	formatDay,
+	parseCommitLog,
+	parseDraftQuery,
+	suggestDraftId,
+} from "./announcement-draft.mjs";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { AVATAR_DEFAULT, applyAvatar, describeAvatar, restoreDefaultAvatar } from "./avatar.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
@@ -79,7 +92,7 @@ const CONFIG_FILES = [
 	"src/config/announcementConfig.ts",
 	"src/config/announcements.json",
 	"src/config/music-playlist.json",
-	"src/config/friends.json",
+	"src/config/friends.json", "src/config/feature-tour.json",
 	"src/config/commentConfig.ts",
 	"src/config/analyticsConfig.ts",
 	"src/config/effectsConfig.ts",
@@ -348,6 +361,183 @@ async function gitNet(gitArgs) {
 		viaDirect: retry.ok,
 		firstTryError: detail.trim().split("\n").slice(-1)[0] || "",
 	};
+}
+
+/**
+ * ── 更新公告草稿（GET /api/announcement-draft）─────────────────────────────
+ * 解决的是「加完功能，老访客不知道你改了什么」：读 git log（**只读**）→ 交给纯函数
+ * 分组整理成中文草稿 → 回给前端填进公告表单，让人确认/删减后再保存。
+ *
+ * 三条刻意设计的边界：
+ *   1. **绝不写盘**：不碰 announcements.json、不打快照、不改任何文件（测试里会验证请求前后
+ *      `git status` 不变）；
+ *   2. **绝不自动发布**：它只产草稿；保存仍走 POST /api/announcements，上线仍走「发布」页；
+ *   3. **git 失败一律降级**：给可读中文原因 + 合适的 4xx/5xx，绝不抛未捕获异常。
+ */
+
+/** 判断「上次公告」是哪个提交：最后一次改动 announcements.json 的那条 */
+async function lastAnnouncementCommit() {
+	const result = await git([
+		"--no-pager",
+		"log",
+		"-1",
+		"--format=%H",
+		"--",
+		DATA_FILES.announcements,
+	]);
+	if (!result.ok) return null;
+	const sha = result.stdout.split(/\r?\n/)[0].trim();
+	return /^[0-9a-fA-F]{7,40}$/.test(sha) ? sha : null;
+}
+
+/** git 用不了时的兜底起点：公告里出现过的最新发布日期 */
+async function lastAnnouncementDate() {
+	try {
+		const items = await readJsonData("announcements");
+		const days = items
+			.map((item) => String(item?.published ?? "").slice(0, 10))
+			.filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))
+			.sort();
+		return days.length > 0 ? days[days.length - 1] : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * 生成草稿并组装 HTTP 响应（status + payload 都由这里决定，路由里只负责发出去）。
+ * @param {{since: null|{kind: string, value: string|number, label: string}, limit: number}} query
+ */
+async function announcementDraftResponse(query) {
+	const now = Date.now();
+	const warnings = [];
+	let mode = "recent";
+	let since = null;
+	let rangeArgs = [];
+	let cap = MAX_FETCH;
+
+	if (query.since) {
+		since = query.since.value;
+		mode = query.since.kind;
+		if (query.since.kind === "sha") {
+			// 语法合法但不存在（或不是提交）的 sha：这是用户填错了，回 400 而不是 500
+			const exists = await git([
+				"rev-parse",
+				"--verify",
+				"--quiet",
+				`${query.since.value}^{commit}`,
+			]);
+			if (!exists.ok || !exists.stdout.trim()) {
+				return {
+					status: 400,
+					payload: {
+						error: `起始提交不存在：${query.since.value}（也可以改填天数，例如 since=30，或日期 2026-10-01）`,
+					},
+				};
+			}
+			rangeArgs = [`${query.since.value}..HEAD`];
+		} else if (query.since.kind === "date") {
+			rangeArgs = [`--since=${query.since.value}`];
+		} else {
+			since = daysAgoIsoDate(query.since.value, now);
+			rangeArgs = [`--since=${since}`];
+		}
+	} else {
+		// 默认：自「上次公告」之后。优先用提交（精确到发布那一刻），其次用公告里的日期
+		const commit = await lastAnnouncementCommit();
+		if (commit) {
+			mode = "announcement-commit";
+			since = commit;
+			rangeArgs = [`${commit}..HEAD`];
+		} else {
+			const date = await lastAnnouncementDate();
+			if (date) {
+				mode = "announcement-date";
+				since = date;
+				rangeArgs = [`--since=${date}`];
+			} else {
+				mode = "recent";
+				cap = query.limit;
+				warnings.push(
+					"判断不出「上次公告」是哪次提交（git 历史或公告文件读不到），已退化成取最近若干条提交。可以手动填起始点（天数 / 日期 / 提交 sha）缩小范围。",
+				);
+			}
+		}
+	}
+
+	const log = await git([
+		"--no-pager",
+		"log",
+		`--pretty=format:${COMMIT_LOG_FORMAT}`,
+		"-n",
+		String(cap),
+		...rangeArgs,
+	]);
+	if (!log.ok) {
+		const detail = (log.stderr || log.message || "").split(/\r?\n/)[0].trim();
+		return {
+			status: 502,
+			payload: {
+				error: `读取 git 历史失败${detail ? `：${detail}` : ""}（请确认当前目录是 git 仓库；也可以改填 since 参数缩小范围）`,
+			},
+		};
+	}
+
+	const commits = parseCommitLog(log.stdout);
+	const draft = buildAnnouncementDraft(commits, { now });
+	const truncated = commits.length >= cap;
+	if (truncated) {
+		warnings.push(
+			`只读取了前 ${cap} 条提交（区间里的提交更多）：请填一个更近的起始点，或分批生成，不要漏发。`,
+		);
+	}
+	const label = query.since
+		? query.since.label
+		: describeRangeLabel({ mode, limit: query.limit, since });
+	const payload = {
+		ok: true,
+		hasDraft: !draft.stats.empty,
+		empty: draft.stats.empty,
+		range: {
+			mode,
+			label,
+			since,
+			limit: query.limit,
+			fetched: commits.length,
+			truncated,
+			cap,
+		},
+		draft: draft.stats.empty
+			? null
+			: {
+					// id 必须满足公告 id 的既有约束（字母数字与 . _ -），见 sanitizeAnnouncements
+					id: suggestDraftId(commits, now),
+					title: draft.title,
+					published: formatDay(now),
+					version: formatDay(now),
+					type: "info",
+					// 默认不勾固定：固定公告只能有一条，勾不勾是人的决定（草稿里会提示）
+					pinned: false,
+					content: draft.body,
+					links: [],
+				},
+		warnings: [...warnings, ...draft.warnings],
+		stats: draft.stats,
+		commits: commits.map((commit) => ({
+			hash: commit.hash,
+			shortHash: commit.shortHash,
+			type: commit.type,
+			scope: commit.scope,
+			subject: commit.text,
+			breaking: commit.breaking,
+			conventional: commit.conventional,
+			merge: commit.merge,
+		})),
+		message: draft.stats.empty
+			? "没有可用的提交，未生成草稿（不会用一条空公告糊弄访客）"
+			: `已生成草稿：${draft.title}（${draft.stats.used} 条要点）。请确认或删减后点「保存」，再去「发布」页推送即可上线。`,
+	};
+	return { status: 200, payload };
 }
 
 /** 把仓库内的相对路径解析成绝对路径，并阻止越界访问 */
@@ -1208,6 +1398,8 @@ const POST_BODY_FIELDS = {
 	"/api/upload": ["dir", "filename", "dataBase64"],
 	"/api/delete-media": ["repoPath"],
 	"/api/announcements": ["items"],
+	// 草稿是 GET-only：登记空数组不是为了接收字段，而是让「往只读接口 POST 带字段」也走 400 而不是静默执行
+	"/api/announcement-draft": [],
 	"/api/playlist": ["songs"],
 	"/api/save-lyrics": ["url", "text", "duration"],
 	"/api/extract-audio": ["repoPath", "url"],
@@ -1492,6 +1684,22 @@ const server = createServer(async (req, res) => {
 					items,
 					message: `已保存 ${items.length} 条公告${items.some((i) => i.pinned) ? "（含 1 条固定公告）" : "（没有固定公告）"}`,
 				});
+				return;
+			}
+
+			case "/api/announcement-draft": {
+				// 只读接口：读 git log → 生成草稿。绝不写盘、绝不发布（见 announcementDraftResponse 注释）
+				if (req.method !== "GET") {
+					sendJson(res, 405, { error: "请用 GET 调用 /api/announcement-draft" });
+					return;
+				}
+				const query = parseDraftQuery(Object.fromEntries(url.searchParams));
+				if (!query.ok) {
+					sendJson(res, 400, { error: query.error });
+					return;
+				}
+				const result = await announcementDraftResponse(query);
+				sendJson(res, result.status, result.payload);
 				return;
 			}
 

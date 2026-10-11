@@ -46,6 +46,7 @@
 | 文章系列（series / seriesOrder） | frontmatter `series` / `seriesOrder`；导航组件 `src/components/misc/SeriesNav.astro` |
 | 文章封面 + LQIP 模糊占位图 | `src/config/coverImageConfig.ts`（`enableInPost` / `enableInPostOverlay` / 随机封面 API）；占位数据由 `scripts/generate-lqips.ts` 生成到 `src/constants/lqips.json` |
 | 音乐播放器（悬浮左下角，可收起） | `src/config/musicConfig.ts` → `floating.enable: true`、`position: "bottom-left"`；歌单 `src/config/music-playlist.json` |
+| **主页功能导览**（首页中间栏顶部，可翻页） | 5 页 / 19 条功能，新访客一进站就知道本站有什么；上一页/下一页/圆点、←/→ 键盘、触摸滑动；默认不自动轮播。数据 `src/config/feature-tour.json`（可在面板「配置」页编辑），开关 `src/config/featureTourConfig.ts` |
 | 歌词逐行高亮 | `musicConfig.ts` → `showLyrics: true`；每首歌的 `lrc` 指向 `public/assets/music/lrc/*.lrc`（带时间戳才逐行高亮） |
 | 音频边下边播 / 拖动进度条 | `worker/index.mjs` 为 `/assets/music/*` 实现 `206` / `ETag` / `HEAD` / `416`（Workers 静态资源本身不处理 Range） |
 | 看板娘（Live2D） | `src/config/pioConfig.ts` → `live2dWidgetConfig.enable: true`，模型 `/pio/models/live2d/snow_miku/model.json`；Spine 是 `spineModelConfig.enable: false` |
@@ -696,6 +697,7 @@ export const tabTitleConfig: TabTitleConfig = {
 - 字段：`id`（必填、只允许字母数字与 `. _ -`）、`title`、`published`（`YYYY-MM-DD`）、`content`、`type`（`info` / `success` …）、`links[]`（`text` / `url` / 可选 `external`）、`pinned`、`version`。
 - `pinned: true` 的那条是"固定公告"：首访弹窗永远展示它；**只能有一条**（体检会报错）。想让所有访客重新看到弹窗，改它的 `version`（或 `id`）——`announcementConfig.modal.storageKey` 记录的正是这个版本号。
 - 列表按日期倒序展示；不勾 `pinned` 的公告只进公告页列表。
+- **加完功能想告诉回访的老访客**：不用手写 JSON —— 面板「公告」页顶部点「**从最近改动生成更新公告草稿**」，它会读 `git log`（只读）把 `feat:` / `fix:` / `perf:` 整理成中文草稿填进表单（`chore:` / 合并提交自动跳过），你确认或删减后点「保存」，再去「发布」页推送即可上线。规则、接口与边界见 [`admin/README.md`](./admin/README.md) 的「更新公告草稿」一节。
 
 ### 7.12 `music-playlist.json`
 
@@ -773,7 +775,7 @@ export const tabTitleConfig: TabTitleConfig = {
 | --- | --- |
 | **概览** | 看仓库/分支/未提交改动、最近提交、最近一次 GitHub Actions 部署状态、本地是否装了 pnpm；按钮：启动本地预览、本地构建、类型检查 |
 | **文章** | 列表 / 新建 / 编辑 / 删除；标题、日期、摘要、标签与分类（带候选下拉，可新增）、封面（可直接上传）、草稿、置顶、密码；Markdown 正文 + 实时预览 + 实时字数；**从 Word / txt 导入** |
-| **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾「固定为弹窗公告」的那条成为首访弹窗；改「弹窗版本号」让所有访客重新看到一次 |
+| **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾「固定为弹窗公告」的那条成为首访弹窗；改「弹窗版本号」让所有访客重新看到一次；**「从最近改动生成更新公告草稿」**（读 `git log` 把 `feat:` / `fix:` / `perf:` 整理成中文草稿填进表单，**只产草稿、不自动发布**） |
 | **音乐** | 上传音频/封面/歌词并加入歌单；编辑歌曲信息、调整播放顺序、本地试听；数据写 `src/config/music-playlist.json`；一键压缩（先试算 / 只压封面 / 音频+封面） |
 | **媒体** | 按目录查看文章图片、音乐、封面、歌词、头像；上传（可多选）、复制路径、删除；批量转 WebP（默认先试算，只新增 `.webp`，不删原图）。**换站点头像请去「站点设置 → 站点头像」**：这里只放文件，不会改配置 |
 | **配置** | 直接编辑 `src/config/*` 的白名单文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
@@ -800,6 +802,7 @@ export const tabTitleConfig: TabTitleConfig = {
 **示例 B：换一条首页公告，并让所有访客重新看到弹窗**
 
 1. 进「公告」页，新建或编辑公告：标题、日期、类型（info/success…）、正文、按钮链接。
+   - 刚加完功能、只想告诉大家"更新了什么"？点上方「**从最近改动生成更新公告草稿**」：留空起始点 = 自上次公告之后，也可手填天数（如 `30`）或提交 sha；它会读 `git log`（**只读**）把 `feat:` / `fix:` / `perf:` 分成「新增 / 修复 / 优化」填进表单并给出提示。**它只产草稿**：确认/删减后再点「保存」，然后照下面第 4 步发布。
 2. 勾选「**固定为弹窗公告**」——固定公告只能有一条，勾了它，首访弹窗就展示它（其余公告只进公告页列表）。
 3. 把「**弹窗版本号**」改成新的值（例如今天的日期）。访客浏览器里存的正是这个版本号（`announcementConfig.modal.storageKey = "zhi-blog-announcement-version"`），**只改内容不改版本号，老访客不会再看到**。
 4. 保存 → 发布。
