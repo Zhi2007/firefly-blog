@@ -5,7 +5,6 @@ description: 这个博客的技术选型和第一篇介绍——Astro 静态生�
 tags: [公告, Astro, Cloudflare]
 category: 公告
 image: ./images/cover-demo.png
-pinned: true
 ---
 
 欢迎来到栀海的博客。
