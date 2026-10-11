@@ -11,8 +11,9 @@ category: 折腾
 ## 一、本地构建并首次部署
 
 ```sh
-npm install          # 只做一次
-npm run deploy       # astro build + wrangler deploy
+pnpm install         # 只做一次（本仓库用 pnpm，npm/yarn 会被 preinstall 拦住）
+pnpm build           # 完整构建：LQIP → Astro → 字体子集化 → Pagefind 索引
+npx wrangler deploy  # 部署到 Cloudflare
 ```
 
 第一次运行 `wrangler deploy` 会打开浏览器要求授权登录 Cloudflare 账号。登录完成后回到终端，会看到：
@@ -32,7 +33,7 @@ Deployed my-blog triggers (x.xx sec)
 1. 在 Cloudflare 控制台 **Workers & Pages → 你的 Worker → Settings → Domains & Routes**，点 **Add → Custom Domain**，填 `blog.example.com`。
 2. 如果域名还没接入 Cloudflare：先在控制台 **Add site** 添加域名，然后到域名注册商处把 NS 改成 Cloudflare 给的两个名称服务器。
 3. 添加成功后 Cloudflare 会自动签发证书，通常 1～15 分钟生效。
-4. 顺手把 `astro.config.mjs` 里的 `site` 和 `src/consts.ts` 里的 `url` 改成新域名，这样 RSS 和站点地图里的链接才是对的。
+4. 顺手把 `astro.config.mjs` 里的 `site` 和 `src/config/siteConfig.ts` 里的 `site_url` 改成新域名，这样 RSS 和站点地图里的链接才是对的。
 
 ## 三、值得打开的开关
 
@@ -48,14 +49,14 @@ Deployed my-blog triggers (x.xx sec)
 | `Error 1027` | Workers 免费额度当天用尽（10 万次/天，UTC 零点重置）；静态资源站点一般很难碰到 |
 | 访问域名 522 / 521 | 这是源站类错误，纯静态部署在 CF 上不会出现；出现说明路径配置有问题，检查 `wrangler.jsonc` 的 `assets.directory` |
 | 子域被占用 | 改 `wrangler.jsonc` 里的 `name` |
-| 页面样式丢失 | 检查 `npm run build` 是否成功、`dist/` 是否生成 |
+| 页面样式丢失 | 检查 `pnpm build` 是否成功、`dist/` 是否生成 |
 | 国内访问慢 | 免费版没有中国大陆节点，通常走香港/日本；这是免费方案的固有代价 |
 
 ## 五、之后的更新流程
 
 ```sh
-npm run dev        # 本地写、本地看
-npm run deploy     # 满意了就上线
+pnpm dev           # 本地写、本地看
+git push           # 推送到 GitHub，Actions 会自动构建并部署
 ```
 
 如果想更省事，可以把仓库连到 Cloudflare 的 Git 集成（Workers Builds），以后 `git push` 就自动构建部署。

@@ -32,7 +32,7 @@ category: 写作
 
 ## 代码
 
-行内代码用反引号，比如 `npm run deploy`。
+行内代码用反引号，比如 `pnpm build`。
 
 代码块可以标语言，构建时会自动做语法高亮：
 
@@ -43,7 +43,7 @@ export function greet(name) {
 ```
 
 ```sh
-npm run build
+pnpm build
 npx wrangler deploy
 ```
 
@@ -51,15 +51,15 @@ npx wrangler deploy
 
 | 功能 | 命令 |
 | --- | --- |
-| 本地预览 | `npm run dev` |
-| 构建 | `npm run build` |
-| 构建并部署 | `npm run deploy` |
+| 本地预览 | `pnpm dev` |
+| 构建 | `pnpm build` |
+| 构建并部署 | `git push`（Actions 自动构建部署） |
 
 ## 链接与图片
 
 链接：`[Cloudflare](https://www.cloudflare.com/)` → [Cloudflare](https://www.cloudflare.com/)
 
-图片：把文件放进 `public/`，然后用 `![说明](/图片名.png)` 引用；文章专属图片也可以放在 `src/content/blog/` 旁边用相对路径引用。
+图片：把文件放进 `public/`，然后用 `![说明](/图片名.png)` 引用；文章专属图片也可以放在 `src/content/posts/` 旁边用相对路径引用。
 
 ## 分隔线
 

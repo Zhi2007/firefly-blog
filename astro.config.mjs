@@ -244,6 +244,10 @@ export default defineConfig({
 				if (pathname === "/dynamic/" && !siteConfig.pages.dynamic) {
 					return false;
 				}
+				// 项目展示页：关闭时同样要排除，否则会往 sitemap 里塞 404 地址
+				if (pathname === "/projects/" && !siteConfig.pages.projects) {
+					return false;
+				}
 				if (pathname.startsWith("/gallery/") && !siteConfig.pages.gallery) {
 					return false;
 				}
@@ -268,10 +272,11 @@ export default defineConfig({
 				if (pathname === "/myanimelist/" && !siteConfig.pages.mal) {
 					return false;
 				}
-				// 动态页评论嵌入页：评论关闭时重定向到 /404/，不应进 sitemap
+				// 动态页评论嵌入页：动态页关闭或评论不可用时重定向到 /404/，不应进 sitemap
 				if (
 					pathname === "/dynamic/comments/" &&
-					(dynamicConfig.showComment === false ||
+					(!siteConfig.pages.dynamic ||
+						dynamicConfig.showComment === false ||
 						!commentConfig.type ||
 						commentConfig.type === "none")
 				) {

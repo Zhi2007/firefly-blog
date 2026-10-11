@@ -19,13 +19,13 @@ pinned: true
 
 ## 怎么发一篇新文章
 
-在 `src/content/blog/` 里新建一个 `.md` 文件，开头写上元信息：
+在 `src/content/posts/` 里新建一个 `.md` 文件，开头写上元信息：
 
 ```markdown
 ---
 title: 文章标题
 description: 一句话摘要，会显示在列表和搜索结果里
-pubDate: 2026-10-09
+published: 2026-10-09
 tags: ['随笔']
 draft: false
 ---
@@ -36,13 +36,13 @@ draft: false
 然后本地预览：
 
 ```sh
-npm run dev      # http://localhost:4321
+pnpm dev         # http://localhost:4321
 ```
 
 确认没问题后发布：
 
 ```sh
-npm run deploy   # = astro build + wrangler deploy
+git push         # 推送到 GitHub，Actions 会自动构建并部署
 ```
 
 就这两步。

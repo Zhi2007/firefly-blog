@@ -28,7 +28,7 @@ const SECURITY_HEADERS = {
 	"permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
 	"x-xss-protection": "0",
 	"content-security-policy":
-		"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'",
+		"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'",
 };
 
 export default {
@@ -61,13 +61,13 @@ export default {
 			// 4) 其余交给静态资源 + 安全头与缓存策略
 			return await serveAsset(request, env);
 		} catch (error) {
-			// 出问题时尽量保底：直接把请求交给静态资源；再失败才返回 503
+			// 出问题时尽量保底：直接把请求交给静态资源；再失败才返回 503（不回显内部错误细节）
 			try {
 				return await env.ASSETS.fetch(request);
 			} catch {
-				return new Response(`服务暂时不可用：${error?.message ?? error}`, {
+				return new Response("服务暂时不可用，请稍后重试。", {
 					status: 503,
-					headers: SECURITY_HEADERS,
+					headers: { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" },
 				});
 			}
 		}

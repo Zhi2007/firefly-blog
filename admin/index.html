@@ -707,8 +707,8 @@
 									<td>${humanSize(f.size)}</td>
 									<td class="small muted">${new Date(f.updatedAt).toLocaleString()}</td>
 									<td>
-										<button class="action ghost small" data-copy="${f.path}">复制路径</button>
-										<button class="action danger small" data-del="${f.repoPath}">删除</button>
+										<button class="action ghost small" data-copy="${escapeHtml(f.path)}">复制路径</button>
+										<button class="action danger small" data-del="${escapeHtml(f.repoPath)}">删除</button>
 									</td>
 								</tr>`,
 							)
