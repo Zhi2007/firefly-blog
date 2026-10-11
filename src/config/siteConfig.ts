@@ -47,8 +47,8 @@ export const siteConfig: SiteConfig = {
 	// 站点副标题
 	subtitle: "记录技术、折腾与随想",
 
-	// 站点 URL（自有域名，Cloudflare 自定义域绑定后生效；旧 workers.dev 地址仍可访问）
-	site_url: "https://zhihaisblog.top",
+	// 站点 URL（主域是 www；裸域 zhihaisblog.top 由 Worker 301 跳到这里）
+	site_url: "https://www.zhihaisblog.top",
 
 	// 站点描述
 	description:

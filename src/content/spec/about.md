@@ -12,7 +12,7 @@
 - 哔哩哔哩：<https://space.bilibili.com/502912899>
 - 本站源码：<https://github.com/Zhi2007/firefly-blog>
 - 问题反馈：<https://github.com/Zhi2007/firefly-blog/issues>
-- 留言板：<https://zhihaisblog.top/guestbook/>
+- 留言板：<https://www.zhihaisblog.top/guestbook/>
 - RSS 订阅：`/rss.xml`
 - 站点地图：`/sitemap-index.xml`
 
