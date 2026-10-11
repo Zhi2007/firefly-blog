@@ -333,7 +333,7 @@ firefly/
 | `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-53`） | 名字会出现在页脚版权、文章作者、OG 卡片；`avatar` 除表单外还能在「站点设置 → 站点头像」直接上传更换（9.8 节） | ✅ 3 个字段（`settings.mjs:40-42`）+ 头像卡片（`/api/avatar`） |
 | `displaySettingsConfig.ts`（72 行） | 视图设置面板（🎨）总开关与各切换项 | `enable: true`（`:24`）、`wallpaperModeSwitchable: false`（`:43`）、`overlaySwitchable`（`:62-66`） | **总开关开/关直接决定客户端 JS 体积**（见 4.3）；`wallpaperModeSwitchable: true` 让每页约 +33 KB JS（`settings.mjs:55` 的 label 原话） | ✅ 4 个字段（`settings.mjs:54-57`） |
 | `perfConfig.ts`（21 行） | 低配模式总开关 | `lowSpec: true`（`:20`） | 见 4.3 与第 12 章；改为 `false` 会恢复毛玻璃与装饰动画 | ✅ 见 4.4：该缺陷已修（面板开关现名 `perf.spine`）（面板那个「性能 · Live2D」开关实际控制错了文件里的块） |
-| `featureTourConfig.ts`（19 行） | 主页中间栏「功能导览」部件：开关、自动轮播、触摸滑动与分页内容（数据在 `feature-tour.json`） | `enable`（`:17`）、`autoplay.enable`（默认 false）、`swipe`；页面数据见 `src/config/feature-tour.json` | `enable:false` 首页完全不渲染（产物里也没有标记）；`autoplay.enable:true` 会引入常驻 setTimeout 轮播（默认关闭，与低 GPU 占用方向一致） | ✏️ 数据是 JSON，可在面板「配置」页编辑 |
+| `featureTourConfig.ts`（15 行） | 主页中间栏「功能导览」部件：开关、自动轮播、触摸滑动与分页内容（数据在 `feature-tour.json`） | `enable`（`:13-14`）、`autoplay.enable`（默认 false）、`swipe`；页面数据见 `src/config/feature-tour.json`（19 条功能，其中 14 条带 `href`） | `enable:false` 首页完全不渲染（产物里也没有标记）；`autoplay.enable:true` 会引入常驻 setTimeout 轮播（默认关闭，与低 GPU 占用方向一致）。**带 `href` 的条目**渲染成 `<a>`（可 Tab 聚焦、`:focus-visible` 有主题色描边），**无 `href` 的条目**是普通文本；`href` **必须是产物里真实存在、且当前页面开关下真的会渲染的地址** —— 目标页面被 `siteConfig.pages` 关掉时产物是 `/404/` 跳转 stub，绝不能当跳转目标。当前 14 个 `href` 全部经「dist 产物存在 + 锚点 id 存在」校验，未演示的能力（数学公式 / 图片灯箱 / Mermaid / PlantUML / 文章加密）宁可不可点 | ✏️ 数据是 JSON，可在面板「配置」页编辑 |
 | `navBarConfig.ts`（456 行） | 导航菜单数组、搜索配置、`LinkPresets`、`applyNavOverrides` | `getDynamicNavBarConfig()`（菜单数组，`:26-150` 的 id/name）、`navBarSearchConfig`（`:163`）、`LinkPresets`（`:171-286`）、`navItemId`（`:298-306`）、`normalizeNavOverrides`（`:331-341`）、`applyNavOverrides`（`:431-451`）、导出（`:453-456`） | 新增菜单项**只能在这里改**；每项必须写显式 `id`，否则面板读不到（`admin/nav.mjs:28`） | ✏️ 只能隐藏/改名/排序（写 `nav-overrides.json`）；**不支持新增**（`admin/nav.mjs:11-12,99`） |
 | `sidebarConfig.ts`（328 行） | 侧栏位置（left/right/both）、平板端选哪侧、左右组件列表与顺序 | `enable`（`:7`）、`position: "both"`（`:14`）、`tabletSidebar: "left"`（`:19`）、`hideSidebarOnPostPage`（`:22`）、`noSidebarContentWidth: 0.6`（`:25`）、`leftComponents[]`（`:36+`，含被关掉的 `announcement`） | 组件顺序 = 数组顺序（`top` 优先于 `sticky`） | ❌（「配置」页编辑器可整文编辑） |
 | `commentConfig.ts` | 评论系统选择与五个后端配置 | `type: "giscus"`（`:5`）、`giscus.repo: "Zhi2007/my-blog"`（`:57`）、`repoId`（`:59`）、`categoryId`（`:63`） | ⚠️ giscus 的仓库 `Zhi2007/my-blog` **不是**本仓库（`Zhi2007/firefly-blog`）：评论存在 Discussions 里；改错 = 评论区空白 | ❌（配置页可编辑） |
@@ -1475,6 +1475,12 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 
 > 补充（2026-10-11）：新增 `src/config` 下的**数据文件（JSON）**同样会改变 §4.1 与 §2.3 的文件计数，
 > 必须同步；`pnpm check-docs` 的第 3 组会直接报出来。
+>
+> 补充（2026-10-11）：给 `src/config/feature-tour.json` 的条目加 `href` 时，**必须按第 4 组的思路先确认
+> 目标真的存在**：① 目标路径在 `dist/` 下能找到产物（`/x/` → `dist/x/index.html`，`/x.xml` → `dist/x.xml`）；
+> ② 带 `#锚点` 时目标 HTML 里真的含该 `id`/`name`；③ 该页面没有被 `siteConfig.pages` 关掉
+> （关掉的页面产物是 `/404/` 跳转 stub，跳过去等于跳 404）。**宁可不给 `href`，也不要编一个不存在的链接**，
+> 演示不了的能力保持普通文本即可。`pnpm check-docs` **不检查**这项，属于人工核对范围。
 
 ### E.3 为什么光靠「记得更新」不行（三个真实历史事故）
 
