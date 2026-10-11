@@ -1,9 +1,9 @@
 ---
-title: VMware Workstation Pro 26H1u1 上手：下载、汉化与新建 Windows 虚拟机
-published: 2026-10-11
-description: 一条龙照抄版——官方下载（认准 Build 25688693）、3 步把界面换成中文、新建 Windows 虚拟机的全程向导，外加 6 个新手最容易踩的坑。
+title: "VMware Workstation Pro 26H1u1 上手：下载、汉化与新建 Windows 虚拟机"
+published: "2026-10-11"
+description: "一条龙照抄版——官方下载（认准 Build 25688693）、3 步把界面换成中文、新建 Windows 虚拟机的全程向导，外加 6 个新手最容易踩的坑。"
 tags: [虚拟机, VMware, Windows, 软件]
-category: 折腾
+category: "技术"
 ---
 
 本文是一条龙流程：**下载 → 安装 →（可选）换中文 → 新建 Windows 虚拟机**，每一步都写清了点哪里、选什么。基于 **26H1u1（Build 25688693）**，免费版即可。
