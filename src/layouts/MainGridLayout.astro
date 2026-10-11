@@ -8,6 +8,7 @@ import NavMenuPanel from "@components/layout/NavMenuPanel.astro";
 import SideBar from "@components/layout/SideBar.astro";
 import type { MarkdownHeading } from "astro";
 import FloatingControls from "@/components/controls/FloatingControls.astro";
+import FeatureTour from "@/components/features/FeatureTour.svelte";
 import CategoryBar from "@/components/layout/CategoryBar.astro";
 import SidebarColumn from "@/components/layout/SidebarColumn.astro";
 import WallpaperSection from "@/components/layout/WallpaperSection.astro";
@@ -17,6 +18,7 @@ import {
 	sidebarLayoutConfig,
 	siteConfig,
 } from "@/config";
+import { featureTourConfig } from "@/config/featureTourConfig";
 import { getBannerVisibilityState } from "@/utils/banner-visibility-utils";
 import { getBackgroundImages, isHomePage } from "@/utils/layout-utils";
 import { resolveNavMenuLinks } from "@/utils/nav-menu-utils";
@@ -70,6 +72,10 @@ const {
 
 const isHomePageCheck = isHomePage(Astro.url.pathname);
 const isPostPage = !!postSlug;
+// 主页功能导览：只在首页第 1 页渲染（isHomePage 只认 `/`，不含 /page/2/），
+// 且开关关闭时连标记都不输出（产物里也找不到）
+const shouldRenderFeatureTour =
+	featureTourConfig.enable && featureTourConfig.pages.length > 0;
 const shouldRenderCategoryBar = !!siteConfig.categoryBar;
 const navbarWidthFull = siteConfig.navbar.widthFull ?? false;
 
@@ -126,6 +132,17 @@ const {
                     
             {/* 主内容区包装器 - 包含静态栏位和swup容器，作为单个grid item */}
             <div id="content-column" class={staticBarClass}>
+                {/* 功能导览（仅首页）：放在中间栏最顶部、分类栏之上 —— 新访客第一眼看到的是
+                    「这站有什么」，而不是先做分类筛选；它挂在 Swup 容器之外，
+                    切页不会重渲染，也不会打断过渡动画 */}
+                {isHomePageCheck && shouldRenderFeatureTour && (
+                    <FeatureTour
+                        client:visible
+                        pages={featureTourConfig.pages}
+                        autoplay={featureTourConfig.autoplay}
+                        swipe={featureTourConfig.swipe}
+                    />
+                )}
                 {/* 分类导航栏 - 全站渲染并显示 */}
                 {shouldRenderCategoryBar && <div id="category-bar-wrapper"><CategoryBar currentPostCategory={postCategory} /></div>}
                 {/* 主内容区 - 始终渲染，确保 Swup 容器存在 */}

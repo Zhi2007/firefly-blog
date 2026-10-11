@@ -14,7 +14,7 @@
 ## 0. 使用本文档的三条硬规则
 
 1. **改任何文件之前，先在第 2 章的三类分类里找到它**。落在「上游主题文件」里的，改动会和上游 diff 冲突；落在「内容与配置」里的才是日常改动区。
-2. **每条结论都能在正文找到锚点**。锚点格式为 `文件:行号`，例如 `admin/server.mjs:1107 parseByteRange`，直接跳过去即可核对。
+2. **每条结论都能在正文找到锚点**。锚点格式为 `文件:行号`，例如 `admin/server.mjs:1108 parseByteRange`，直接跳过去即可核对。
 3. **不确定就复测**。仓库里有现成的门禁命令（第 11 章），跑一遍比猜便宜得多。
 
 ---
@@ -48,11 +48,11 @@
 | 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
 | 构建产物页数 | **28 个 HTML** | `dist/` 实测 28；提交 `704baad`/`bc3f0b2` 等均以「astro build 28 页」为验收 |
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
-| 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:924-985`、`.github/workflows/deploy.yml:58-63` |
-| 上线耗时 | 约 1 分钟 | `admin/README.md:171`、`admin/server.mjs:982` |
-| 管理面板 | `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin/server.mjs:58,1995` |
+| 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:925-986`、`.github/workflows/deploy.yml:58-63` |
+| 上线耗时 | 约 1 分钟 | `admin/README.md:172`、`admin/server.mjs:983` |
+| 管理面板 | `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin/server.mjs:59,1995` |
 | 面板页签数 | **10 个** | `admin/index.html:185-194` |
-| `/api/*` 路由数 | **33**（32 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
+| `/api/*` 路由数 | **34**（33 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
 | 已发布文章 | 3 篇 | `src/content/posts/*.md` 实测 |
 
@@ -102,12 +102,13 @@
 
 ```text
 firefly/
-├── admin/                      # ② 零依赖本地管理面板（14 个文件，只用 node: 内置模块）
-│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2015 行）
-│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，119 KB）
-│   ├── README.md               #    面板完整用法（463 行）★ 改面板前必读
+├── admin/                      # ② 零依赖本地管理面板（15 个文件，只用 node: 内置模块）
+│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2063 行）
+│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，126 KB）
+│   ├── README.md               #    面板完整用法（519 行）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
+│   ├── avatar.mjs              #    站点头像：魔数校验 + 可选缩放 → 写新文件并改 profileConfig.avatar
 │   ├── nav.mjs                 #    导航隐藏/改名/排序 → 只写 nav-overrides.json
 │   ├── doctor.mjs              #    体检 8 项（只读）
 │   ├── backups.mjs             #    写前快照 admin-backups/（保留 40 份）
@@ -130,7 +131,7 @@ firefly/
 │   └── anime-list.json
 ├── src/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
-│   ├── config/                 # ③ 配置区（31 个文件：23 个 *Config.ts + backgroundWallpaper.ts
+│   ├── config/                 # ③ 配置区（33 个文件：23 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
 │   ├── content/                # ③ 内容：posts/（3 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
@@ -164,7 +165,7 @@ firefly/
 | `src/config/*.json` | 面板写入，或手工编辑（保持 JSON 合法 + tab 缩进 + 末尾换行） | 改 `friends.json` 的字段名（`friendsConfig.ts:9` 直接当类型用） |
 | `src/config/nav-overrides.json` | 面板「站点设置 → 导航菜单」写入 | 想「新增菜单项」改这里（无效）；新增要改 `navBarConfig.ts` 的数组（`admin/nav.mjs:11-12,99`） |
 | `public/vendor/` | 整包替换 + 同步改 import 路径 | 原地修改同名文件（immutable 缓存） |
-| `public/friends/` | 手工放图标（面板**不能**上传到这个目录） | 通过面板上传/删除（`server.mjs:110` 只把它放进**只读**白名单） |
+| `public/friends/` | 手工放图标（面板**不能**上传到这个目录） | 通过面板上传/删除（`server.mjs:111` 只把它放进**只读**白名单） |
 | `admin/` | 修改既有 `.mjs`（保持零依赖） | 新增 npm 依赖、改动 `/api/*` 路由却不更新 `POST_BODY_FIELDS`（见 9.2 节） |
 | `src/constants/lqips.json` | `pnpm lqips` 重新生成 | 手改（会被下次生成覆盖） |
 | `admin-backups/`、`logs/` | 让面板/脚本自己写 | 提交（`.gitignore:20,23`） |
@@ -255,7 +256,7 @@ firefly/
 | --- | --- | --- | --- | --- |
 | ① `public/`（站点级） | `/assets/images/foo.webp`（**以 `/` 开头**） | ❌ 不优化，原样拷贝 | `profileConfig.ts:6`、`siteConfig.ts:102`，`public/` 会整体进 `dist/` | 头像、logo、打赏码、分享图、动图（GIF/动态 WebP 必须走这里，见 ② 的注意） |
 | ② `src/assets/`（走管线） | `assets/images/foo.avif`（**不以 `/` 开头**） | ✅ 自动转 WebP（`siteConfig.imageOptimization.formats: "webp"`，质量 85） | `profileConfig.ts:7`、`siteConfig.ts:103,327-344` | 文章封面、内容配图（体积敏感） |
-| ③ 文章自己的 `images/` 目录 | `./images/foo.png`（**相对文章文件**） | ❌ | `admin/server.mjs:126`（`MEDIA_URL_PREFIX["post-images"] = "./images/"`）、`admin/README.md:127-130` | 面板上传的图片、Word 导入抽出的图片 |
+| ③ 文章自己的 `images/` 目录 | `./images/foo.png`（**相对文章文件**） | ❌ | `admin/server.mjs:127`（`MEDIA_URL_PREFIX["post-images"] = "./images/"`）、`admin/README.md:128-131` | 面板上传的图片、Word 导入抽出的图片 |
 | ④ 远程 URL | `https://.../foo.jpg` | ❌ | `siteConfig.ts:104` | 防盗链站点（已在 `noReferrerDomains` 里列了 `*.hdslb.com` 等，`siteConfig.ts:338-343`） |
 
 ⚠️ **动图红线**：`profileConfig.ts:9-10` 写明「动图必须放在 `public/` 并用 `/` 开头的路径，走 `src` 的优化管线会被转成静态图、动画就没了」。当前头像就是 `public/assets/images/avatar-zhi.webp`（动态 WebP）。
@@ -276,14 +277,14 @@ firefly/
 
 | 项 | 事实 | 依据 |
 | --- | --- | --- |
-| 入口 | 「文章」页编辑器上方「从 Word / txt 导入」 | `admin/README.md:57` |
-| 支持 | `.docx`（自己读 ZIP + `inflateRawSync`）、`.txt`/`.text`、`.md`/`.markdown` | `admin/import-doc.mjs:1011` 导出 `MAX_IMPORT_BYTES`；`admin/README.md:112-118` |
+| 入口 | 「文章」页编辑器上方「从 Word / txt 导入」 | `admin/README.md:58` |
+| 支持 | `.docx`（自己读 ZIP + `inflateRawSync`）、`.txt`/`.text`、`.md`/`.markdown` | `admin/import-doc.mjs:1011` 导出 `MAX_IMPORT_BYTES`；`admin/README.md:113-119` |
 | 不支持 | 旧版 `.doc`（二进制）、其它扩展名 | 同上 |
-| 体积上限 | **25 MB**（前端拦一次，后端 `MAX_IMPORT_BYTES` 再拦一次，`admin/import-doc.mjs:17`、`server.mjs:1816-1827`） | 实测 |
-| 编码 | UTF-8 严格模式 → 失败或含 `\uFFFD` 时退回 **GBK**，并写 `warnings` | `admin/README.md:121` |
-| 图片落盘 | `src/content/posts/images/<slug>-imgN.ext`，同名往后加序号，**绝不覆盖**；后端先校验目录必须是 `src/content/posts/images` | `server.mjs:1829-1838` |
-| 是否自动保存 | **不自动保存**。接口只做「转 Markdown + 图片落盘」，正文回填编辑器由人确认后再点保存 | `server.mjs:1799-1805`、`admin/README.md:148-156` |
-| 认证 | 与其它接口一致（Cookie / `X-Admin-Token` / `?token=` 任一），非 POST 返回 405 | `server.mjs:1802-1805` |
+| 体积上限 | **25 MB**（前端拦一次，后端 `MAX_IMPORT_BYTES` 再拦一次，`admin/import-doc.mjs:17`、`server.mjs:1819-1830`） | 实测 |
+| 编码 | UTF-8 严格模式 → 失败或含 `\uFFFD` 时退回 **GBK**，并写 `warnings` | `admin/README.md:122` |
+| 图片落盘 | `src/content/posts/images/<slug>-imgN.ext`，同名往后加序号，**绝不覆盖**；后端先校验目录必须是 `src/content/posts/images` | `server.mjs:1832-1841` |
+| 是否自动保存 | **不自动保存**。接口只做「转 Markdown + 图片落盘」，正文回填编辑器由人确认后再点保存 | `server.mjs:1802-1808`、`admin/README.md:149-157` |
+| 认证 | 与其它接口一致（Cookie / `X-Admin-Token` / `?token=` 任一），非 POST 返回 405 | `server.mjs:1805-1808` |
 
 ### 3.8 `pnpm new-post` 模板里的 `slug` 字段（一定会困惑的点）
 
@@ -296,9 +297,9 @@ firefly/
 
 | 操作 | 风险 | 安全做法 |
 | --- | --- | --- |
-| 用脚本批量改 frontmatter | 破坏 YAML → 构建失败 | 改前 `pnpm type-check && pnpm build`；或走面板（`/api/save-post` 会 `snapshotBefore`，`server.mjs:1378-1381`） |
-| 直接删文章文件 | 无快照、无回滚 | 面板「文章 → 删除」会先快照（`server.mjs:1402`） |
-| 手工重命名文章 | URL 变了、封面相对路径可能失效 | 面板保存时传 `originalSlug` 会删旧文件（`server.mjs:1383-1386`），并**先校验 slug 正则**（`server.mjs:1371-1374`，这是 `M2` 修的越界删文件漏洞，见第 12 章） |
+| 用脚本批量改 frontmatter | 破坏 YAML → 构建失败 | 改前 `pnpm type-check && pnpm build`；或走面板（`/api/save-post` 会 `snapshotBefore`，`server.mjs:1381-1384`） |
+| 直接删文章文件 | 无快照、无回滚 | 面板「文章 → 删除」会先快照（`server.mjs:1405`） |
+| 手工重命名文章 | URL 变了、封面相对路径可能失效 | 面板保存时传 `originalSlug` 会删旧文件（`server.mjs:1386-1389`），并**先校验 slug 正则**（`server.mjs:1374-1377`，这是 `M2` 修的越界删文件漏洞，见第 12 章） |
 | 手工改 `friends.json`/`announcements.json`/`music-playlist.json` | 结构错 → 面板/构建报错 | 优选面板接口；改完跑面板「体检」（`admin/doctor.mjs` 会查引用与必填字段） |
 
 ---
@@ -311,12 +312,12 @@ firefly/
 
 | 口径 | 数量 | 清单 |
 | --- | --- | --- |
-| `*Config.ts` | **23** | analytics, announcement, booknav, comment, coverImage, displaySettings, dynamic, effects, expressiveCode, font, friends, gallery, license, mermaid, music, navBar, perf, pio, plantuml, profile, sidebar, site, sponsor |
-| 目录下全部 `.ts` | **25** | 上面 23 个 + `backgroundWallpaper.ts`（壁纸，不以 Config 结尾）+ `index.ts`（统一导出，`src/config/index.ts:58-89`） |
-| 目录下全部文件 | **31** | 上面 25 个 + `README.md` + `FooterConfig.html` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json` |
-| 面板「配置」页可编辑白名单 | **15** | `admin/server.mjs:72-88` 的 `CONFIG_FILES` |
+| `*Config.ts` | **24** | analytics, announcement, booknav, comment, coverImage, displaySettings, dynamic, effects, expressiveCode, font, friends, gallery, license, mermaid, music, navBar, perf, pio, plantuml, profile, sidebar, site, sponsor |
+| 目录下全部 `.ts` | **26** | 上面 23 个 + `backgroundWallpaper.ts`（壁纸，不以 Config 结尾）+ `index.ts`（统一导出，`src/config/index.ts:58-89`） |
+| 目录下全部文件 | **33** | 上面 25 个 + `README.md` + `FooterConfig.html` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json` |
+| 面板「配置」页可编辑白名单 | **15** | `admin/server.mjs:73-89` 的 `CONFIG_FILES` |
 | 面板「站点设置」可视化字段 | **33 条 def，落在 5 个文件** | `admin/settings.mjs:25-68` |
-| 面板管理的 JSON 数据 | **3 + 1** | `announcements.json`、`music-playlist.json`（`server.mjs:192-195` 的 `DATA_FILES`）+ `friends.json`（`admin/friends.mjs`）+ `nav-overrides.json`（`admin/nav.mjs`） |
+| 面板管理的 JSON 数据 | **3 + 1** | `announcements.json`、`music-playlist.json`（`server.mjs:193-196` 的 `DATA_FILES`）+ `friends.json`（`admin/friends.mjs`）+ `nav-overrides.json`（`admin/nav.mjs`） |
 
 > `index.ts` 只做统一导出与 `navbarMode` 解析（`src/config/index.ts:8-17`），**没有**导出 `perfConfig`：`perfConfig` 由 `src/layouts/Layout.astro:51` 直接 import。改动 `index.ts` 的导出集合会影响所有 `@/config` 引用点，属于高风险文件。
 
@@ -328,9 +329,10 @@ firefly/
 | --- | --- | --- | --- | --- |
 | `siteConfig.ts`（359 行） | 站点身份、主题色、宽度、列表布局、分页、文章页、各第三方（bilibili/bangumi/vndb/mal）、图片优化、RSS、页面开关 | `title/subtitle/site_url/description/keywords`（`:45-58`）、`themeColor.hue/defaultMode`（`:61-66`）、`pageWidth`（`:71`）、`contentWidth/contentWidthVw`（`:73-74`）、`navbar.*`（`:98-126`）、`siteStartDate`（`:129`）、`timezone`（`:133`）、`postListLayout.*`（`:155-211`）、`pagination.postsPerPage`（`:216`）、`post.*`（`:220-254`）、`imageOptimization.*`（`:327-344`）、`feed.contentMode`（`:351`）、`pages`（`:10-41` + `:358`） | 影响全站；`site_url` 改动必须**同时**改 `wrangler.jsonc:19-25` 与 `worker/index.mjs:16-17`（否则 canonical/RSS/301 目标不一致） | ✅ 14 个字段（`settings.mjs:26-39`）+ 11 个 `pages.*` 开关（动态从 `resolvePageToggles` 读取） |
 | `backgroundWallpaper.ts`（209 行） | 壁纸模式、图片列表、主页横幅文案/链接、轮播、水波纹、渐变、导航栏毛玻璃、全屏模糊渐变 | `mode`（`:5`）、`playerEnable: false`（`:8`）、`src.desktop/mobile`（`:42-59`）、`common.homeText.*`（`:71-122`）、`common.carousel`（`:124-131`）、`common.waves.enable.{desktop,mobile}: false`（`:133-140`）、`banner.navbar.blur: 0`（`:169`）、`overlay.blur: 0`（`:179`）、`fullscreen.blurRamp.enable.{desktop,mobile}: false`（`:200-207`） | 性能相关字段都调过（第 12 章）；`playerEnable: true` 会重新引入视频 | ✅ 11 个字段（`settings.mjs:43-45,61-67`） |
-| `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-53`） | 名字会出现在页脚版权、文章作者、OG 卡片 | ✅ 3 个字段（`settings.mjs:40-42`） |
+| `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-53`） | 名字会出现在页脚版权、文章作者、OG 卡片；`avatar` 除表单外还能在「站点设置 → 站点头像」直接上传更换（9.8 节） | ✅ 3 个字段（`settings.mjs:40-42`）+ 头像卡片（`/api/avatar`） |
 | `displaySettingsConfig.ts`（72 行） | 视图设置面板（🎨）总开关与各切换项 | `enable: true`（`:24`）、`wallpaperModeSwitchable: false`（`:43`）、`overlaySwitchable`（`:62-66`） | **总开关开/关直接决定客户端 JS 体积**（见 4.3）；`wallpaperModeSwitchable: true` 让每页约 +33 KB JS（`settings.mjs:55` 的 label 原话） | ✅ 4 个字段（`settings.mjs:54-57`） |
 | `perfConfig.ts`（21 行） | 低配模式总开关 | `lowSpec: true`（`:20`） | 见 4.3 与第 12 章；改为 `false` 会恢复毛玻璃与装饰动画 | ✅ 见 4.4：该缺陷已修（面板开关现名 `perf.spine`）（面板那个「性能 · Live2D」开关实际控制错了文件里的块） |
+| `featureTourConfig.ts`（19 行） | 主页中间栏「功能导览」部件：开关、自动轮播、触摸滑动与分页内容（数据在 `feature-tour.json`） | `enable`（`:17`）、`autoplay.enable`（默认 false）、`swipe`；页面数据见 `src/config/feature-tour.json` | `enable:false` 首页完全不渲染（产物里也没有标记）；`autoplay.enable:true` 会引入常驻 setTimeout 轮播（默认关闭，与低 GPU 占用方向一致） | ✏️ 数据是 JSON，可在面板「配置」页编辑 |
 | `navBarConfig.ts`（456 行） | 导航菜单数组、搜索配置、`LinkPresets`、`applyNavOverrides` | `getDynamicNavBarConfig()`（菜单数组，`:26-150` 的 id/name）、`navBarSearchConfig`（`:163`）、`LinkPresets`（`:171-286`）、`navItemId`（`:298-306`）、`normalizeNavOverrides`（`:331-341`）、`applyNavOverrides`（`:431-451`）、导出（`:453-456`） | 新增菜单项**只能在这里改**；每项必须写显式 `id`，否则面板读不到（`admin/nav.mjs:28`） | ✏️ 只能隐藏/改名/排序（写 `nav-overrides.json`）；**不支持新增**（`admin/nav.mjs:11-12,99`） |
 | `sidebarConfig.ts`（328 行） | 侧栏位置（left/right/both）、平板端选哪侧、左右组件列表与顺序 | `enable`（`:7`）、`position: "both"`（`:14`）、`tabletSidebar: "left"`（`:19`）、`hideSidebarOnPostPage`（`:22`）、`noSidebarContentWidth: 0.6`（`:25`）、`leftComponents[]`（`:36+`，含被关掉的 `announcement`） | 组件顺序 = 数组顺序（`top` 优先于 `sticky`） | ❌（「配置」页编辑器可整文编辑） |
 | `commentConfig.ts` | 评论系统选择与五个后端配置 | `type: "giscus"`（`:5`）、`giscus.repo: "Zhi2007/my-blog"`（`:57`）、`repoId`（`:59`）、`categoryId`（`:63`） | ⚠️ giscus 的仓库 `Zhi2007/my-blog` **不是**本仓库（`Zhi2007/firefly-blog`）：评论存在 Discussions 里；改错 = 评论区空白 | ❌（配置页可编辑） |
@@ -672,15 +674,15 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 | 机制 | 参数 | 依据 |
 | --- | --- | --- |
-| 匿名 API 配额 | **每小时 60 次** | `admin/README.md:305` |
-| 内存缓存 | `CI_CACHE_TTL_MS = 60 * 1000`（同一 URL 60 秒内只请求一次），最多 200 条，超出淘汰最旧 | `admin/ci.mjs:23,27`、`admin/README.md:305` |
-| 只缓存成功响应 | 超时、断网、403（限流）、404、非法 JSON **都不进缓存**（避免偶发失败被钉死 60 秒） | `admin/README.md:306` |
-| 超时 | `CI_TIMEOUT_MS = 8000`（8 秒）+ 任何异常降级成 `{ok:false, error}`，不抛错 | `admin/ci.mjs:25`、`admin/README.md:307` |
+| 匿名 API 配额 | **每小时 60 次** | `admin/README.md:360` |
+| 内存缓存 | `CI_CACHE_TTL_MS = 60 * 1000`（同一 URL 60 秒内只请求一次），最多 200 条，超出淘汰最旧 | `admin/ci.mjs:23,27`、`admin/README.md:360` |
+| 只缓存成功响应 | 超时、断网、403（限流）、404、非法 JSON **都不进缓存**（避免偶发失败被钉死 60 秒） | `admin/README.md:361` |
+| 超时 | `CI_TIMEOUT_MS = 8000`（8 秒）+ 任何异常降级成 `{ok:false, error}`，不抛错 | `admin/ci.mjs:25`、`admin/README.md:362` |
 | 日志体积 | `LOG_MAX_BYTES = 2 MiB`，只保留尾部再切最后 30 行 | `admin/ci.mjs:29`、`tailLines`（`:204`） |
-| 限流识别 | `isRateLimitedResponse()`（`admin/ci.mjs:105`）+ `rateLimitWarning()`（`:117`）；`/api/ci` 返回 `rateLimited: true/false` 与 `warning` | `admin/server.mjs:821-834,867` |
+| 限流识别 | `isRateLimitedResponse()`（`admin/ci.mjs:105`）+ `rateLimitWarning()`（`:117`）；`/api/ci` 返回 `rateLimited: true/false` 与 `warning` | `admin/server.mjs:822-835,867` |
 | 请求次数优化 | `M5` 修复后：由「每次约 10 个请求」改为 **1 次 `actions/runs` 按 `head_sha` 归并**（`groupWorkflowRunsBySha`，`admin/ci.mjs:91`） | `bc3f0b2` 正文 |
-| 详情是「尽力而为」 | `actions/jobs/{id}/logs` 匿名请求不稳定（可能 403/404/302）；拿不到就只在 `detailWarning` 说明，步骤与原因照常显示；`/api/ci` **永远是 200** | `admin/README.md:308,323`、`admin/server.mjs:1753-1771` |
-| 看几个提交 | 最近 **8** 个（更早的老失败不显示） | `admin/README.md:326` |
+| 详情是「尽力而为」 | `actions/jobs/{id}/logs` 匿名请求不稳定（可能 403/404/302）；拿不到就只在 `detailWarning` 说明，步骤与原因照常显示；`/api/ci` **永远是 200** | `admin/README.md:363,323`、`admin/server.mjs:1756-1774` |
+| 看几个提交 | 最近 **8** 个（更早的老失败不显示） | `admin/README.md:381` |
 
 ### 8.7 其他 GitHub 侧事实与「需确认」项
 
@@ -698,69 +700,70 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 ### 9.1 这一章解决什么问题
 
-面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（463 行，章节索引在它开头）。
+面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（519 行，章节索引在它开头）。
 
 ### 9.2 认证模型
 
 | 环节 | 事实 | 依据 |
 | --- | --- | --- |
-| 监听地址 | **只监听 `127.0.0.1`**，局域网/公网都访问不到 | `admin/server.mjs:1995`（`server.listen(PORT, "127.0.0.1", ...)`） |
-| 端口 | 默认 **8799**；`--port=8899` 或环境变量 `ADMIN_PORT` 可改 | `admin/server.mjs:53-58` |
-| 令牌 | **每次启动随机生成**：`randomBytes(16).toString("hex")` → 32 位十六进制 | `admin/server.mjs:61` |
-| 打开方式 | 启动时自动打开 `http://127.0.0.1:<PORT>/?token=<TOKEN>`；`--no-open` 可禁自动打开 | `admin/server.mjs:59,1997,2006-2013` |
-| 页面本身也要令牌 | 打开 `/` 或 `/index.html` 时只认 **URL `?token=` 或 `X-Admin-Token` 头**，**不认 Cookie** | `admin/server.mjs:1279-1289` |
-| 会话 Cookie | 页面校验通过后下发 `admin_session=<HMAC-SHA256 hex>`，属性 `HttpOnly; SameSite=Strict; Path=/`，**不含 `Secure`**（只跑在 127.0.0.1） | `admin/server.mjs:67-69,424-426` |
-| Cookie 签名密钥 | 就是本次启动的 TOKEN → **重启面板后旧 Cookie 自动失效** | `admin/server.mjs:66-69` |
-| 三选一认证 | 接口接受 `sessionValid(Cookie)` **或** `x-admin-token` **或** `?token=` | `admin/server.mjs:418-421` |
-| 恒定时间比较 | 令牌与 Cookie 签名都用 `timingSafeEqual`，长度不等直接 false | `admin/server.mjs:379-385,404-411` |
-| **`/api/logout` 故意免认证** | 它只清本地 Cookie，没登录时调用也无害；**除它以外所有接口都要凭证** | `admin/server.mjs:1300-1309`（注释写明设计原因，`L7`） |
-| 未认证返回 | `403 {"error":"令牌无效，请重新启动管理后台"}`（**不是 401**） | `admin/server.mjs:1312-1315` |
-| 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs:1255-1261` |
-| 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=` | `admin/README.md:346` |
+| 监听地址 | **只监听 `127.0.0.1`**，局域网/公网都访问不到 | `admin/server.mjs:2043`（`server.listen(PORT, "127.0.0.1", ...)`） |
+| 端口 | 默认 **8799**；`--port=8899` 或环境变量 `ADMIN_PORT` 可改 | `admin/server.mjs:54-59` |
+| 令牌 | **每次启动随机生成**：`randomBytes(16).toString("hex")` → 32 位十六进制 | `admin/server.mjs:62` |
+| 打开方式 | 启动时自动打开 `http://127.0.0.1:<PORT>/?token=<TOKEN>`；`--no-open` 可禁自动打开 | `admin/server.mjs:60,1997,2006-2013` |
+| 页面本身也要令牌 | 打开 `/` 或 `/index.html` 时只认 **URL `?token=` 或 `X-Admin-Token` 头**，**不认 Cookie** | `admin/server.mjs:1282-1292` |
+| 会话 Cookie | 页面校验通过后下发 `admin_session=<HMAC-SHA256 hex>`，属性 `HttpOnly; SameSite=Strict; Path=/`，**不含 `Secure`**（只跑在 127.0.0.1） | `admin/server.mjs:68-70,424-426` |
+| Cookie 签名密钥 | 就是本次启动的 TOKEN → **重启面板后旧 Cookie 自动失效** | `admin/server.mjs:67-70` |
+| 三选一认证 | 接口接受 `sessionValid(Cookie)` **或** `x-admin-token` **或** `?token=` | `admin/server.mjs:419-422` |
+| 恒定时间比较 | 令牌与 Cookie 签名都用 `timingSafeEqual`，长度不等直接 false | `admin/server.mjs:380-386,404-411` |
+| **`/api/logout` 故意免认证** | 它只清本地 Cookie，没登录时调用也无害；**除它以外所有接口都要凭证** | `admin/server.mjs:1303-1312`（注释写明设计原因，`L7`） |
+| 未认证返回 | `403 {"error":"令牌无效，请重新启动管理后台"}`（**不是 401**） | `admin/server.mjs:1315-1318` |
+| 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs:1258-1264` |
+| 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=` | `admin/README.md:401` |
 
-### 9.3 全部 `/api/*` 路由表（33 条）
+### 9.3 全部 `/api/*` 路由表（34 条）
 
-**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **32** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **33** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1204-1236`）登记 **31** 条，唯一没登记的是 `/api/post`（它只需 `GET` + query，无 POST 语义）。
+**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **33** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **34** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1205-1239`）登记 **32** 条，唯一没登记的是 `/api/post`（它只需 `GET` + query，无 POST 语义）。
 
-> ⚠️ 新增 `/api/*` 路由时**必须同时往 `POST_BODY_FIELDS` 加一行**：未登记的接口跳过字段校验（`assertPostBody` 里 `if (!allowed) return body;`，`admin/server.mjs:1247`），等于放弃「字段打错不许静默执行」这道保护。
+> ⚠️ 新增 `/api/*` 路由时**必须同时往 `POST_BODY_FIELDS` 加一行**：未登记的接口跳过字段校验（`assertPostBody` 里 `if (!allowed) return body;`，`admin/server.mjs:1250`），等于放弃「字段打错不许静默执行」这道保护。
 
 | # | 路由 | 方法（代码实际行为） | 写盘 | 写前快照 | 关键安全约束 / 备注 | 位置 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `/api/logout` | **仅 POST**（否则 405） | 否 | 否 | **故意免认证**；清 Cookie | `:1302-1309` |
-| 2 | `/api/status` | GET（POST 也会执行） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测 | `:1322-1335` |
-| 3 | `/api/posts` | GET | 否 | 否 | 文章列表 | `:1336-1338` |
-| 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`） | `:1340-1361` |
-| 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`） | `:1363-1389` |
-| 6 | `/api/delete-post` | POST | 是（删除） | 是 | slug 正则 + `resolveInside([POSTS_DIR])` | `:1391-1406` |
-| 7 | `/api/media` | GET | 否 | 否 | 返回目录表与文件列表 | `:1408-1410` |
-| 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；音频额外抽封面/歌词 | `:1412-1453` |
-| 9 | `/api/delete-media` | POST | 是（删除） | **是**（删除不可逆，必留快照） | `resolveInside` 到全部 `MEDIA_DIRS` | `:1455-1473` |
-| 10 | `/api/announcements` | GET 读 / POST 写 | **是** | 是（`writeJsonData` 内） | `body.items` 必须是数组 | `:1475-1493` |
-| 11 | `/api/playlist` | GET 读 / POST 写 | **是** | 是 | `body.songs` 必须是数组 | `:1495-1508` |
-| 12 | `/api/save-lyrics` | POST | **是** | **是**（`L6` 补的） | 路径由音频 URL 派生到 `lrc/<base>.lrc` | `:1510-1536` |
-| 13 | `/api/extract-audio` | POST | 是（封面/歌词） | 否（走 `extractAndStoreAudio`） | 只允许 `public/assets/music` 下的音频 | `:1538-1556` |
-| 14 | `/media-file` | GET（非 `/api`） | 否（只读流） | 否 | 只读白名单 `MEDIA_READ_DIRS`（= 5 个媒体目录 + `public/friends`）；Range/206/416；**畸形 Range 曾打死进程**（`C1`） | `:1558-1628` |
-| 15 | `/api/configs` | GET | 否 | 否 | 返回 `CONFIG_FILES`（15 个） | `:1630-1632` |
-| 16 | `/api/config-file` | GET 读 / POST 写 | **是** | 是 | `path` 必须在 `CONFIG_FILES` 白名单内 | `:1634-1654` |
-| 17 | `/api/sync` | GET/POST | 否（git 操作） | 否 | 本地有未提交改动则拒绝 | `:1656-1660` |
-| 18 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检，有 error 拦住（`force: true` 跳过）；只暂存 `PUBLISH_SCOPE` | `:1662-1671` |
-| 19 | `/api/doctor` | GET/POST | 否（只读） | 否 | 8 项体检 | `:1673-1677` |
-| 20 | `/api/settings` | 非 POST 读 / POST 写 | **是** | 是（每个涉及文件） | `SETTINGS_DEFS` 白名单 + 类型/范围/枚举 + 结构体检 + 回读校验 + 失败回滚 | `:1679-1702` |
-| 21 | `/api/backups` | GET | 否 | 否 | 列出 `admin-backups/` | `:1704-1707` |
-| 22 | `/api/restore` | POST | **是** | **是**（恢复前再给「当前版本」留一份） | `id` 格式校验；`rel` 双重校验（`1940c1c`） | `:1709-1717` |
-| 23 | `/api/backup-export` | **仅 GET** | 否（读快照打包） | 否 | `id` 必须 `^[A-Za-z0-9-]+$` | `:1719-1751` |
-| 24 | `/api/ci` | **仅 GET** | 否 | 否 | 内部与路由双层兜底，**永远 200**；限流时 `rateLimited: true` | `:1753-1771` |
-| 25 | `/api/revert` | **仅 POST** | git revert（+push） | 否（git 操作无原文件） | `sha` 必须 `^[0-9a-f]{7,40}$`；`execFile` 不过 shell | `:1773-1788` |
-| 26 | `/api/taxonomy` | **仅 GET** | 否 | 否 | 标签/分类候选 | `:1790-1797` |
-| 27 | `/api/import-document` | **仅 POST** | 图片落盘（不写文章） | **否（设计如此：没有旧版本可备份）** | 25 MB 上限（先按 base64 估长再解码）；图片目录固定且校验 | `:1799-1841` |
-| 28 | `/api/nav` | GET 读 / POST 写 | **是**（`nav-overrides.json`） | 是 | 提交的 id 集合必须与 `navBarConfig.ts` 完全一致，**不支持新增** | `:1843-1854` |
-| 29 | `/api/friends` | GET 读 / POST 写 | **是**（`friends.json`） | 是 | 校验规则见 `admin/README.md:393-404` | `:1856-1866` |
-| 30 | `/api/friends-fetch` | **仅 POST** | 是（图标落盘 `public/friends/`） | 否 | SSRF 守卫（`admin/friends.mjs:389+`）；**不写 `friends.json`** | `:1868-1878` |
-| 31 | `/api/compress-music` | **仅 POST** | 取决于 `mode` | 否（脚本内部） | `mode ∈ {all, covers, check}`；命令行参数由服务端拼；`check` 固定带 `--dry-run` | `:1880-1902` |
-| 32 | `/api/compress-media` | **仅 POST** | 是（**只新增 `.webp`**） | 否 | `dirs` 必须在 3 个 `COMPRESS_DIRS` 内；`dryRun` 默认 true 由前端控制 | `:1904-1933` |
-| 33 | `/api/run` | POST | 否 | 否 | `script ∈ {build, dev, check}`；找不到 pnpm 时返回**可读提示**（不是报错） | `:1935-1961` |
-| — | `/api/diff` | GET/POST | 否 | 否 | `git diff --stat` | `:1963-1967` |
-| — | 未知 `/api/*` | 任意 | 否 | 否 | `404 {"error":"未知接口: <route>"}` | `:1969-1970` |
+| 1 | `/api/logout` | **仅 POST**（否则 405） | 否 | 否 | **故意免认证**；清 Cookie | `:1305-1312` |
+| 2 | `/api/status` | GET（POST 也会执行） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测 | `:1325-1338` |
+| 3 | `/api/posts` | GET | 否 | 否 | 文章列表 | `:1339-1341` |
+| 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`） | `:1343-1364` |
+| 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`） | `:1366-1392` |
+| 6 | `/api/delete-post` | POST | 是（删除） | 是 | slug 正则 + `resolveInside([POSTS_DIR])` | `:1394-1409` |
+| 7 | `/api/media` | GET | 否 | 否 | 返回目录表与文件列表 | `:1411-1413` |
+| 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；音频额外抽封面/歌词 | `:1415-1456` |
+| 9 | `/api/delete-media` | POST | 是（删除） | **是**（删除不可逆，必留快照） | `resolveInside` 到全部 `MEDIA_DIRS` | `:1458-1476` |
+| 10 | `/api/announcements` | GET 读 / POST 写 | **是** | 是（`writeJsonData` 内） | `body.items` 必须是数组 | `:1478-1496` |
+| 11 | `/api/playlist` | GET 读 / POST 写 | **是** | 是 | `body.songs` 必须是数组 | `:1498-1511` |
+| 12 | `/api/save-lyrics` | POST | **是** | **是**（`L6` 补的） | 路径由音频 URL 派生到 `lrc/<base>.lrc` | `:1513-1539` |
+| 13 | `/api/extract-audio` | POST | 是（封面/歌词） | 否（走 `extractAndStoreAudio`） | 只允许 `public/assets/music` 下的音频 | `:1541-1559` |
+| 14 | `/media-file` | GET（非 `/api`） | 否（只读流） | 否 | 只读白名单 `MEDIA_READ_DIRS`（= 5 个媒体目录 + `public/friends`）；Range/206/416；**畸形 Range 曾打死进程**（`C1`） | `:1561-1631` |
+| 15 | `/api/configs` | GET | 否 | 否 | 返回 `CONFIG_FILES`（15 个） | `:1633-1635` |
+| 16 | `/api/config-file` | GET 读 / POST 写 | **是** | 是 | `path` 必须在 `CONFIG_FILES` 白名单内 | `:1637-1657` |
+| 17 | `/api/sync` | GET/POST | 否（git 操作） | 否 | 本地有未提交改动则拒绝 | `:1659-1663` |
+| 18 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检，有 error 拦住（`force: true` 跳过）；只暂存 `PUBLISH_SCOPE` | `:1665-1674` |
+| 19 | `/api/doctor` | GET/POST | 否（只读） | 否 | 8 项体检 | `:1676-1680` |
+| 20 | `/api/settings` | 非 POST 读 / POST 写 | **是** | 是（每个涉及文件） | `SETTINGS_DEFS` 白名单 + 类型/范围/枚举 + 结构体检 + 回读校验 + 失败回滚 | `:1682-1705` |
+| 21 | `/api/backups` | GET | 否 | 否 | 列出 `admin-backups/` | `:1707-1710` |
+| 22 | `/api/restore` | POST | **是** | **是**（恢复前再给「当前版本」留一份） | `id` 格式校验；`rel` 双重校验（`1940c1c`） | `:1712-1720` |
+| 23 | `/api/backup-export` | **仅 GET** | 否（读快照打包） | 否 | `id` 必须 `^[A-Za-z0-9-]+$` | `:1722-1754` |
+| 24 | `/api/ci` | **仅 GET** | 否 | 否 | 内部与路由双层兜底，**永远 200**；限流时 `rateLimited: true` | `:1756-1774` |
+| 25 | `/api/revert` | **仅 POST** | git revert（+push） | 否（git 操作无原文件） | `sha` 必须 `^[0-9a-f]{7,40}$`；`execFile` 不过 shell | `:1776-1791` |
+| 26 | `/api/taxonomy` | **仅 GET** | 否 | 否 | 标签/分类候选 | `:1793-1800` |
+| 27 | `/api/import-document` | **仅 POST** | 图片落盘（不写文章） | **否（设计如此：没有旧版本可备份）** | 25 MB 上限（先按 base64 估长再解码）；图片目录固定且校验 | `:1802-1844` |
+| 28 | `/api/nav` | GET 读 / POST 写 | **是**（`nav-overrides.json`） | 是 | 提交的 id 集合必须与 `navBarConfig.ts` 完全一致，**不支持新增** | `:1846-1857` |
+| 29 | `/api/friends` | GET 读 / POST 写 | **是**（`friends.json`） | 是 | 校验规则见 `admin/README.md:448-459` | `:1859-1869` |
+| 30 | `/api/friends-fetch` | **仅 POST** | 是（图标落盘 `public/friends/`） | 否 | SSRF 守卫（`admin/friends.mjs:389+`）；**不写 `friends.json`** | `:1871-1881` |
+| 31 | `/api/compress-music` | **仅 POST** | 取决于 `mode` | 否（脚本内部） | `mode ∈ {all, covers, check}`；命令行参数由服务端拼；`check` 固定带 `--dry-run` | `:1883-1905` |
+| 32 | `/api/compress-media` | **仅 POST** | 是（**只新增 `.webp`**） | 否 | `dirs` 必须在 3 个 `COMPRESS_DIRS` 内；`dryRun` 默认 true 由前端控制 | `:1907-1936` |
+| 33 | `/api/run` | POST | 否 | 否 | `script ∈ {build, dev, check}`；找不到 pnpm 时返回**可读提示**（不是报错） | `:1938-1964` |
+| 34 | `/api/avatar` | 非 POST 读状态 / POST 换图或恢复默认 | **是**（新图片 + 改写 `profileConfig.ts` 的 `avatar`） | 是（同名图片覆盖时 + 配置改写前） | 扩展名白名单 + **魔数校验**（改扩展名骗不过）+ 25 MB 上限 + 只写 `public/assets/images`；`{restore:true}` 改回默认；见 9.8 节 | `:1966-2009` |
+| — | `/api/diff` | GET/POST | 否 | 否 | `git diff --stat` | `:2011-2015` |
+| — | 未知 `/api/*` | 任意 | 否 | 否 | `404 {"error":"未知接口: <route>"}` | `:2017-2018` |
 
 ### 9.4 页签清单（10 个，实测 `admin/index.html:185-194`）
 
@@ -773,23 +776,23 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 5 | 友链 | `friends` | 26 条友链的增删改排序 + 启停；「从网址抓取」自动猜标题/简介/图标（只填表单，需人工确认） |
 | 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图） |
 | 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
-| 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 |
+| 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节） |
 | 9 | 体检 / 备份 | `doctor` | 一键体检（8 项）；快照列表 + 恢复 + 导出 ZIP；CI 失败横幅与「回滚该提交」 |
 | 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志 |
 
-> 📌 **文档与代码不一致**：`README.md` 第 8.3 节的标题与目录结构注释都写「九个页签」，实际是 **10 个**（`admin/index.html:185-194` 逐个数出来）。`admin/README.md:42-53` 的表格才是 10 行。
+> 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），现已改成 **10 个**（`README.md:770`、`README.md:172`）；`admin/README.md:43-54` 的功能表也是 10 行。这个是附录 E.3 事故 2 的现场，留作教材。
 
 ### 9.5 写入安全链（所有写接口共用）
 
 ```text
-① 认证（Cookie / X-Admin-Token / ?token=，三者任一）        server.mjs:1312-1315
+① 认证（Cookie / X-Admin-Token / ?token=，三者任一）        server.mjs:1315-1318
    ↓
-② POST 请求体校验：必须是 JSON 对象 + 只允许登记字段         server.mjs:1242-1253
+② POST 请求体校验：必须是 JSON 对象 + 只允许登记字段         server.mjs:1245-1256
    （坏 JSON / null / 数组 / 数字 / 字符串 / 意外字段 → 400，绝不 500）
    ↓
 ③ 参数格式校验（slug 正则 / dir 白名单 / 扩展名白名单 / id 格式 / 目录归属）
    ↓
-④ safeResolve + resolveInside（先 resolve 再按绝对路径比较目录前缀）  server.mjs:353-376
+④ safeResolve + resolveInside（先 resolve 再按绝对路径比较目录前缀）  server.mjs:354-377
    ↓
 ⑤ 写前快照 → admin-backups/<时间戳>-<随机>/（保留 40 份）    backups.mjs:15,79
    ↓
@@ -800,11 +803,11 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 ⑧ 前端提示（含 backup 快照 id，可「传错了想还原」）
 ```
 
-具体到「站点设置」这一条最长的链（`admin/settings.mjs:397-475` + `admin/README.md:212-220`）：
+具体到「站点设置」这一条最长的链（`admin/settings.mjs:397-475` + `admin/README.md:213-221`）：
 
 1. **白名单**：只允许 `SETTINGS_DEFS` 声明的 id（`:417-419`）；`pages.*` 走动态分支（`:405-415`）。
 2. **类型校验**：string 长度、number 范围（如 `theme.hue` 0-360）、enum 取值、boolean、stringlist（`literalFor`，`:100-141`）。
-3. **写前快照**：每个涉及文件一次（`server.mjs:1693-1695`）。
+3. **写前快照**：每个涉及文件一次（`server.mjs:1696-1698`）。
 4. **结构体检**：改写前后 `countStructure()` 的 `{}[]` 数量必须一致（`:294-300,444-452`）—— 这一步挡的是「正则匹配到意外位置」。
 5. **位置校验**：`replaceLiteralChecked` 要求字段在作用域内唯一，且改写后重新定位的下标与改写前完全相同（`:223-238`）。
 6. **回读校验**：重新解析刚写的文件，值与目标不符 → **立即用原文回滚**并报错（`:457-469`）。
@@ -813,25 +816,44 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 | 能力 | 实现 | 依据 |
 | --- | --- | --- |
-| 汇总最近 8 个提交的结论 | `ciStatus()` | `admin/server.mjs:796-873`、`admin/README.md:326` |
-| 追到「哪个 job 的哪个 step 挂了」 | `check-runs` → `details_url` 取 run id → `actions/runs/{id}/jobs` → 失败 job 的 `actions/jobs/{id}/logs` | `admin/README.md:252-259`、`admin/ci.mjs:143-204` |
+| 汇总最近 8 个提交的结论 | `ciStatus()` | `admin/server.mjs:797-874`、`admin/README.md:381` |
+| 追到「哪个 job 的哪个 step 挂了」 | `check-runs` → `details_url` 取 run id → `actions/runs/{id}/jobs` → 失败 job 的 `actions/jobs/{id}/logs` | `admin/README.md:307-314`、`admin/ci.mjs:143-204` |
 | `lastFailure` 只在「失败比成功更新」时返回 | 修掉了「旧失败永久挂红条」 | 提交 `e861438` |
-| 日志片段 | 尾部 2 MiB → 最后 30 行；拿不到就只给 `detailWarning` | `admin/ci.mjs:29,204`；`admin/README.md:298,323` |
-| 限流 | `rateLimited` 字段 + `warning` 文案 | `admin/server.mjs:821-834` |
-| 一键回滚 | 「回滚该提交」→ `POST /api/revert {sha}` | `admin/index.html`（横幅按钮）、`admin/server.mjs:1773-1788` |
+| 日志片段 | 尾部 2 MiB → 最后 30 行；拿不到就只给 `detailWarning` | `admin/ci.mjs:29,204`；`admin/README.md:353,323` |
+| 限流 | `rateLimited` 字段 + `warning` 文案 | `admin/server.mjs:822-835` |
+| 一键回滚 | 「回滚该提交」→ `POST /api/revert {sha}` | `admin/index.html`（横幅按钮）、`admin/server.mjs:1776-1791` |
 
 ### 9.7 已知边界（**不要**当成 bug 去修）
 
 | 边界 | 说明 | 依据 |
 | --- | --- | --- |
-| SSRF 防护是「尽力而为」 | 判断主机与真正发请求之间**仍存在 DNS 重绑定窗口**，也不检查非 HTTP 端口的语义。所以「从网址抓取」只应对信任站点使用 | `admin/README.md:427-428`、`admin/friends.mjs:1152` 注释 |
-| JS 动态渲染的站点抓不到简介 | 正文很短又没有 meta 时，明确提示「页面没有可用的静态介绍，请手动填写」 | `admin/README.md:418` |
-| **头像/友链图标不能通过面板上传** | `public/friends/` **不在**上传/删除白名单（只是**只读**可访问，`MEDIA_READ_DIRS` 额外加了它）；`avatar` 目录能传，但友链图标不行 | `admin/server.mjs:107-110`、`admin/README.md:433-435` |
+| SSRF 防护是「尽力而为」 | 判断主机与真正发请求之间**仍存在 DNS 重绑定窗口**，也不检查非 HTTP 端口的语义。所以「从网址抓取」只应对信任站点使用 | `admin/README.md:482-483`、`admin/friends.mjs:1152` 注释 |
+| JS 动态渲染的站点抓不到简介 | 正文很短又没有 meta 时，明确提示「页面没有可用的静态介绍，请手动填写」 | `admin/README.md:473` |
+| **友链图标不能通过面板上传** | `public/friends/` **不在**上传/删除白名单（只是**只读**可访问，`MEDIA_READ_DIRS` 额外加了它）。站点头像则是**可以**通过面板换的：走「站点设置 → 站点头像」的 `/api/avatar`（只写 `public/assets/images/` 并同时改 `profileConfig.avatar`，见 9.8 节），「媒体」页里的 `avatar` 目录仍然只能传文件、不关联配置 | `admin/server.mjs:108-111`、`admin/README.md:488-490`、9.8 节 |
+| 换头像不动友链页那张图 | 友链页自己的头像硬编码在 `src/content/spec/friends.mdx`（站点绝对 URL，属内容文件），换站点头像不会连带改它；旧文件不删，所以不会 404 | `src/content/spec/friends.mdx:14`、`admin/README.md` 站点头像一节 |
+| 头像只认平铺路径 | `avatar` 被手工写成远程 URL / `src` 相对路径 / 子目录时，卡片只显示路径文本（`repoPath: null`），不会去猜文件 | `admin/avatar.mjs` 的 `describeAvatar` |
 | 媒体 404 也走统一收口 | 媒体非 2xx 会经 `withSecurityHeaders` 返回，避免漏安全头 | `worker/index.mjs:147-148`、`H1` |
 | 面板不新增导航项 | 见 4.3 节 | `admin/nav.mjs:99` |
-| `/api/import-document` 不建快照 | 它不写文章（没有旧版本可备份），只转 Markdown + 落图片 | `admin/server.mjs:1799-1805` |
-| `compress-media` 只新增 `.webp` | 不删也不覆盖原图；默认先试算 | `admin/README.md:444` |
+| `/api/import-document` 不建快照 | 它不写文章（没有旧版本可备份），只转 Markdown + 落图片 | `admin/server.mjs:1802-1808` |
+| `compress-media` 只新增 `.webp` | 不删也不覆盖原图；默认先试算 | `admin/README.md:499` |
 | 体检「站内链接」依赖 `dist/` | 没有 `dist/` 时动态路由判定会退化（它先看 `dist/` 是否存在） | `admin/doctor.mjs:183-184` |
+
+### 9.8 站点头像更换（`/api/avatar` + `admin/avatar.mjs`）
+
+面板「站点设置」页顶部新增**站点头像卡片**：缩略图 + 当前路径/体积 + 「上传新头像…」+「恢复默认」。
+
+**为什么放在「站点设置」而不是「媒体」页**：换头像不是单纯的文件上传，它得**同时改写 `src/config/profileConfig.ts` 的 `avatar` 字段**（首页侧栏资料卡 `Profile.astro`、文章分享海报 `[...slug].astro`、OG 图 `og/[...slug].ts`、`Person.image` 结构化数据都读它）。配置的归属地是「站点设置」，写入必须复用 `settings.mjs` 那条链；「媒体」页继续只做文件管理。
+
+| 环节 | 实现 | 依据 |
+| --- | --- | --- |
+| 路由 | 一个 `/api/avatar`：`GET` 读状态（`describeAvatar`），`POST {filename,dataBase64}` 换图，`POST {restore:true}` 恢复默认 | `admin/server.mjs:1966-2010` |
+| 落盘位置 | `public/assets/images/avatar-<内容 sha256 前 12 位>.<真实格式>`；**不覆盖** `avatar-zhi.webp`，「恢复默认」= 把配置写回它 | `admin/avatar.mjs` |
+| 校验 | 扩展名白名单（与 `UPLOAD_EXT.avatar` 同口径：png/jpg/jpeg/webp/avif/gif）+ **魔数嗅探**（`sniffImageFormat`，`a.php.png` 这类拒掉；落盘扩展名取魔数）+ 25 MB 上限（base64 长度预检 + 解码后再卡） | `admin/avatar.mjs`、`admin/server.mjs:141-152` |
+| 缩放 | 有 `sharp`（`createRequire` 惰性解析，面板仍零依赖）且最长边 > 512px、**且不是动图/GIF** → 等比缩到 512px 并去掉 EXIF；动图与 GIF 一律原样保存（默认参数会把动画压成静帧，见 3.5 节动图红线）；无 `sharp`/失败 → 原图 + `note` 说明 | `admin/avatar.mjs` 的 `downscaleAvatar` |
+| 写配置 | `applySettings({ "profile.avatar": url }, snapshot)`：白名单 → 类型校验 → 写前快照 → 结构体检 → 回读校验；**失败时把刚写入的新图片删掉**再回滚 | `admin/avatar.mjs`、`admin/settings.mjs` |
+| 发布 | 两个路径都在 `PUBLISH_SCOPE`（`public/assets`、`src/config`），点「发布」会一起提交 | `admin/publish-scope.mjs:14-20`、10.3 节 |
+
+已知边界见 9.7 节（友链页那张图不跟着换、只认平铺路径、恢复默认不删已上传文件）。用户向说明在 `admin/README.md` 的「站点头像（上传 / 恢复默认）」一节。
 
 ---
 
@@ -847,9 +869,9 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 ① 本地改内容/配置（面板 或 手写 src/config、src/content）
         ↓
 ② 面板「发布」页点「立即发布」（或开自动同步，保存即触发；2.5s 内合并为一次提交）
-   ├─ (a) 先跑体检 runDoctor：有 error 级问题 → 直接拦住         server.mjs:928-940
+   ├─ (a) 先跑体检 runDoctor：有 error 级问题 → 直接拦住         server.mjs:929-941
    ├─ (b) stageForPublish：只 git add 白名单内的路径             publish-scope.mjs:67-84
-   ├─ (c) git commit -m "<提交说明>"                            server.mjs:962
+   ├─ (c) git commit -m "<提交说明>"                            server.mjs:963
    └─ (d) git fetch origin → 落后则 pull --rebase --autostash → git push   :893-922
         ↓
 ③ GitHub Actions 被 push 触发（.github/workflows/deploy.yml:3-7）
@@ -859,7 +881,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
         ↓
 ④ Cloudflare 边缘：上传 dist/ 静态资源 + 部署 Worker；custom_domain 路由生效
         ↓
-⑤ 访客侧生效：约 1 分钟（admin/README.md:171、server.mjs:982）
+⑤ 访客侧生效：约 1 分钟（admin/README.md:172、server.mjs:983）
 ```
 
 ### 10.3 ⭐ 发布只提交 `PUBLISH_SCOPE`（必须记住）
@@ -879,10 +901,10 @@ export const PUBLISH_SCOPE = [
 | 行为 | 事实 | 依据 |
 | --- | --- | --- |
 | 只暂存白名单内的改动 | `git status --porcelain -z --untracked-files=all` → 过滤 → 分批（50 个一组）`git add -- <paths>` | `publish-scope.mjs:67-84` |
-| **范围外改动会被跳过，并明确提示** | 返回体带 `skipped`，message 形如「面板管理范围内没有改动。另有 N 个改动不在面板管理范围，已跳过（不会提交）：a、b、c… —— 需要提交请用 git 命令手动处理」 | `server.mjs:948-959` |
+| **范围外改动会被跳过，并明确提示** | 返回体带 `skipped`，message 形如「面板管理范围内没有改动。另有 N 个改动不在面板管理范围，已跳过（不会提交）：a、b、c… —— 需要提交请用 git 命令手动处理」 | `server.mjs:949-960` |
 | 为什么不用 `git add -A` | 会把工作区**所有**改动一起提交推送，包括改到一半的在制品；`admin/` 的半成品无害，但 `src/**` 的半成品会**直接让构建失败** | `publish-scope.mjs:4-11` |
 | 为什么必须 `--untracked-files=all` | 否则 git 会把**整个未跟踪目录**折叠成一条 `public/`，导致新上传的媒体文件根本不会被暂存 | `publish-scope.mjs:62-64`（`09b0634` 实测踩到） |
-| 演练模式 | `ADMIN_PUBLISH_DRY_RUN=1` 时 `DRY_RUN_PUBLISH` 为真：照常 commit，但跳过 push 并 `git reset --soft HEAD~1` 撤销提交 | `server.mjs:60,968-973` |
+| 演练模式 | `ADMIN_PUBLISH_DRY_RUN=1` 时 `DRY_RUN_PUBLISH` 为真：照常 commit，但跳过 push 并 `git reset --soft HEAD~1` 撤销提交 | `server.mjs:61,968-973` |
 
 > 🔴 **给 agent 的推论**：如果你用文本工具改了 `src/styles/variables.styl`、`worker/index.mjs`、`admin/*.mjs`、`README.md`、`AGENTS.md` 等**范围外**文件，**面板的发布按钮不会提交它们**。必须用 git 命令逐个 `git add -- <file>` 后自己提交（并遵守第 1.4 节第 1 条：不要 `git add -A`）。
 
@@ -890,11 +912,11 @@ export const PUBLISH_SCOPE = [
 
 | # | 手段 | 适用场景 | 怎么做 | 依据 |
 | --- | --- | --- | --- | --- |
-| 1 | **文件级恢复（面板快照）** | 改坏了某个配置/文章/媒体，想回到面板写入前 | 「体检 / 备份」页 → 找快照 → 「恢复 xxx」。**恢复前还会给「当前版本」再打一份快照**，所以恢复错了还能再恢复回来 | `admin/backups.mjs:182`、`admin/README.md:328-339` |
-| 2 | **提交级回滚（git revert）** | 某次提交把站点搞坏了，且被后续提交压在下面 | 「体检 / 备份」页的「回滚该提交」或 `POST /api/revert {sha}`；它走 `git revert --no-edit` + 同样的 fetch/rebase/push 流程，**不改写历史** | `server.mjs:992-1024`、`admin/README.md:249` |
+| 1 | **文件级恢复（面板快照）** | 改坏了某个配置/文章/媒体，想回到面板写入前 | 「体检 / 备份」页 → 找快照 → 「恢复 xxx」。**恢复前还会给「当前版本」再打一份快照**，所以恢复错了还能再恢复回来 | `admin/backups.mjs:182`、`admin/README.md:383-394` |
+| 2 | **提交级回滚（git revert）** | 某次提交把站点搞坏了，且被后续提交压在下面 | 「体检 / 备份」页的「回滚该提交」或 `POST /api/revert {sha}`；它走 `git revert --no-edit` + 同样的 fetch/rebase/push 流程，**不改写历史** | `server.mjs:993-1025`、`admin/README.md:304` |
 | 3 | **Cloudflare 版本回滚** | CI 部署出的版本有问题（或 Worker 自身出问题） | Cloudflare 控制台 → Workers & Pages → `my-blog` → Deployments → 回滚到上一个版本 | 需在控制台操作（**需确认**具体界面文案随 CF 版本变化） |
 
-补充：`revert` 遇到冲突时**不会硬来**，会留下冲突现场并提示手工处理（`server.mjs:999-1006`）。
+补充：`revert` 遇到冲突时**不会硬来**，会留下冲突现场并提示手工处理（`server.mjs:1000-1007`）。
 
 ### 10.5 本地手动部署（不走 CI）
 
@@ -979,7 +1001,7 @@ pnpm build
 | --- | --- | --- |
 | `npx` 被执行策略挡住 | `npx tsx ...` 直接失败（Windows 上的 PowerShell 执行策略 / 应用控制） | 用 **`node node_modules/... `** 直接调二进制：`node node_modules/@biomejs/biome/bin/biome`、`node node_modules/typescript/bin/tsc`、`node node_modules/tsx/dist/cli.mjs`。本次两条门禁就是这么跑通的 |
 | PowerShell 读 UTF-8/GBK 会乱码 | `Get-Content` 输出中文乱码；`read` 工具读 GBK 的 `.cmd` 直接报错 | **用 node 读**：`node -e "console.log(require('fs').readFileSync('f','utf8'))"`；GBK 文件用 `new TextDecoder('gbk')` |
-| 起过 `admin/server.mjs` 忘了关 | 再起时报 `EADDRINUSE`；老进程仍占着端口，`?token=` 也是旧的 | 面板已经给了可读提示（`admin/server.mjs:1986-1993`：提示「可能已有一个管理面板在运行」并给出换端口命令）。处理：① 直接用已开着的那个窗口；② 任务管理器结束 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。**用完记得关**，避免留下占端口的后台进程 |
+| 起过 `admin/server.mjs` 忘了关 | 再起时报 `EADDRINUSE`；老进程仍占着端口，`?token=` 也是旧的 | 面板已经给了可读提示（`admin/server.mjs:2034-2041`：提示「可能已有一个管理面板在运行」并给出换端口命令）。处理：① 直接用已开着的那个窗口；② 任务管理器结束 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。**用完记得关**，避免留下占端口的后台进程 |
 | `dist/` 是陈旧产物 | 用陈旧 `dist/` 判断「某文件是否被引用」会得到错误结论 | 判断产物类问题前先 `pnpm build`；或明确标注「基于旧 dist，未重建」 |
 | `git status` 折叠未跟踪目录 | 默认只显示 `public/` 一行，看不到里面新增的媒体文件 | 一律加 `--untracked-files=all`（`-uall`）；面板代码就是必须带它（`publish-scope.mjs:62-64`） |
 | 手工 `git add -A` | 见 10.3 与第 12.8 节 | 逐个路径 `git add -- <paths>` |
@@ -1084,11 +1106,11 @@ pnpm build
 | --- | --- |
 | 现象 | 前端拖动试听进度条（或手工构造畸形 Range）→ **整个面板进程 exit 1** |
 | 原因链 | `createReadStream` 的越界参数会**同步抛** `ERR_OUT_OF_RANGE` → 冒到最外层 `catch` → 此时响应头已经发出 → 第二次 `writeHead` 抛 `ERR_HTTP_HEADERS_SENT` → 无人接管 → 进程退出 |
-| 复现证据（实测，面板已修前的记录） | `%TEMP%\ff-final-repro.txt`：`Range: bytes=99999999999999-` 与 `bytes=5-1` 都导致 `面板进程: 已死亡（exitCode=1）❌`，stderr 是 `ERR_HTTP_HEADERS_SENT at sendJson (...server.mjs:1037)` |
-| 处理（`bc3f0b2`） | 新增 `parseByteRange()`（`server.mjs:1107-1128`）与 `streamFile()`（`:1136-1147`）：非法/越界 → `416` + `Content-Range: bytes */<size>`；start/end 一律夹到 `[0, size-1]`；`stream.on("error")` 兜底 `res.destroy()`；`sendJson` 与最外层 `catch` **先判 `headersSent`**；`res.on("close")` 销毁流避免 fd 泄漏 |
+| 复现证据（实测，面板已修前的记录） | `%TEMP%\ff-final-repro.txt`：`Range: bytes=99999999999999-` 与 `bytes=5-1` 都导致 `面板进程: 已死亡（exitCode=1）❌`，stderr 是 `ERR_HTTP_HEADERS_SENT at sendJson (...server.mjs:989)`（**日志原文，行号属当时那一版代码**，不要按现在的 `server.mjs` 去找） |
+| 处理（`bc3f0b2`） | 新增 `parseByteRange()`（`server.mjs:1108-1129`）与 `streamFile()`（`:1136-1147`）：非法/越界 → `416` + `Content-Range: bytes */<size>`；start/end 一律夹到 `[0, size-1]`；`stream.on("error")` 兜底 `res.destroy()`；`sendJson` 与最外层 `catch` **先判 `headersSent`**；`res.on("close")` 销毁流避免 fd 泄漏 |
 | 同时修掉 | **M3**：`bytes=0-99999999999999` 曾返回 `206` + `Content-Length` 谎报 100 TB 却给 0 字节；以及既有 bug：`bytes=-N` 应返回**最后 N 字节** |
 | 现状（实测） | 修复后同组用例：`bytes=0-100` → `206` + 101 字节；`bytes=abc` → 忽略该头返回 `200` 全量；面板存活 |
-| ⚠️ 给 agent 的警告 | `parseRange` 的「非法 → 忽略头返回 200」是**刻意的**（`worker/index.mjs:194-198` 同样如此）；`/media-file` 的 416 分支（`server.mjs:1603-1614`）注释解释了为什么不能把 start/end 直接丢给 `createReadStream`；不要为了「简洁」把这两层兜底删掉 |
+| ⚠️ 给 agent 的警告 | `parseRange` 的「非法 → 忽略头返回 200」是**刻意的**（`worker/index.mjs:194-198` 同样如此）；`/media-file` 的 416 分支（`server.mjs:1606-1617`）注释解释了为什么不能把 start/end 直接丢给 `createReadStream`；不要为了「简洁」把这两层兜底删掉 |
 
 ### 12.10 `/api/save-post` 的 `originalSlug` 越界，真的删掉了 `README.md`（M2）
 
@@ -1097,7 +1119,7 @@ pnpm build
 | 现象 | 保存文章时可以传 `originalSlug`，它参与两件事：**删掉改名前的旧文件**、打快照 |
 | 原因 | 旧实现只校验了 `slug`，**没校验 `originalSlug`** → `originalSlug="../config/navBarConfig"` 能删 `src/config` 下任意 `.md`，更宽的越界可以删仓库内任意 `.md` |
 | 真实后果 | 复现时**真的删掉了仓库根 `README.md`**；后来用面板快照 + git 校验恢复（**逐字节一致**，71588 字节） |
-| 处理 | `bc3f0b2`：`originalSlug` 与 `slug` 用**同一套正则** `POST_SLUG_RE = /^[A-Za-z0-9._-]+$/`（`server.mjs:103,1371-1374`）；并给 `/api/post` 的 `slug` 也补了正则（`M1`：原来会 500 且回显内部路径） |
+| 处理 | `bc3f0b2`：`originalSlug` 与 `slug` 用**同一套正则** `POST_SLUG_RE = /^[A-Za-z0-9._-]+$/`（`server.mjs:104,1371-1374`）；并给 `/api/post` 的 `slug` 也补了正则（`M1`：原来会 500 且回显内部路径） |
 | ⚠️ 给 agent 的警告 | 任何「会被拼进文件路径」的参数（slug、originalSlug、repoPath、id、rel、dir、filename）都**必须**先过格式/白名单校验，再做 `safeResolve`/`resolveInside`。这是本仓库反复踩过的一条线（`1940c1c` 也修了 `/api/restore` 的 `rel` 越界） |
 
 ### 12.11 路径穿越与上传白名单（`1940c1c`）
@@ -1105,7 +1127,7 @@ pnpm build
 | 项 | 内容 |
 | --- | --- |
 | 现象 | `/api/restore` 的 `rel` 未校验（可越界读/写）；`safeResolve` 少了 `path.sep`（`../` 或同名前缀兄弟目录能绕过）；上传只按扩展名粗判，`.html`/`.svg`（可携带脚本）能传进站点目录 |
-| 处理 | ① `safeResolve` 补 `path.sep`（`server.mjs:353-360`）；② 新增 `resolveInside`（先 resolve 再按绝对路径比较目录白名单，`:367-376`），`/media-file`、`/api/delete-media`、`/api/extract-audio`、`/api/upload` 全部改用它；③ `UPLOAD_EXT` 按目录细分白名单（`:140-146`），拒绝 `.html`/`.svg`；④ 访问令牌改 `timingSafeEqual` 恒定时间比较（`:379-385`） |
+| 处理 | ① `safeResolve` 补 `path.sep`（`server.mjs:354-361`）；② 新增 `resolveInside`（先 resolve 再按绝对路径比较目录白名单，`:367-376`），`/media-file`、`/api/delete-media`、`/api/extract-audio`、`/api/upload` 全部改用它；③ `UPLOAD_EXT` 按目录细分白名单（`:140-146`），拒绝 `.html`/`.svg`；④ 访问令牌改 `timingSafeEqual` 恒定时间比较（`:379-385`） |
 | 验证口径 | 安全回归 16 项全过（穿越读/删除/恢复、上传 `.html`/`.svg` 均被拒，正常上传/删除/读取/体检/设置仍可用） | `1940c1c` 正文 |
 | ⚠️ 给 agent 的警告 | 新增任何「按路径读写」的接口时，**必须**用 `resolveInside(rel, [允许的前缀])`，不要自己 `path.join(REPO_ROOT, rel)` |
 
@@ -1114,7 +1136,7 @@ pnpm build
 | 项 | 内容 |
 | --- | --- |
 | 现象 | 面板已有一个实例在跑，再启动会抛未捕获的 `EADDRINUSE` 栈 |
-| 处理 | `server.on("error")` 里识别 `EADDRINUSE`，打印可读提示（「可能已有一个管理面板在运行…或换个端口 `--port=8800`」）并 `process.exit(1)` | `server.mjs:1986-1993` |
+| 处理 | `server.on("error")` 里识别 `EADDRINUSE`，打印可读提示（「可能已有一个管理面板在运行…或换个端口 `--port=8800`」）并 `process.exit(1)` | `server.mjs:2034-2041` |
 | 备注 | 仓库历史里出现过成对提交（`05b5c94` 与 `36869ea` 内容相近），说明作者曾把同一修复提交两次；**读历史时不要以为漏了一个修复** |
 
 ---
@@ -1132,10 +1154,11 @@ pnpm build
 | 面板受保护路由的未认证访问 | 父会话记录：「**32 个受保护路由 × 6 种凭据 = 364 条断言全部 403**」 | `%TEMP%\ff-admin-auth-test.mjs`（脚本按源码自动提取路由） | ⚠️ **部分复核 + 数量不一致**，见 13.5 节 |
 | SSRF 防护 | **87/87 拦截** | `%TEMP%\ff-ssrf-test.mjs` | ✅ **本次逐行清点 = 87 条**（A 段 40 条私有主机 + A 段 16 条公网主机 + B 段 15 条协议/主机 + C 段 7 目标 ×2 + 2 条重定向检查 = 87），与记录一致 |
 | 路径穿越 | 父会话记录「**32 组载荷全挡**」 | 同上脚本第 11 节 | ⚠️ 该脚本里实际是 **15 组**穿越读取 × 2 条断言 = 30 条；「32 组」可能来自其它测试文件（`ff-cc*.mjs`，本次未逐一清点）→ **需确认** |
-| 上传扩展名白名单 | 成立 | `admin/server.mjs:140-146`（实测：5 个目录各自的 `UPLOAD_EXT` 正则，仅图片/音频/`.lrc`） | ✅ |
+| 上传扩展名白名单 | 成立 | `admin/server.mjs:141-147`（实测：5 个目录各自的 `UPLOAD_EXT` 正则，仅图片/音频/`.lrc`） | ✅ |
+| 头像上传的**魔数校验** | 成立（新增能力，本次实测） | `admin/avatar.mjs` 的 `sniffImageFormat`：把文本/PHP 改名成 `.png`（含 `a.php.png`）一律 400 且不落盘；落盘扩展名取真实格式。38 条模块级断言 + 21 条 HTTP 断言全绿（夹具仓库，未碰真实头像） | ✅ |
 | 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 28 个 HTML、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
 | CSP 两份一致 | 成立 | 实测：`worker/index.mjs:31` 与 `public/_headers:32` 都是 **407 字符**且逐字节相同；两份都不含 `esm.sh`、都含 `giscus.app` | ✅ |
-| 面板只监听 127.0.0.1 | 成立 | `admin/server.mjs:1995` | ✅ |
+| 面板只监听 127.0.0.1 | 成立 | `admin/server.mjs:2043` | ✅ |
 | 备份/日志/产物不入库 | 成立 | `.gitignore:2,5,8,20,23`（`dist/`、`public/vndb-covers/`、`.astro/`、`logs/`、`admin-backups/`） | ✅ |
 | 门禁全绿 | `tsc --noEmit --isolatedDeclarations` exit 0；`biome ci src` 315 文件 0 问题 | 本次实测 | ✅ |
 
@@ -1157,8 +1180,8 @@ pnpm build
 | **L1** | 低危 | legacy 跳转大小写敏感 | 改大小写不敏感（`worker/index.mjs:84-90`） |
 | **L4** | 低危 | friends 抓取的**模块级** meta 缓存串页 | 改为每请求独立 |
 | **L5** | 低危 | 图标重定向用 `follow`，会把请求打到内网 | 改 `manual` 并**每跳**重新校验（`admin/friends.mjs`） |
-| **L6** | 低危 | `save-lyrics` 没有快照（唯一漏掉的一处） | 补 `snapshotBefore`（`server.mjs:1526`） |
-| **L7** | 低危 | `/api/logout` 免认证 | **保留**免认证，但写明设计原因（`server.mjs:1300-1301`） |
+| **L6** | 低危 | `save-lyrics` 没有快照（唯一漏掉的一处） | 补 `snapshotBefore`（`server.mjs:1529`） |
+| **L7** | 低危 | `/api/logout` 免认证 | **保留**免认证，但写明设计原因（`server.mjs:1303-1304`） |
 
 > 编号口径提醒：`bc3f0b2` 的标题说「1 critical + 2 high + 6 中危 + 5 低危」= 14 项，但正文实际列出 **16 个编号**（C1/M3 合并、L7 额外）。父任务给 agent 的清单只列了 12 个（缺 M3、L7）。**以本表为准（15 行，含 C1 与 M3 分列）**，口径差异已在 13.6 节记录。
 
@@ -1170,7 +1193,7 @@ pnpm build
 | --- | --- | --- |
 | 1 | **真实 Cloudflare 边缘未做系统测试** | 本次只有 4 条实测（200 / 404 / 206 Range / 301），且来自父 agent 的一次性采集。未测：大文件 Range 边界、`If-None-Match` 304、并发、`HEAD`、`405`、`416` 的线上表现、边缘缓存 TTL 实际行为 |
 | 2 | **多文件批次写入的原子性** | 面板多处「一次请求改多个文件」（如 `/api/settings` 批量改同一文件的多字段、`/api/save-post` 同时写新文件+删旧文件）**没有事务语义**：中途失败可能留下部分写入。现有的兜底是「每个文件写前快照 + 写后回读校验 + 单文件失败立即用原文回滚」 |
-| 3 | `admin/index.html` 其余 `innerHTML` 未逐一做浏览器级验证 | 已知修过的是「媒体列表文件名补 `escapeHtml`」（`1940c1c`）、CI 横幅外部文本 `escapeHtml`（`admin/README.md:317`）。其余渲染点未逐个在浏览器里做过注入验证 |
+| 3 | `admin/index.html` 其余 `innerHTML` 未逐一做浏览器级验证 | 已知修过的是「媒体列表文件名补 `escapeHtml`」（`1940c1c`）、CI 横幅外部文本 `escapeHtml`（`admin/README.md:372`）。其余渲染点未逐个在浏览器里做过注入验证 |
 | 4 | 真实 GitHub 侧状态未验证 | 分支保护、Secrets 是否配置、最近 Actions 结果：全为 403 或未查询（8.7 节） |
 | 5 | 线上 CSP 全文未逐字节比对 | 证据文件把 CSP 值截断了（`…style-src 'self' 'unsafe-inli…`）；只能确认**前缀一致**，完整比对需 `curl -I` 复测 |
 | 6 | `pnpm build` 本次未跑 | 见 11.2 第 3 条；`dist/` 是否为当前 HEAD 的产物**未确认** |
@@ -1181,7 +1204,7 @@ pnpm build
 
 | 脚本（`%TEMP%`，未入库） | 父会话概述 | 本次逐行清点 | 差异说明 |
 | --- | --- | --- | --- |
-| `ff-admin-auth-test.mjs` | 「32 个受保护路由 × 6 种凭据 = 364 条断言全部 403」 | 脚本从源码提取 **33 条** `/api` 路由（32 条在 switch 内 + `/api/logout`）；断言总数 **488 条**，其中「必须 403」的 **330 条**（§1 无凭据 33×2=66；§2 错令牌 33×3=99；§3 伪造 Cookie 33×5=165） | 两个数字都对不上：`32 × 6 = 192 ≠ 364`；脚本结构也数不出 364。**结论：路由数 33（其中 32 个受保护）可信；「364」需以实际运行脚本的输出为准 → 标注需确认** |
+| `ff-admin-auth-test.mjs` | 「32 个受保护路由 × 6 种凭据 = 364 条断言全部 403」 | 脚本从源码提取 **33 条** `/api` 路由（32 条在 switch 内 + `/api/logout`）；断言总数 **488 条**，其中「必须 403」的 **330 条**（§1 无凭据 33×2=66；§2 错令牌 33×3=99；§3 伪造 Cookie 33×5=165） | 两个数字都对不上：`32 × 6 = 192 ≠ 364`；脚本结构也数不出 364。**结论：路由数 33（其中 32 个受保护）可信；「364」需以实际运行脚本的输出为准 → 标注需确认**。注：这是**父会话当时的清点**；本次新增 `/api/avatar` 后为 34 条（33 个受保护），见 9.3 节 |
 | `ff-ssrf-test.mjs` | 「87/87 拦截」 | **87 条**（40+16+15+14+2） | ✅ 一致 |
 | `ff-final-repro.mjs` / `.txt` | 「媒体 Range 畸形值曾打死面板进程」 | 复现记录完整：`bytes=99999999999999-`、`bytes=5-1` → `exitCode=1`；修复后同组用例存活 | ✅ 一致 |
 | `ff-cc2/3/4.mjs`、`ff-determinism.mjs`、`ff-dist-check.mjs`、`ff-config-check.mjs`、`ff-worker-*.mjs`、`ff-xss-proof.mjs`、`ff-ci-check.mjs` 等 | 分散在 `bc3f0b2`、`1940c1c`、`f040d66` 的验收段落里 | 本次**未逐一清点** | 「201 条断言全绿」「路径穿越 32 组」这类总数以这些脚本为准 → **需确认** |
@@ -1203,14 +1226,14 @@ pnpm build
 
 ---
 
-## 附录 A：快问快答（22 条）
+## 附录 A：快问快答（24 条）
 
 | # | 问题 | 答案（含位置） |
 | --- | --- | --- |
-| 1 | **想加一个友链，改哪？** | 优先：面板「友链」页 → 新增（写 `src/config/friends.json`，`admin/friends.mjs`）。手工：直接编辑 `src/config/friends.json`，字段见 `friendsConfig.ts:9` 与 `admin/README.md:393-404`（`title` ≤60 字、`siteurl` 只允许 http(s)、`imgurl` 必填、`weight` -999~999）。图标要放进 `public/friends/` 再填路径（**面板不能上传到这个目录**） |
+| 1 | **想加一个友链，改哪？** | 优先：面板「友链」页 → 新增（写 `src/config/friends.json`，`admin/friends.mjs`）。手工：直接编辑 `src/config/friends.json`，字段见 `friendsConfig.ts:9` 与 `admin/README.md:448-459`（`title` ≤60 字、`siteurl` 只允许 http(s)、`imgurl` 必填、`weight` -999~999）。图标要放进 `public/friends/` 再填路径（**面板不能上传到这个目录**） |
 | 2 | **想调页面宽度 / 内容宽度，改哪？** | 面板「站点设置」：`site.pageWidth`（rem，50-200）、`site.contentWidth`（px，600-2400）、`site.contentWidthVw`（%，60-100）。手工等价位置：`siteConfig.ts:71,73,74`。⚠️ **不要动 `variables.styl:170` 的 1280px 静态兜底**（12.3 节） |
 | 3 | **构建失败先查什么？** | ① 本地 `node_modules` 是否与 lockfile 一致 → 跑 `重建依赖.cmd`（11.3）；② 面板「体检」页看 8 项检查（JSON 合法性、歌单/文章引用、站内链接、密钥、大文件、配置矛盾、git 状态，`admin/doctor.mjs:70-330`）；③ 看你改的是不是 `src/config/*.ts` 这种一改就可能破语法的地方；④ 跑三条门禁（11.2）定位是类型、lint 还是构建 |
-| 4 | **面板起不来？** | 先看是不是 `EADDRINUSE`（提示已写在 `server.mjs:1988-1990`）：① 用已经开着的那个窗口；② 结束任务管理器里的 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。注意默认端口是 **8799**（`server.mjs:58`），别名里写的 8899 只是示例 |
+| 4 | **面板起不来？** | 先看是不是 `EADDRINUSE`（提示已写在 `server.mjs:2036-2038`）：① 用已经开着的那个窗口；② 结束任务管理器里的 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。注意默认端口是 **8799**（`server.mjs:59`），别名里写的 8899 只是示例 |
 | 5 | **评论区空白？** | 按 12.6 节的排查顺序：① 浏览器控制台有没有 **CSP 报错**（要改就改 `worker/index.mjs:31`，改 `_headers` 无效）；② `public/vendor/giscus-1.6.0.mjs` 是否真的部署上去了（`Giscus.astro:68` 的 import 是否 200）；③ `commentConfig.ts:57,59,63` 的 `repo` / `repoId` / `categoryId` 是否与 GitHub Discussions 配置一致；④ Swup 换页后重新初始化是否还在（`Giscus.astro:85-91`） |
 | 6 | **音乐不能拖进度条 / 不能边下边播？** | 这是 Workers 静态资源不处理 `Range` 的固有问题，必须靠 Worker：确认 `wrangler.jsonc:11` 的 `run_worker_first: true` 还在、`worker/index.mjs:59-61` 的 `/assets/music/` 分支还在。`README.md:986` 有同样的问答 |
 | 7 | **想新增一个导航菜单项？** | **只能改 `src/config/navBarConfig.ts`**（面板不支持新增，`admin/nav.mjs:99`）。在 `getDynamicNavBarConfig()` 里加项，**必须写显式 `id`**，否则面板读不到它（`navBarConfig.ts:26-150`）。加完可以再用面板做隐藏/改名/排序 |
@@ -1229,6 +1252,8 @@ pnpm build
 | 20 | **想让看板娘回来 / 想关掉毛玻璃？** | 看板娘：改 `pioConfig.ts:88`（Live2D）或 `:6`（Spine）——⚠️ 面板那个「性能 · Live2D」开关控制的是 Spine（4.4 节）。毛玻璃：`perfConfig.ts:20` 的 `lowSpec` 改 `false` 恢复全部玻璃态；只想调某一处 blur 就改 `backgroundWallpaper.ts:169,179,196`（但注意 12.4 节：改半径不等于去掉合成层） |
 | 21 | **想加一首歌？** | 面板「音乐」页上传（自动抽封面/歌词并写 `src/config/music-playlist.json`）。手工：文件放 `public/assets/music/`，在 `music-playlist.json` 加一条（字段 `name/artist/url/cover/lrc`，实测样例带 `?v=<哈希>`）。单曲建议 ≤ 10 MB（Cloudflare 单资源上限 25 MiB，`musicConfig.ts:11`） |
 | 22 | **提交前该跑什么？** | 三条门禁（11.2）：`tsc --noEmit --isolatedDeclarations`、`biome ci src`、`pnpm build`（28 页）。若无法用 `npx`，用 `node node_modules/...` 等价命令。**改了两个门禁都不会覆盖的文件（如 `worker/`、`admin/`、文档）时，更要手动跑，因为 CI 不检查它们** |
+| 23 | **想换站点头像？** | 面板「站点设置 → 站点头像」→「上传新头像…」（支持 png/jpg/jpeg/webp/avif/gif，≤25 MB；静态大图自动缩到最长边 512px，动图/GIF 不缩）。它会**另存新文件**并改写 `profileConfig.ts:14` 的 `avatar`，原头像保留，可「恢复默认」（9.8 节）。手工等价：把图片放进 `public/assets/images/`，再改 `profileConfig.ts:14` 为 `/assets/images/<文件名>`（动图**必须**走 public，见 3.5 节红线） |
+| 24 | **面板能上传友链图标吗？** | **不能**。`public/friends/` 只在 `/media-file` 的**只读**白名单里（`MEDIA_READ_DIRS`），请手工放文件再填路径（9.7 节） |
 
 ---
 
@@ -1244,7 +1269,7 @@ pnpm build
 | 4 | 7.4 | 阿里云账号/持有人/实名状态/到期日/自动续费/转移锁/是否存在重复解析 | 仓库无凭据、无截图、RDAP 采集失败；**父任务要求不得编造账号或备案号** |
 | 5 | 7.3 | 是否需要 ICP 备案 | 属合规判断，仓库内无任何可核实证据（**本文不作断言**） |
 | 6 | 8.7 | 分支保护是否开启、两个 Secret 是否已配置、最近 Actions 结果 | 证据文件 `branchProtection: 403`、`secretsReadable: 403`；本次未查询 GitHub |
-| 7 | 13.2 / 13.5 | 「32 个受保护路由 × 6 种凭据 = 364 条断言」与「路径穿越 32 组载荷」 | 脚本逐行清点为 33 路由 / 488 断言（其中 330 条是 403 断言）、单脚本穿越载荷 15 组；与概述对不上，且未复跑脚本 |
+| 7 | 13.2 / 13.5 | 「32 个受保护路由 × 6 种凭据 = 364 条断言」与「路径穿越 32 组载荷」 | 脚本逐行清点为 33 路由 / 488 断言（其中 330 条是 403 断言）、单脚本穿越载荷 15 组；与概述对不上，且未复跑脚本。**本次新增 `/api/avatar` 后路由总数为 34（33 个受保护），见 9.3 节** |
 | 8 | 13.4 | 真实 Cloudflare 边缘的系统测试、多文件批次写入原子性、`admin/index.html` 其余 `innerHTML` 的浏览器级验证 | 本次未做（原因见 13.4/13.5） |
 | 9 | 13.4 | 线上 CSP 全文逐字节一致性 | 证据文件把 CSP 值截断，只能确认前缀 |
 | 10 | 11.2 | `pnpm build` 本次是否通过 / `dist/` 是否是当前 HEAD 的产物 | 未重建（`dist/` 已被 gitignore） |
@@ -1308,17 +1333,17 @@ dist\vendor\giscus-1.6.0.mjs       admin-backups                     node_module
 **统计方式**（脚本化，可复现）：
 
 ```js
-const cases = [...new Set([...src.matchAll(/case\s+"(\/api\/[^"]+)"/g)].map(m => m[1]))];   // → 32
+const cases = [...new Set([...src.matchAll(/case\s+"(\/api\/[^"]+)"/g)].map(m => m[1]))];   // → 33
 const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"/g)].map(m => m[1]))]; // → ["/api/logout"]
-// 并集去重 → 33
+// 并集去重 → 34
 ```
 
 | 口径 | 数字 |
 | --- | --- |
-| switch 内 `case "/api/..."` | 32 |
+| switch 内 `case "/api/..."` | 33 |
 | switch 之外前置处理 | 1（`/api/logout`） |
-| **唯一 `/api/*` 路由总数** | **33** ← 本文 9.3 节表格逐行列出，数量一致 |
-| `POST_BODY_FIELDS` 登记 | 31（唯一未登记的是 GET-only 的 `/api/post`；有 case 但未登记 = `/api/post`，登记但无 case = 无） |
+| **唯一 `/api/*` 路由总数** | **34** ← 本文 9.3 节表格逐行列出，数量一致 |
+| `POST_BODY_FIELDS` 登记 | 32（唯一未登记的是 GET-only 的 `/api/post`；有 case 但未登记 = `/api/post`，登记但无 case = 无） |
 | 非 `/api` 的 case | 1（`/media-file`，本文 9.3 节第 14 行同样列出） |
 
 ### C.3 frontmatter 字段与 `src/content.config.ts` 一致
@@ -1334,7 +1359,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | `*Config.ts` | **23** | ✅ 4.2 节表格 23 行逐行覆盖 |
 | 非 `*Config.ts` 的 `.ts` | **2**（`backgroundWallpaper.ts`、`index.ts`） | ✅ 4.2 节首行与末行 |
 | 关键 JSON | **4**（`announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json`） | ✅ 4.1 节表 + 4.2 节对应 `*Config.ts` 行的「面板」列 |
-| 面板可编辑白名单 | 15（`server.mjs:72-88`） | ✅ 4.1 节表 |
+| 面板可编辑白名单 | 15（`server.mjs:73-89`） | ✅ 4.1 节表 |
 | 站点设置字段 | 33 条 def / 5 个文件（实测 `readSettings` 返回 44 个键，含 11 个 `pages.*`） | ✅ 4.1 节表 + 4.2 节「面板」列 |
 
 复现命令：`Get-ChildItem src/config -Filter *Config.ts | Measure-Object` → 23。
@@ -1400,8 +1425,8 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 
 | # | 改动的类型 | 必须同步的文件与章节 | 检查器 |
 | --- | --- | --- | --- |
-| 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:72-88` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
-| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（33 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1204`，**接受 POST body 就必须登记**，否则该路由跳过字段校验）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1312-1315`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
+| 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:73-89` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
+| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（34 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1205`，**接受 POST body 就必须登记**，否则该路由跳过字段校验）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1315-1318`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
 | 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 10 个）；② `admin/README.md` 的功能表（`:42-53`）；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
 | 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-41` + `:358`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
@@ -1410,6 +1435,9 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 8 | **新增第三方脚本 / 样式来源** | ① `worker/index.mjs:31` 的 CSP（**唯一生效处**）；② `public/_headers:32` 必须与它**逐字节一致**；③ 本文档 6.4 的 CSP 全文 + 逐条放行说明（写清为什么放行）；④ 按来源选指令：`script-src` / `style-src` / `connect-src` / `frame-src` / `img-src` | ✅（三处 CSP 逐字节一致 + 文档声明的字符数） |
 | 9 | **面板新增会写盘的能力** | ① `admin/README.md`（接口说明 + 安全链）；② 本文档第 9 章（9.3 表格的「写盘 / 写前快照」列、9.5 写入安全链）；③ `PUBLISH_SCOPE`（`admin/publish-scope.mjs`）—— 若它写的是**提交范围之外**的路径（`worker/`、`admin/`、`src/styles/`…），要么把路径纳入 `PUBLISH_SCOPE`，要么在 10.3 明说「面板发布不会提交它」 | ⚠️ 部分（`PUBLISH_SCOPE` 逐条 ↔ 10.3；「写盘 / 快照」列不检查） |
 | 10 | **删除功能（必须反向清理）** | 按 1–9 反向删：文档段落、面板入口（`index.html` 的页签 / 按钮）、`SETTINGS_DEFS` 条目、`CONFIG_FILES` 白名单、CSP 放行、缓存规则、构建步骤、`navBarConfig.ts` 菜单项、`PUBLISH_SCOPE` 前缀。删完跑 `pnpm check-docs`，数字 / 清单对不上就会报 ❌ | ⚠️ 部分（「该删的忘了删」会被数字抓到；「不该删的删错了」抓不到） |
+
+> 补充（2026-10-11）：新增 `src/config` 下的**数据文件（JSON）**同样会改变 §4.1 与 §2.3 的文件计数，
+> 必须同步；`pnpm check-docs` 的第 3 组会直接报出来。
 
 ### E.3 为什么光靠「记得更新」不行（三个真实历史事故）
 

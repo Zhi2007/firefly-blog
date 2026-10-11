@@ -18,6 +18,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
+import { AVATAR_DEFAULT, applyAvatar, describeAvatar, restoreDefaultAvatar } from "./avatar.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
 import { PUBLISH_SCOPE, stageForPublish } from "./publish-scope.mjs";
 // CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
@@ -1224,6 +1225,8 @@ const POST_BODY_FIELDS = {
 	"/api/friends-fetch": ["url"],
 	"/api/compress-music": ["mode", "dryRun"],
 	"/api/compress-media": ["dirs", "dryRun"],
+	// 头像：filename + dataBase64 换图；restore: true 恢复默认（两者不能同时给）
+	"/api/avatar": ["filename", "dataBase64", "restore"],
 	"/api/run": ["script"],
 	"/api/diff": [],
 	"/api/status": [],
@@ -1956,6 +1959,51 @@ const server = createServer(async (req, res) => {
 				sendJson(res, 200, {
 					ok: result.ok,
 					output: `${result.stdout}\n${result.stderr}`.trim().slice(-8000),
+				});
+				return;
+			}
+
+			case "/api/avatar": {
+				// 站点头像：GET 读当前状态（缩略图用），POST 换图 / 恢复默认。
+				// 这是个「文件 + 配置」的组合操作，所以不放在 /api/upload 里：
+				// 换图会同时落盘一张**新**图片（不覆盖原头像）并改写 profileConfig.ts 的 avatar 字段，
+				// 配置那一步走 settings.mjs 的白名单 / 快照 / 回读 / 回滚（见 admin/avatar.mjs 顶部说明）。
+				if (req.method !== "POST") {
+					sendJson(res, 200, await describeAvatar(REPO_ROOT));
+					return;
+				}
+				if (body.restore === true) {
+					const restored = await restoreDefaultAvatar({
+						repoRoot: REPO_ROOT,
+						snapshot: async (rel) => {
+							await snapshotBefore(rel, "恢复默认头像");
+						},
+					});
+					sendJson(res, 200, {
+						...restored,
+						avatar: await describeAvatar(REPO_ROOT),
+						message: restored.unchanged
+							? "当前用的已经是默认头像，无需改动"
+							: `已恢复默认头像（${AVATAR_DEFAULT}）；上传过的图片文件仍留在 public/assets/images/`,
+					});
+					return;
+				}
+				if (body.restore !== undefined) {
+					sendJson(res, 400, { error: "restore 只接受 true" });
+					return;
+				}
+				const saved = await applyAvatar({
+					repoRoot: REPO_ROOT,
+					filename: body.filename,
+					dataBase64: body.dataBase64,
+					snapshot: async (rel) => {
+						await snapshotBefore(rel, "更换站点头像");
+					},
+				});
+				sendJson(res, 200, {
+					...saved,
+					avatar: await describeAvatar(REPO_ROOT),
+					message: `头像已换成 ${saved.url}（新文件，原头像保留，可随时「恢复默认」）${saved.note ? `；${saved.note}` : ""}`,
 				});
 				return;
 			}
