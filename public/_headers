@@ -1,7 +1,8 @@
 # 安全响应头
 #
-# Cloudflare Workers 静态资源会在构建产物里解析这个文件，规则应用到所有静态资源响应
-# （这个文件本身不会被当成资源提供）。
+# ⚠️ 注意：自从 wrangler.jsonc 里设了 run_worker_first: true，所有请求都由 worker/index.mjs 接管，
+#    而 _headers **不作用于 Worker 处理的响应** —— 也就是说本文件目前只是"文档"，
+#    真正下发这些响应头的是 worker/index.mjs 里的 SECURITY_HEADERS（改这里也要同步改那边）。
 #
 # 关于「防 DNS 污染/劫持」：域名被解析到假 IP 时，光靠 DNS 没法拦住，
 # 但下面这些头能让浏览器**拒绝**那个假站点：
@@ -13,11 +14,11 @@
 #   'unsafe-inline'    → 站点大量使用内联脚本/样式（Firefly 的内联初始化）
 #   'wasm-unsafe-eval' → Pagefind 站内搜索用 WebAssembly
 #   img-src blob:      → Fancybox 用 URL.createObjectURL 处理 SVG 图片
-#   media-src https:   → 首页横幅背景视频（远程）
 #   img-src https:     → 远程壁纸/随机封面 API（t.alcy.cc 等）
 #   frame-src giscus.app / script-src giscus.app → 评论区
 #   script-src static.cloudflareinsights.com → Cloudflare 统计
 #   worker-src 'self' blob: → 樱花特效的 Web Worker
+#   media-src 'self' blob: → 音乐播放器；背景视频已删除，不再放行远程媒体
 # 如果以后某个功能被 CSP 挡住（浏览器控制台会有 CSP 报错），
 # 把下面这行改回 Content-Security-Policy-Report-Only: 即可先观察不拦截。
 
@@ -28,7 +29,7 @@
 	X-Frame-Options: SAMEORIGIN
 	Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
 	X-XSS-Protection: 0
-	Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
+	Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
 
 # 带内容哈希的构建产物可以长期缓存（文件名变了 URL 就变，安全）
 /_astro/*

@@ -131,7 +131,18 @@ export async function restoreSnapshot(repoRoot, id, rel) {
 	if (!id || !/^[A-Za-z0-9-]+$/.test(id)) throw new Error("快照 id 不合法");
 	if (!rel) throw new Error("缺少要恢复的文件路径");
 
-	const source = path.join(repoRoot, BACKUP_DIR, id, rel);
+	// 双重校验：目标必须落在仓库内，源文件必须落在该快照目录内（防止 ../ 越界读或越界写）
+	const repoAbs = path.resolve(repoRoot);
+	const target = path.resolve(repoAbs, rel);
+	if (target !== repoAbs && !target.startsWith(repoAbs + path.sep)) {
+		throw new Error(`恢复路径越界: ${rel}`);
+	}
+	const snapshotDir = path.resolve(repoAbs, BACKUP_DIR, id);
+	const source = path.resolve(snapshotDir, rel);
+	if (source !== snapshotDir && !source.startsWith(snapshotDir + path.sep)) {
+		throw new Error(`快照内路径越界: ${rel}`);
+	}
+
 	try {
 		if (!(await fs.stat(source)).isFile()) throw new Error("不是文件");
 	} catch {
@@ -139,9 +150,8 @@ export async function restoreSnapshot(repoRoot, id, rel) {
 	}
 
 	// 恢复前先给"当前版本"留一份
-	await createSnapshot(repoRoot, [rel], { reason: `恢复 ${id}/${rel} 前的现场` }).catch(() => {});
+	await createSnapshot(repoAbs, [rel], { reason: `恢复 ${id}/${rel} 前的现场` }).catch(() => {});
 
-	const target = path.join(repoRoot, rel);
 	await fs.mkdir(path.dirname(target), { recursive: true });
 	await fs.copyFile(source, target);
 	const size = (await fs.stat(target)).size;

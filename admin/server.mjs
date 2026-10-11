@@ -12,7 +12,7 @@
 
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -79,6 +79,15 @@ function mediaUrl(dirKey, name) {
 }
 
 const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
+
+// 上传类型白名单：只允许真正的图片/音频/歌词，避免把 .html / .svg（可带脚本）传进站点目录
+const UPLOAD_EXT = {
+	"post-images": /\.(png|jpe?g|webp|avif|gif)$/i,
+	music: AUDIO_EXT,
+	"music-cover": /\.(png|jpe?g|webp|avif|gif)$/i,
+	"music-lrc": /\.lrc$/i,
+	avatar: /\.(png|jpe?g|webp|avif|gif)$/i,
+};
 
 /**
  * 从上传的音频里提取封面与歌词并落盘，返回可直接写进歌单的路径。
@@ -249,8 +258,36 @@ async function gitNet(gitArgs) {
 /** 把仓库内的相对路径解析成绝对路径，并阻止越界访问 */
 function safeResolve(relative) {
 	const abs = path.resolve(REPO_ROOT, relative);
-	if (!abs.startsWith(REPO_ROOT)) throw new Error(`路径越界: ${relative}`);
+	// 注意必须先 resolve 再比较，并带上 path.sep，否则 `../` 或同名前缀的兄弟目录能绕过
+	if (abs !== REPO_ROOT && !abs.startsWith(REPO_ROOT + path.sep)) {
+		throw new Error(`路径越界: ${relative}`);
+	}
 	return abs;
+}
+
+/**
+ * 解析路径并校验它确实落在允许的目录内（先解析、后用绝对路径比较）。
+ * @param relative       仓库内相对路径
+ * @param allowedPrefixes 允许的目录前缀（相对仓库根目录），省略则不限制（只要在仓库内）
+ */
+function resolveInside(relative, allowedPrefixes) {
+	const abs = safeResolve(relative);
+	if (!allowedPrefixes || allowedPrefixes.length === 0) return abs;
+	const ok = allowedPrefixes.some((prefix) => {
+		const root = path.resolve(REPO_ROOT, prefix);
+		return abs === root || abs.startsWith(root + path.sep);
+	});
+	if (!ok) throw new Error(`不在允许的目录内: ${relative}`);
+	return abs;
+}
+
+/** 恒定时间比较访问令牌，避免时序侧信道 */
+function tokenValid(provided) {
+	if (typeof provided !== "string") return false;
+	const a = Buffer.from(provided);
+	const b = Buffer.from(TOKEN);
+	if (a.length !== b.length) return false;
+	return timingSafeEqual(a, b);
 }
 
 /**
@@ -662,7 +699,7 @@ const server = createServer(async (req, res) => {
 	try {
 		// 静态页面：允许带 token 访问，页面内所有请求都会带上它
 		if (route === "/" || route === "/index.html") {
-			if (token !== TOKEN) {
+			if (!tokenValid(token)) {
 				res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
 				res.end(
 					`访问令牌不正确。请使用启动时打开的地址（含 ?token=…），或重新启动：node admin/server.mjs`,
@@ -676,7 +713,7 @@ const server = createServer(async (req, res) => {
 		}
 
 		// 其余接口一律要令牌
-		if (token !== TOKEN) {
+		if (!tokenValid(token)) {
 			sendJson(res, 403, { error: "令牌无效，请重新启动管理后台" });
 			return;
 		}
@@ -747,7 +784,11 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "缺少 slug" });
 					return;
 				}
-				const file = safeResolve(`${POSTS_DIR}/${slug}.md`);
+				if (!/^[A-Za-z0-9._-]+$/.test(String(slug))) {
+					sendJson(res, 400, { error: "slug 只能包含字母、数字、点、下划线和连字符" });
+					return;
+				}
+				const file = resolveInside(`${POSTS_DIR}/${slug}.md`, [POSTS_DIR]);
 				await snapshotBefore(`${POSTS_DIR}/${slug}.md`, "删除文章");
 				if (await exists(file)) await fs.rm(file, { force: true });
 				sendJson(res, 200, { ok: true });
@@ -769,7 +810,13 @@ const server = createServer(async (req, res) => {
 					return;
 				}
 				const safeName = path.basename(filename).replace(/[\\/]/g, "_");
-				const target = safeResolve(path.posix.join(MEDIA_DIRS[dir], safeName));
+				if (!UPLOAD_EXT[dir].test(safeName)) {
+					sendJson(res, 400, {
+						error: `该目录只允许 ${UPLOAD_EXT[dir].source} 类型的文件：${safeName}`,
+					});
+					return;
+				}
+				const target = resolveInside(path.posix.join(MEDIA_DIRS[dir], safeName), [MEDIA_DIRS[dir]]);
 				await fs.mkdir(path.dirname(target), { recursive: true });
 				const buffer = Buffer.from(dataBase64, "base64");
 				await fs.writeFile(target, buffer);
@@ -795,15 +842,14 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "缺少 repoPath" });
 					return;
 				}
-				const inWhitelist = Object.values(MEDIA_DIRS).some((dir) =>
-					repoPath.startsWith(`${dir}/`),
-				);
-				if (!inWhitelist) {
+				let target;
+				try {
+					target = resolveInside(repoPath, Object.values(MEDIA_DIRS));
+				} catch {
 					sendJson(res, 400, { error: "只能删除媒体目录里的文件" });
 					return;
 				}
-				const file = safeResolve(repoPath);
-				if (await exists(file)) await fs.rm(file, { force: true });
+				if (await exists(target)) await fs.rm(target, { force: true });
 				sendJson(res, 200, { ok: true });
 				return;
 			}
@@ -860,11 +906,13 @@ const server = createServer(async (req, res) => {
 			case "/api/extract-audio": {
 				// 对已经存在的音频重新提取一次（老歌曲也能补上封面/歌词）
 				const repoPath = String(body.repoPath || (body.url ? `public${body.url}` : ""));
-				if (!repoPath.startsWith(`${MEDIA_DIRS.music}/`)) {
+				let file;
+				try {
+					file = resolveInside(repoPath, [MEDIA_DIRS.music]);
+				} catch {
 					sendJson(res, 400, { error: "只能处理 public/assets/music 下的音频" });
 					return;
 				}
-				const file = safeResolve(repoPath);
 				const buffer = await fs.readFile(file).catch(() => null);
 				if (!buffer) {
 					sendJson(res, 404, { error: "音频文件不存在" });
@@ -878,14 +926,17 @@ const server = createServer(async (req, res) => {
 			case "/media-file": {
 				// 本地试听/预览：把媒体目录里的文件读出来（管理面板不是静态服务器，不能直接开 /assets 路径）
 				const repoPath = url.searchParams.get("path");
-				const allowed = Object.values(MEDIA_DIRS).some((dir) =>
-					repoPath?.startsWith(`${dir}/`),
-				);
-				if (!repoPath || !allowed) {
+				if (!repoPath) {
 					sendJson(res, 400, { error: "只能读取媒体目录里的文件" });
 					return;
 				}
-				const file = safeResolve(repoPath);
+				let file;
+				try {
+					file = resolveInside(repoPath, Object.values(MEDIA_DIRS));
+				} catch {
+					sendJson(res, 400, { error: "只能读取媒体目录里的文件" });
+					return;
+				}
 				const stat = await fs.stat(file).catch(() => null);
 				if (!stat || !stat.isFile()) {
 					sendJson(res, 404, { error: "文件不存在" });
