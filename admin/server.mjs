@@ -1641,35 +1641,14 @@ const server = createServer(async (req, res) => {
 	}
 });
 
-// 端口被占用时给出可读提示（而不是抛未捕获的 EADDRINUSE 栈）：
-//   1) 如果占用者就是本面板（能取到面板页面），直接提示去用那个窗口，退出码 0；
-//   2) 否则自动顺延到后面的端口重试（最多 +9），再不行才报错。
-let listenAttempt = 0;
-const basePort = port;
-server.on("error", async (err) => {
-	if (err && err.code !== "EADDRINUSE") throw err;
-	const hostForUrl = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
-	const url = `http://${hostForUrl}:${port}/`;
-	try {
-		const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-		const html = await res.text();
-		if (/管理面板|<title>\s*Admin/i.test(html.slice(0, 4000))) {
-			console.log("");
-			console.log(`[面板] 端口 ${port} 上已经有一个管理面板在运行：${url}`);
-			console.log("[面板] 用那个窗口里显示的令牌即可；那个窗口若已关闭，先在任务管理器结束 node.exe，或换个端口启动（--port=8800）。");
-			console.log("");
-			process.exit(0);
-		}
-	} catch {}
-	if (listenAttempt < 9) {
-		listenAttempt++;
-		port = basePort + listenAttempt;
-		console.log(`[面板] 端口 ${basePort + listenAttempt - 1} 被其它程序占用，改用 ${port}…`);
-		server.listen(port, host);
-		return;
+// 端口被占用时给出可读提示，而不是抛未捕获的 EADDRINUSE 栈（只引用 server，避免作用域问题）
+server.on("error", (err) => {
+	if (err && err.code === "EADDRINUSE") {
+		console.error("[面板] 端口已被占用。可能已有一个管理面板在运行：直接用它那个窗口；");
+		console.error("[面板] 若已关闭，请在任务管理器结束 node.exe，或换个端口启动：node admin/server.mjs --port=8800");
+		process.exit(1);
 	}
-	console.error(`[面板] 端口 ${basePort}-${port} 都被占用，请用 --port=88xx 指定其它端口。`);
-	process.exit(1);
+	throw err;
 });
 
 server.listen(PORT, "127.0.0.1", async () => {
