@@ -17,8 +17,8 @@ Use `pnpm`; the `preinstall` script enforces it.
 - `pnpm dev` or `pnpm start`: run the local Astro dev server.
 - `pnpm check`: run Astro diagnostics.
 - `pnpm type-check`: run TypeScript with `--noEmit --isolatedDeclarations` （本仓库修正：实际脚本见 package.json）.
-- `pnpm format`: format `src` with Biome.
-- `pnpm lint`: run Biome checks and safe fixes on `src`.
+- `pnpm format`: format `./src ./scripts` with Biome（本仓库修正：上游写的是 `src`）.
+- `pnpm lint`: run Biome checks and safe fixes on `./src ./scripts`（本仓库修正：上游写的是 `src`）.
 - `pnpm build`: 8 steps — generate-github-card-data → generate-lqips → generate-vndb-covers → astro build → prune-pio-assets → subset-fonts → minify-inline-scripts → run-pagefind，输出到 `dist`（本仓库修正：上游写的是「generate icons …」，与实际脚本不符，且漏了 3 步）.
 - `pnpm preview`: preview the production build locally.
 - `pnpm new-post`: scaffold a new content post.
