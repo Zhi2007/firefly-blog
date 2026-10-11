@@ -82,7 +82,7 @@ Defined in `src/content.config.ts`:
 
 ## Build Pipeline
 
-Multi-step: `scripts/generate-lqips.ts` → `scripts/generate-vndb-covers.ts` → `astro build` → `scripts/prune-pio-assets.ts` → `scripts/subset-fonts.ts` → `scripts/minify-inline-scripts.ts` → `pagefind --site dist`
+Multi-step（8 步，以 `package.json` 的 `build` 为准）: `scripts/generate-github-card-data.ts` → `scripts/generate-lqips.ts` → `scripts/generate-vndb-covers.ts` → `astro build` → `scripts/prune-pio-assets.ts` → `scripts/subset-fonts.ts` → `scripts/minify-inline-scripts.ts` → `scripts/run-pagefind.ts`
 
 LQIP data is generated into `src/constants/lqips.json` and committed — regenerate with `pnpm lqips`. Icon data lives in `src/constants/icons-data.json` (committed, Biome-ignored, consumed by `src/components/common/Icon.svelte`) but has no generator script in the current build.
 
@@ -92,7 +92,6 @@ LQIP data is generated into `src/constants/lqips.json` and committed — regener
 
 ## Deployment
 
-- **Cloudflare Workers**（本仓库修正：实际部署平台；`vercel.json` 是上游遗留、未使用）
-- **Cloudflare Workers** (`wrangler.jsonc`, set `CF_WORKERS` env var)
+- **Cloudflare Workers**（本仓库修正：实际部署平台，配置见 `wrangler.jsonc`；上游写的 Vercel/`vercel.json` 是本仓库未使用的遗留）
 - Static output to `dist/`
 
