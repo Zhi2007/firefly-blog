@@ -133,9 +133,9 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		waves: {
 			enable: {
 				// 桌面端是否启用水波纹动画效果
-				desktop: true,
+				desktop: false,
 				// 移动端是否启用水波纹动画效果
-				mobile: true,
+				mobile: false,
 			},
 		},
 		// 渐变过渡效果配置，当水波纹关闭时自动启用，提供壁纸底部到背景色的平滑过渡
@@ -166,7 +166,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 			transparentMode: "semi",
 			// 毛玻璃模糊度，0 即关闭导航栏的毛玻璃
 			// 注意：导航栏子菜单与浮动面板始终保留毛玻璃，模糊度跟随此项但有最小值
-			blur: 12,
+			blur: 0,
 		},
 	},
 	// 覆盖透明覆盖模式特有配置
@@ -176,7 +176,7 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 		// 壁纸透明度
 		opacity: 0.8,
 		// 背景模糊度
-		blur: 10,
+		blur: 0,
 		// 卡片透明度，0-1之间，值越小越透明
 		cardOpacity: 0.6,
 	},
@@ -193,16 +193,16 @@ export const backgroundWallpaper: BackgroundWallpaperConfig = {
 			// 导航栏透明模式："semi" 半透明，"semifull" 动态透明（仅首页顶部透明、下滑玻璃化；非首页均跟卡片半透明）
 			transparentMode: "semifull",
 			// 导航栏毛玻璃模糊度，0 即关闭（玻璃态生效）
-			blur: 12,
+			blur: 0,
 		},
 		// 首页下滑时壁纸模糊渐变开关（从 0 渐变为 overlay.blur 的最大模糊）
 		// 关闭后该设备上全屏壁纸保持清晰（首页与非首页都不模糊），设置面板的模糊度滑块也会隐藏
 		blurRamp: {
 			enable: {
 				// 桌面端是否启用模糊渐变
-				desktop: true,
+				desktop: false,
 				// 移动端是否启用模糊渐变
-				mobile: true,
+				mobile: false,
 			},
 		},
 	},
