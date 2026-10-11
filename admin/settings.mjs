@@ -41,6 +41,14 @@ export const SETTINGS_DEFS = [
 	{ id: "wallpaper.mode", file: "src/config/backgroundWallpaper.ts", key: "mode", type: "enum", values: ["banner", "fullscreen", "overlay", "none"], label: "壁纸模式" },
 	{ id: "wallpaper.dimOpacity", file: "src/config/backgroundWallpaper.ts", key: "dimOpacity", within: "common", type: "number", min: 0, max: 1, label: "壁纸遮罩暗度（0-1）" },
 	{ id: "wallpaper.title", file: "src/config/backgroundWallpaper.ts", key: "title", within: "homeText", type: "string", label: "主页横幅主标题" },
+	{
+		id: "banner.subtitles",
+		file: "src/config/backgroundWallpaper.ts",
+		key: "subtitle",
+		within: "homeText",
+		type: "stringlist",
+		label: "首页横幅副标题（每行一条）",
+	},
 	{ id: "display.enable", file: "src/config/displaySettingsConfig.ts", key: "enable", type: "boolean", label: "显示设置面板（🎨 按钮）" },
 	{ id: "display.wallpaperModeSwitchable", file: "src/config/displaySettingsConfig.ts", key: "wallpaperModeSwitchable", type: "boolean", label: "允许访客切换壁纸模式" },
 	{ id: "display.themeColorSwitchable", file: "src/config/displaySettingsConfig.ts", key: "themeColorSwitchable", type: "boolean", label: "允许访客切换主题色" },
@@ -52,7 +60,22 @@ export const PAGE_PREFIX = "pages.";
 const PAGE_BLOCK = "resolvePageToggles";
 
 const STRING_RE = /^"(?:[^"\\]|\\.)*"$/;
-const LITERAL_ALT = `("(?:[^"\\\\]|\\\\.)*"|-?\\d+(?:\\.\\d+)?|true|false|\\[[^\\]]*\\])`;
+
+/** 字符串字面量（支持转义字符） */
+const STRING_ALT = `"(?:[^"\\\\]|\\\\.)*"`;
+
+/**
+ * 数组字面量，允许跨行。
+ * 为什么不用 `\[[^\]]*\]`：主题里 homeText.subtitle 是**每行一个字符串的多行数组**，
+ * 单行正则完全匹配不到，面板就永远读不出、也写不进。
+ * 为什么不用 `\[[\s\S]*?\]`：只要数组里某个字符串本身带 `]`（例如 "结尾 ] 这样"），
+ * 惰性匹配会提前收口，截出半截字面量。
+ * 这里的负字符类排除了 `]` `"` `\`，所以 `]` 只可能作为数组结尾被消费 ——
+ * 天然只会匹配到**最近的一个闭合方括号**，落在字符串里的 `]` 会被字符串分支吃掉。
+ */
+const ARRAY_ALT = `\\[(?:[^\\]"\\\\]|\\\\.|${STRING_ALT})*\\]`;
+
+const LITERAL_ALT = `(${STRING_ALT}|-?\\d+(?:\\.\\d+)?|true|false|${ARRAY_ALT})`;
 
 function escapeForTs(value) {
 	return JSON.stringify(String(value));
@@ -65,12 +88,17 @@ function literalFor(def, value) {
 			if (value.length > 2000) throw new Error(`${def.label} 太长（上限 2000 字符）`);
 			return escapeForTs(value);
 		case "stringlist": {
-			const list = Array.isArray(value)
-				? value.map((v) => String(v).trim()).filter(Boolean)
-				: String(value ?? "")
-						.split(/[,，]/)
-						.map((v) => v.trim())
-						.filter(Boolean);
+			// 面板有两种输入形态，这里都要能吃下：
+			//   1. 多行文本域（含换行）→ 每行一条。这时**不按逗号切**，
+			//      否则「代码、音乐，还有一点生活」这种文案里的「，」会被当成分隔符切碎。
+			//   2. 单行输入框（无换行）→ 沿用原来的逗号分隔（中英文逗号都算）。
+			const raw = Array.isArray(value) ? null : String(value ?? "");
+			const parts = raw === null
+				? value
+				: /[\r\n]/.test(raw)
+					? raw.split(/[\r\n]+/)
+					: raw.split(/[,，]/);
+			const list = parts.map((v) => String(v).trim()).filter(Boolean);
 			if (list.length === 0) throw new Error(`${def.label} 不能为空`);
 			if (list.length > 30) throw new Error(`${def.label} 最多 30 项`);
 			for (const item of list) {
@@ -118,33 +146,164 @@ function findBlock(text, blockName) {
 	return null;
 }
 
-/** 从一段文本里取出某个字段的原始字面量（字符串带引号） */
-function extractLiteral(text, def) {
+/**
+ * 在文本里定位某个字段的字面量。
+ * 返回 { literal, index, start, end }：
+ *   index 是整段匹配（含 key 与冒号）的起点，start/end 是字面量本身的起止。
+ * index 很关键：改写前后它必须一致，用来确认"改的是同一处"。
+ */
+function findLiteralMatch(text, def) {
 	const pattern = new RegExp(`(?:^|[\\s{,])${def.key}\\s*:\\s*${LITERAL_ALT}`);
 	const match = pattern.exec(text);
 	if (!match) return null;
-	return match[1];
+	const literal = match[1];
+	const start = match.index + match[0].length - literal.length;
+	return { literal, index: match.index, start, end: start + literal.length };
 }
 
-/** 替换一段文本里某个字段的字面量 */
-function replaceLiteral(text, def, literal) {
-	const pattern = new RegExp(`((?:^|[\\s{,])${def.key}\\s*:\\s*)${LITERAL_ALT}`);
-	const match = pattern.exec(text);
-	if (!match) return null;
-	return text.slice(0, match.index) + match[1] + literal + text.slice(match.index + match[0].length);
+/** 从一段文本里取出某个字段的原始字面量（字符串带引号） */
+function extractLiteral(text, def) {
+	const hit = findLiteralMatch(text, def);
+	return hit ? hit.literal : null;
+}
+
+/** 数一数字段在同一段文本里出现了几次（用来挡住"匹配到意外位置"） */
+function countLiteralMatches(text, def) {
+	const pattern = new RegExp(`(?:^|[\\s{,])${def.key}\\s*:\\s*${LITERAL_ALT}`, "g");
+	let count = 0;
+	while (pattern.exec(text) !== null) count++;
+	return count;
+}
+
+/** 取出字段所在的作用域：有 within 就只看那个配置块，否则看全文 */
+function scopeOf(text, def) {
+	if (!def.within) return { block: null, scope: text };
+	const block = findBlock(text, def.within);
+	if (!block) return { block: null, scope: null };
+	return { block, scope: text.slice(block[0], block[1]) };
+}
+
+/**
+ * 替换作用域里某字段的字面量，并在返回前做两道"改对了地方"的校验：
+ *   1. 字段在作用域里必须存在；带 within 时还要求**只出现一次**（出现两次说明正则可能挑错目标，宁可不改）
+ *   2. 改写后重新定位，匹配起点必须与改写前完全一致，且取到的字面量正是刚写进去的那个
+ * 这两条挡住的正是"正则匹配到意料之外的位置"：校验不过直接抛错，不会落到磁盘上。
+ * @returns 改写后的作用域文本
+ */
+function replaceLiteralChecked(scope, def, literal, rel) {
+	const where = `${def.within ? `${def.within}.` : ""}${def.key}`;
+	const total = countLiteralMatches(scope, def);
+	if (total === 0) throw new Error(`${rel} 的 ${where} 没找到，已放弃修改`);
+	if (def.within && total > 1) {
+		throw new Error(`${rel} 的 ${def.within} 里有 ${total} 处 ${def.key}，无法确定改哪一处，已放弃修改`);
+	}
+
+	const before = findLiteralMatch(scope, def);
+	const next = scope.slice(0, before.start) + literal + scope.slice(before.end);
+	const after = findLiteralMatch(next, def);
+	if (!after || after.literal !== literal || after.index !== before.index) {
+		throw new Error(`${rel} 的 ${where} 改写位置校验失败（正则可能匹配到了意外位置），已放弃修改`);
+	}
+	return next;
+}
+
+/** 去掉数组/对象里字符串外的尾随逗号（TS 允许尾随逗号，JSON.parse 不允许） */
+function stripTrailingCommas(text) {
+	let out = "";
+	let quote = null;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (quote) {
+			out += ch;
+			if (ch === "\\") {
+				out += text[i + 1] ?? "";
+				i++;
+				continue;
+			}
+			if (ch === quote) quote = null;
+			continue;
+		}
+		if (ch === '"' || ch === "'") {
+			quote = ch;
+			out += ch;
+			continue;
+		}
+		if (ch === ",") {
+			// 往后跳过空白，如果下一个字符是 ] 或 }，说明这是尾随逗号，丢掉它
+			let j = i + 1;
+			while (j < text.length && /\s/.test(text[j])) j++;
+			if (text[j] === "]" || text[j] === "}") continue;
+		}
+		out += ch;
+	}
+	return out;
+}
+
+/**
+ * 解析配置里的数组字面量。
+ * 主题源码里的数组通常写成多行 + 尾随逗号（例如 homeText.subtitle），
+ * 直接 JSON.parse 会失败，所以先按"字符串外"的规则去掉尾随逗号再解析。
+ */
+function parseArrayLiteral(literal) {
+	for (const candidate of [literal, stripTrailingCommas(literal)]) {
+		try {
+			const value = JSON.parse(candidate);
+			if (Array.isArray(value)) return value;
+		} catch {
+			// 换下一种写法继续试
+		}
+	}
+	return undefined;
+}
+
+/**
+ * 统计"结构性"的花括号 / 方括号：跳过注释与字符串内容。
+ * 为什么不直接 `match(/\{/g)`：文案里出现 `]` 之类符号时会被误判成结构变化；
+ * 只统计语法层面的括号，既能挡住正则改坏结构，也不会被字符串内容干扰。
+ */
+function countStructure(text) {
+	const count = { "{": 0, "}": 0, "[": 0, "]": 0 };
+	let i = 0;
+	let quote = null; // 当前所在字符串的定界符：' " `
+	while (i < text.length) {
+		const ch = text[i];
+		const next = text[i + 1];
+		if (quote) {
+			if (ch === "\\") {
+				i += 2;
+				continue;
+			}
+			if (ch === quote) quote = null;
+			i++;
+			continue;
+		}
+		// 注释（先于引号判断，避免注释里的撇号被当成字符串开头）
+		if (ch === "/" && next === "/") {
+			const end = text.indexOf("\n", i);
+			i = end === -1 ? text.length : end;
+			continue;
+		}
+		if (ch === "/" && next === "*") {
+			const end = text.indexOf("*/", i + 2);
+			i = end === -1 ? text.length : end + 2;
+			continue;
+		}
+		if (ch === '"' || ch === "'" || ch === "`") {
+			quote = ch;
+			i++;
+			continue;
+		}
+		if (ch in count) count[ch]++;
+		i++;
+	}
+	return count;
 }
 
 function unquote(literal) {
 	if (literal === null || literal === undefined) return undefined;
 	if (literal === "true") return true;
 	if (literal === "false") return false;
-	if (literal.startsWith("[")) {
-		try {
-			return JSON.parse(literal);
-		} catch {
-			return undefined;
-		}
-	}
+	if (literal.startsWith("[")) return parseArrayLiteral(literal);
 	if (STRING_RE.test(literal)) {
 		try {
 			return JSON.parse(literal);
@@ -241,28 +400,24 @@ export async function applySettings(repoRoot, patch, snapshot) {
 		let next = original;
 
 		for (const { def, literal } of edits) {
-			let result;
-			if (def.within) {
-				const block = findBlock(next, def.within);
-				if (!block) throw new Error(`${rel} 里找不到 ${def.within} 配置块`);
-				const scope = next.slice(block[0], block[1]);
-				const replaced = replaceLiteral(scope, def, literal);
-				if (replaced === null) throw new Error(`${rel} 的 ${def.within}.${def.key} 没找到，已放弃修改`);
-				result = next.slice(0, block[0]) + replaced + next.slice(block[1]);
-			} else {
-				result = replaceLiteral(next, def, literal);
-				if (result === null) throw new Error(`${rel} 的 ${def.key} 没找到，已放弃修改`);
-			}
-			next = result;
+			const { block, scope } = scopeOf(next, def);
+			if (scope === null) throw new Error(`${rel} 里找不到 ${def.within} 配置块`);
+			const replaced = replaceLiteralChecked(scope, def, literal, rel);
+			next = block ? next.slice(0, block[0]) + replaced + next.slice(block[1]) : replaced;
 		}
 
 		if (next === original) continue;
 
-		// 轻量语法体检：花括号/方括号数量必须与原文一致（正则改坏结构时能挡住）
-		const count = (str, ch) => (str.match(new RegExp(`\\${ch}`, "g")) ?? []).length;
+		// 轻量语法体检：花括号/方括号的**结构**数量必须与原文一致。
+		// 这里数的是字符串与注释之外的括号（countStructure），
+		// 所以「副标题文案里带 ] 」不会被误判，而真正的结构破坏一定挡得住。
+		const structBefore = countStructure(original);
+		const structAfter = countStructure(next);
 		for (const ch of ["{", "}", "[", "]"]) {
-			if (count(next, ch) !== count(original, ch)) {
-				throw new Error(`${rel} 改写后 ${ch} 数量不一致，已放弃修改（可能是正则匹配到了意外位置）`);
+			if (structAfter[ch] !== structBefore[ch]) {
+				throw new Error(
+					`${rel} 改写后 ${ch} 数量不一致（原文 ${structBefore[ch]}，现在 ${structAfter[ch]}），已放弃修改（可能是正则匹配到了意外位置）`,
+				);
 			}
 		}
 

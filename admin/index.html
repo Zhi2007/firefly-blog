@@ -119,11 +119,37 @@
 				background: rgba(0, 0, 0, .35);
 			}
 			#dropOverlay strong { display: block; font-size: 20px; margin-bottom: 8px; }
+			/* CI 部署失败横幅 */
+			#ciBanner, #topBanner { display: none; }
+			#ciBanner.show, #topBanner.show { display: block; }
+			#ciBanner {
+				border: 1px solid var(--err); border-left: 8px solid var(--err);
+				background: rgba(220, 38, 38, .1); border-radius: var(--radius);
+				padding: 14px 16px; margin-bottom: 14px;
+			}
+			#topBanner {
+				background: var(--err); color: #fff;
+				padding: 10px 20px; font-size: 13px;
+				/* 低于 header(z-index:10)，滚动时被吸顶表头盖住 */
+				position: relative; z-index: 9;
+			}
+			#ciBanner h2 { color: var(--err); }
+			.banner-title { font-weight: 700; color: var(--err); margin-bottom: 6px; }
+			#topBanner .banner-title { color: #fff; margin: 0; }
+			.ci-row { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+			.ci-row:last-child { border-bottom: 0; }
+			.ci-ico { font-size: 15px; }
+			.ci-fail { color: var(--err); font-weight: 700; }
+			.ci-ok { color: var(--ok); font-weight: 700; }
+			.nav-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+			.nav-row .nav-label { flex: 1; min-width: 160px; }
+			#webpTable td, #webpTable th { font-size: 12px; }
 			[data-drop-dir] { position: relative; }
 			[data-drop-dir].drag-target { outline: 2px dashed var(--primary); outline-offset: 2px; }
 		</style>
 	</head>
 	<body>
+		<div id="topBanner" role="alert"></div>
 		<header>
 			<h1>栀海博客 · 管理后台</h1>
 			<span id="repoName" class="muted small"></span>
@@ -198,10 +224,22 @@
 					<div class="grid" style="margin-top:12px">
 						<div><label>文件名（slug，不含 .md）</label><input id="fSlug" /></div>
 						<div><label>标题</label><input id="fTitle" /></div>
-						<div><label>发布日期</label><input id="fPublished" placeholder="2026-10-10" /></div>
-						<div><label>分类</label><input id="fCategory" /></div>
-						<div><label>标签（逗号分隔）</label><input id="fTags" /></div>
+						<div><label>发布日期</label><input type="date" id="fPublished" /></div>
+						<div>
+							<label>分类（可从候选里选，也可自己填）</label>
+							<input id="fCategory" list="categoryOptions" placeholder="例如：技术" />
+							<datalist id="categoryOptions"></datalist>
+						</div>
+						<div>
+							<label>标签（逗号分隔，可多选也可新增）</label>
+							<input id="fTags" list="tagOptions" placeholder="例如：Astro, 前端" />
+							<datalist id="tagOptions"></datalist>
+						</div>
 						<div><label>封面路径</label><input id="fImage" placeholder="./images/xxx.png" /></div>
+						<div>
+							<label>密码（可选，填了就是加密文章）</label>
+							<input id="fPassword" type="text" autocomplete="off" placeholder="留空表示不加密" />
+						</div>
 					</div>
 					<div style="margin-top:10px">
 						<label>摘要</label>
@@ -223,6 +261,7 @@
 							<label>正文（Markdown）</label>
 							<textarea id="fBody" rows="26" spellcheck="false"
 								style="font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
+							<div class="hint" id="bodyCount">字数：0</div>
 						</div>
 						<div>
 							<label>预览</label>
@@ -335,6 +374,29 @@
 					</div>
 					<div id="songPreview" class="hint"></div>
 				</div>
+
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">一键压缩全部音乐</h2>
+						<span style="flex:1"></span>
+						<div style="min-width:180px">
+							<label>压缩范围</label>
+							<select id="musicCompressMode">
+								<option value="all">全部（音频 + 封面）</option>
+								<option value="covers">只压封面</option>
+								<option value="check">只检查（不改文件）</option>
+							</select>
+						</div>
+						<label style="display:flex;gap:6px;align-items:center;margin:0">
+							<input type="checkbox" id="musicCompressDry" style="width:auto" /> 先试算（dryRun，不改文件）
+						</label>
+						<button class="action danger" id="btnCompressMusic">一键压缩全部音乐</button>
+					</div>
+					<div class="hint">
+						<b>会直接重写音频文件</b>（原地覆盖，不进 git 历史），执行前请先勾选「先试算」确认影响范围；压缩后需要到「发布」页推送才会生效。
+					</div>
+					<pre class="log" id="musicCompressOutput">（还没有执行过压缩）</pre>
+				</div>
 			</section>
 
 			<!-- 媒体 -->
@@ -359,6 +421,27 @@
 					<table style="margin-top:12px">
 						<thead><tr><th>文件</th><th>大小</th><th>修改时间</th><th>操作</th></tr></thead>
 						<tbody id="mediaBody"></tbody>
+					</table>
+				</div>
+
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">批量转 WebP</h2>
+						<span style="flex:1"></span>
+						<label style="display:flex;gap:6px;align-items:center;margin:0">
+							<input type="checkbox" id="webpDry" style="width:auto" checked /> 先试算（dryRun，不写文件）
+						</label>
+						<button class="action" id="btnWebp">开始转换</button>
+					</div>
+					<div class="hint">
+						<b>只新增 .webp，不删除原文件</b>（可以随时对照或删掉不满意的结果）；不填目录时按当前「目录」下拉选择处理。转换后记得到「发布」页推送。
+					</div>
+					<div id="webpSummary" class="hint"></div>
+					<table id="webpTable" style="display:none;margin-top:8px">
+						<thead>
+							<tr><th>原文件</th><th>新文件</th><th>压缩前</th><th>压缩后</th><th>节省</th><th>状态</th></tr>
+						</thead>
+						<tbody id="webpBody"></tbody>
 					</table>
 				</div>
 			</section>
@@ -389,6 +472,10 @@
 					<div class="hint">
 						这些字段来自 <code>src/config</code> 的白名单。<b>保存前会自动备份原文件</b>，写入后会回读校验，校验不过立即回滚 —— 不会留下改坏的文件。
 					</div>
+					<div class="row" style="margin:10px 0 4px;align-items:center">
+						<label style="min-width:200px;display:inline-block">首页横幅副标题<br><span class="muted small">banner.subtitles（每行一条）</span></label>
+						<textarea id="bannerSubtitles" rows="4" placeholder="每行一条副标题"></textarea>
+					</div>
 					<div id="settingsForm" class="small">加载中…</div>
 					<div class="row" style="margin-top:12px">
 						<button class="action" id="btnSaveSettings">保存设置</button>
@@ -401,10 +488,34 @@
 					<div class="hint">关掉的页面会返回 404，并自动从导航栏隐藏（对应 <code>siteConfig.ts</code> 顶部的 <code>resolvePageToggles</code>）。</div>
 					<div id="pageToggles" class="small">加载中…</div>
 				</div>
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">导航菜单</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnNavReload">重新载入</button>
+						<button class="action" id="btnNavSave">保存导航</button>
+					</div>
+					<div class="hint">
+						顺序即导航栏显示顺序（点 ↑ ↓ 调整）；取消勾选「显示」即可隐藏某一项，改文本框可自定义显示名。保存后到「发布」页推送才生效。
+					</div>
+					<div id="navForm" class="small">加载中…</div>
+				</div>
 			</section>
 
 			<!-- 体检 / 备份 -->
 			<section class="panel" id="panel-doctor">
+				<div id="ciBanner" role="alert"></div>
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">CI 部署状态</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnCiReload">刷新状态</button>
+					</div>
+					<div class="hint">
+						最近几次 GitHub Actions 运行结果；<b>有失败时页面顶部会出现红色横幅</b>，可在对应那条上点「回滚这次提交」（会生成一个反向提交并直接推送，部署随后自动重跑）。
+					</div>
+					<div id="ciBox" class="small">加载中…</div>
+				</div>
 				<div class="card">
 					<div class="row">
 						<h2 style="margin:0">仓库体检</h2>
@@ -474,7 +585,16 @@
 		<div id="toast"></div>
 
 		<script>
+			// ── 认证 ───────────────────────────────────────────────────────
+			// 页面加载时后端已下发 HttpOnly Cookie，接口不再需要 ?token=；
+			// 这里把地址栏里的令牌抹掉（避免留在浏览器历史里），但保留一份给
+			// /media-file（<audio> 直接用标签请求，后端仍支持 ?token= 兜底）。
 			const TOKEN = new URLSearchParams(location.search).get("token") || "";
+			try {
+				history.replaceState(null, "", location.pathname);
+			} catch {
+				// 忽略（file:// 等场景下可能不允许）
+			}
 			const $ = (id) => document.getElementById(id);
 			let postsCache = [];
 			let currentSlug = null;
@@ -488,21 +608,42 @@
 			}
 
 			async function api(path, options = {}) {
-				const url = new URL(path, location.origin);
-				url.searchParams.set("token", TOKEN);
-				const res = await fetch(url, {
+				// 认证改用后端下发的 HttpOnly Cookie，不再往地址里拼 token
+				const res = await fetch(new URL(path, location.origin), {
 					method: options.method || "GET",
+					credentials: "same-origin",
 					headers: options.body ? { "Content-Type": "application/json" } : undefined,
 					body: options.body ? JSON.stringify(options.body) : undefined,
 				});
 				const data = await res.json().catch(() => ({}));
+				if (res.status === 403) {
+					const hint = "认证失败（403）：请用带令牌的地址重新打开管理面板";
+					toast(data.error ? `${hint} —— ${data.error}` : hint, "err");
+					throw new Error(data.error || hint);
+				}
 				if (!res.ok) throw new Error(data.error || `请求失败（${res.status}）`);
 				return data;
 			}
 
 			// ── 极简 Markdown 预览（不依赖任何 CDN，离线可用） ──────────────
 			function escapeHtml(text) {
-				return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+				return String(text ?? "").replace(
+					/[&<>"]/g,
+					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+				);
+			}
+
+			/** 数值兜底：拿不到数字就返回 fallback */
+			function toNum(value, fallback = 0) {
+				const n = Number(value);
+				return Number.isFinite(n) ? n : fallback;
+			}
+
+			/** 只允许 http(s) / 站内绝对路径，挡掉 javascript: 之类的注入 */
+			function safeUrl(url) {
+				const text = String(url ?? "").trim();
+				if (/^(https?:)?\/\//i.test(text) || text.startsWith("/")) return text;
+				return "";
 			}
 			function renderMarkdown(markdown) {
 				const blocks = [];
@@ -634,12 +775,36 @@
 				});
 			}
 
+			/** 正文实时统计：中文字符数 + 西文词数 */
+			function updateBodyCount() {
+				const text = $("fBody").value;
+				const cjk = (text.match(/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g) || []).length;
+				const words = (text.match(/[A-Za-z0-9_'-]+/g) || []).length;
+				$("bodyCount").textContent = `中文字符 ${cjk} · 西文词 ${words} · 总字符 ${text.length}`;
+			}
+
 			function bindEditor() {
 				const update = () => {
 					$("mdPreview").innerHTML = renderMarkdown($("fBody").value);
+					updateBodyCount();
 				};
 				$("fBody").addEventListener("input", update);
 				update();
+			}
+
+			/** 标签 / 分类候选（来自 /api/taxonomy），用 datalist 实现「可选可新增」 */
+			async function loadTaxonomy() {
+				try {
+					const data = await api("/api/taxonomy");
+					const tags = Array.isArray(data.tags) ? data.tags : [];
+					const categories = Array.isArray(data.categories) ? data.categories : [];
+					const option = (v) => `<option value="${escapeHtml(String(v))}"></option>`;
+					$("tagOptions").innerHTML = tags.map(option).join("");
+					$("categoryOptions").innerHTML = categories.map(option).join("");
+				} catch (error) {
+					// 候选拉不到不影响手填，只在控制台留个记录
+					console.warn("读取标签/分类候选失败：", error.message);
+				}
 			}
 
 			function fillForm(frontmatter, body, slug) {
@@ -651,10 +816,12 @@
 				$("fTags").value = Array.isArray(frontmatter.tags) ? frontmatter.tags.join(", ") : frontmatter.tags || "";
 				$("fImage").value = frontmatter.image || "";
 				$("fDescription").value = frontmatter.description || "";
+				$("fPassword").value = frontmatter.password || "";
 				$("fDraft").checked = frontmatter.draft === true;
 				$("fPinned").checked = frontmatter.pinned === true;
 				$("fBody").value = body || "";
 				$("mdPreview").innerHTML = renderMarkdown(body || "");
+				updateBodyCount();
 				$("editorCard").style.display = "";
 				$("editorTitle").textContent = slug ? `编辑：${slug}.md` : "新建文章";
 				$("btnDeletePost").style.display = slug ? "" : "none";
@@ -681,6 +848,7 @@
 						tags: $("fTags").value.split(",").map((t) => t.trim()).filter(Boolean),
 						category: $("fCategory").value.trim(),
 						image: $("fImage").value.trim(),
+						password: $("fPassword").value.trim(),
 						draft: $("fDraft").checked,
 						pinned: $("fPinned").checked,
 					},
@@ -816,10 +984,13 @@
 						defs: data.defs || [],
 						pagePrefix: data.pagePrefix || "pages.",
 					};
-					const main = settingsCache.defs.filter((d) => !d.id.startsWith(settingsCache.pagePrefix));
+					const main = settingsCache.defs.filter(
+						(d) => !d.id.startsWith(settingsCache.pagePrefix) && d.id !== "banner.subtitles",
+					);
 					$("settingsForm").innerHTML = main.length
 						? main.map((d) => settingsField(d, settingsCache.values[d.id])).join("")
 						: "（没有可编辑的设置项）";
+					applyBannerSubtitles();
 					renderPageToggles();
 				} catch (error) {
 					$("settingsForm").textContent = `读取失败：${error.message}`;
@@ -837,6 +1008,11 @@
 				document.querySelectorAll("[data-page]").forEach((el) => {
 					values[`${settingsCache.pagePrefix}${el.dataset.page}`] = el.checked;
 				});
+				// 首页横幅副标题：每行一条（多行文本框是唯一来源，避免与通用字段重复提交）
+				values["banner.subtitles"] = $("bannerSubtitles")
+					.value.split("\n")
+					.map((line) => line.trim())
+					.filter(Boolean);
 				if (!confirm(`确定保存 ${Object.keys(values).length} 项设置？\n（原文件会自动备份，可随时恢复）`)) return;
 				try {
 					const result = await api("/api/settings", { method: "POST", body: { values } });
@@ -888,6 +1064,12 @@
 								<b>${b.time ? new Date(b.time).toLocaleString() : escapeHtml(b.id)}</b>
 								<span class="muted small">· ${escapeHtml(b.reason || "手动快照")}</span>
 								<div class="muted small" style="margin:6px 0">${b.files.map((f) => escapeHtml(f.rel)).join("、")}</div>
+								<div class="row" style="margin:2px 0 6px">
+									<a class="action ghost" data-export="${escapeHtml(String(b.id))}"
+										href="/api/backup-export?id=${encodeURIComponent(String(b.id))}"
+										download style="font-size:12px;padding:4px 10px;text-decoration:none">导出 ZIP</a>
+									<span class="muted small">把这份快照里 ${b.files.length} 个文件打包下载（靠 Cookie 认证）</span>
+								</div>
 								${b.files
 									.map(
 										(f) =>
@@ -912,8 +1094,401 @@
 							}
 						});
 					});
+					document.querySelectorAll("[data-export]").forEach((link) =>
+						link.addEventListener("click", () => {
+							toast(`开始下载快照 ${link.dataset.export} 的 ZIP…`);
+						}),
+					);
 				} catch (error) {
 					$("backupBox").textContent = `备份列表读取失败：${error.message}`;
+				}
+			}
+
+			// ── CI 部署状态 / 回滚 ─────────────────────────────────────────
+			let ciCache = null;
+			let ciKnownFailureSha = null;
+			let ciDismissedSha = null;
+
+			// 契约：conclusion 为 success | failure | cancelled | null（null=还在跑）；
+			// 后端另外会返回 pending / unknown（查不到 check-runs），一并兜住。
+			const CI_LABEL = {
+				success: "✅ 成功",
+				failure: "❌ 失败",
+				cancelled: "⏳ 已取消",
+				pending: "⏳ 进行中",
+			};
+			const CI_ICON = { success: "✅", failure: "❌", cancelled: "⏳", pending: "⏳" };
+
+			function actionsRunUrl(run) {
+				return safeUrl(run && run.url);
+			}
+
+			function shortShaOf(run) {
+				return escapeHtml(String((run && (run.shortSha || run.sha)) || "").slice(0, 7));
+			}
+
+			/** 结论文案：已知结论用固定中文，未知结论一律转义后再插入 */
+			function ciText(conclusion) {
+				if (CI_LABEL[conclusion]) return CI_LABEL[conclusion];
+				if (!conclusion) return "⏳ 进行中";
+				if (conclusion === "unknown") return "⏳ 无数据";
+				return `⏳ ${escapeHtml(String(conclusion))}`;
+			}
+
+			function ciIcon(conclusion) {
+				return CI_ICON[conclusion] || "⏳";
+			}
+
+			/** 有失败时在体检页顶部显示醒目红色横幅 */
+			function ciBannerBlock(failed) {
+				const link = actionsRunUrl(failed);
+				const linkHtml = link
+					? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">在 GitHub 查看这次运行 →</a>`
+					: '<span class="muted small">（这次运行没有返回链接）</span>';
+				return `<div class="banner-title">❌ CI 部署失败：${shortShaOf(failed)}</div>
+					<div>结论：<b>${ciText(failed.conclusion)}</b>
+						${failed.status ? ` · 状态：${escapeHtml(String(failed.status))}` : ""}
+						${failed.createdAt ? ` · ${escapeHtml(new Date(failed.createdAt).toLocaleString())}` : ""}</div>
+					${failed.message ? `<div class="small" style="margin-top:4px">${escapeHtml(String(failed.message))}</div>` : ""}
+					<div class="row" style="margin-top:8px">
+						${linkHtml}
+						<span style="flex:1"></span>
+						<button class="action danger" data-revert="${escapeHtml(String(failed.sha || ""))}" ${failed.sha ? "" : "disabled"}>回滚这次提交（${shortShaOf(failed)}）</button>
+					</div>`;
+			}
+
+			/** 渲染失败横幅：页面顶部（所有页签可见）+ 体检页顶部 */
+			function renderCiBanner() {
+				const bannerEl = $("ciBanner");
+				const topEl = $("topBanner");
+				const runs = (ciCache && Array.isArray(ciCache.runs)) ? ciCache.runs : [];
+				const failed = runs.find((r) => r && r.conclusion === "failure");
+				// 失败信号变化时重新展示（用户手动关掉后不再反复弹）
+				if (failed && failed.sha !== ciKnownFailureSha) {
+					ciKnownFailureSha = failed.sha;
+					ciDismissedSha = null;
+				}
+				const html = failed ? ciBannerBlock(failed) : "";
+				const hidden = !failed || ciDismissedSha === failed.sha;
+				bannerEl.innerHTML = hidden ? "" : html;
+				bannerEl.classList.toggle("show", !hidden);
+				// 顶部横幅：只提示，不放按钮（体检页里才有回滚入口）
+				if (hidden) {
+					topEl.innerHTML = "";
+				} else {
+					topEl.innerHTML = `<div class="row">
+						<span class="banner-title">❌ CI 部署失败：${shortShaOf(failed)}（${ciText(failed.conclusion)}）</span>
+						${actionsRunUrl(failed) ? `<a href="${escapeHtml(actionsRunUrl(failed))}" target="_blank" rel="noopener" style="color:#fff">Actions 日志 →</a>` : ""}
+						<span style="flex:1"></span>
+						<button class="action ghost" data-ci-goto>去体检页回滚</button>
+					</div>`;
+				}
+				topEl.classList.toggle("show", !hidden);
+			}
+
+			function renderCi() {
+				const data = ciCache || {};
+				const runs = Array.isArray(data.runs) ? data.runs : [];
+
+				if (data.ok === false) {
+					$("ciBox").innerHTML = `<div class="muted">暂时取不到 CI 状态：${escapeHtml(String(data.error || "网络不可达或仓库不公开"))}</div>`;
+				} else if (!runs.length) {
+					$("ciBox").innerHTML = '<div class="muted">还没有查询到运行记录。</div>';
+				} else {
+					const warning = data.warning
+						? `<div class="muted" style="margin-bottom:6px">⚠️ ${escapeHtml(String(data.warning))}</div>`
+						: "";
+					$("ciBox").innerHTML =
+						warning +
+						runs
+							.slice(0, 6)
+							.map((run) => {
+								const link = actionsRunUrl(run);
+								return `<div class="ci-row">
+									<span class="ci-ico">${ciIcon(run.conclusion)}</span>
+									<code>${shortShaOf(run)}</code>
+									<span class="${run.conclusion === "failure" ? "ci-fail" : run.conclusion === "success" ? "ci-ok" : ""}">${ciText(run.conclusion)}</span>
+									<span class="small muted">${escapeHtml(String(run.message || ""))}</span>
+									<span class="small muted">${run.createdAt ? escapeHtml(new Date(run.createdAt).toLocaleString()) : ""}</span>
+									<span style="flex:1"></span>
+									<span>
+										${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">Actions</a>` : ""}
+										${run.conclusion === "failure" && run.sha ? `<button class="action danger" data-revert="${escapeHtml(String(run.sha))}" style="margin-left:8px">回滚这次提交</button>` : ""}
+									</span>
+								</div>`;
+							})
+							.join("");
+				}
+			}
+
+			async function loadCi() {
+				$("ciBox").innerHTML = "读取 CI 状态中…";
+				try {
+					ciCache = await api("/api/ci");
+				} catch (error) {
+					ciCache = { ok: false, runs: [], error: error.message };
+				}
+				renderCi();
+				renderCiBanner();
+			}
+
+			async function doRevertCi(sha, button) {
+				const short = String(sha || "").slice(0, 7);
+				const tip = `确定回滚提交 ${short} 吗？\n\n面板会执行 git revert 生成一个反向提交，并直接推送到 GitHub（不会改写历史，部署随后自动重跑）。`;
+				if (!confirm(tip)) return;
+				if (button) {
+					button.disabled = true;
+					button.textContent = "回滚中…";
+				}
+				toast(`正在回滚 ${short}…`);
+				try {
+					const result = await api("/api/revert", { method: "POST", body: { sha } });
+					const detail = formatSteps(result.steps);
+					if (detail) $("publishOutput").textContent = detail;
+					const failed = result.ok === false;
+					toast(result.message || (failed ? `回滚 ${short} 失败` : `已回滚 ${short}`), failed ? "err" : "ok");
+					await loadCi();
+					await loadStatus();
+					// 后端已自行推送（演练模式下不会推），不再走自动同步
+					if (!failed && result.dryRun) toast("演练模式：回滚提交已撤销，未推送", "");
+				} catch (error) {
+					toast(`回滚失败：${error.message}`, "err");
+					if (button) {
+						button.disabled = false;
+						button.textContent = "回滚这次提交";
+					}
+				}
+			}
+
+			// ── 音乐：一键压缩全部音乐 ─────────────────────────────────────
+			/** 压缩范围 → 中文说明 */
+			function compressModeLabel(mode) {
+				return (
+					{
+						all: "全部音乐（音频 + 封面）",
+						covers: "只压封面图",
+						check: "只检查（不改文件）",
+					}[mode] || mode
+				);
+			}
+
+			async function runCompressMusic() {
+				const mode = $("musicCompressMode").value;
+				const dryRun = $("musicCompressDry").checked;
+				const willWrite = !dryRun && mode !== "check";
+				const tip = willWrite
+					? `确定压缩「${compressModeLabel(mode)}」吗？\n\n⚠️ 会直接重写音频文件（原地覆盖，退出后无法用面板恢复）。\n建议先勾选「先试算」看一遍影响范围。`
+					: `按「${compressModeLabel(mode)}」${dryRun ? "试算" : "检查"}一遍？不会修改任何文件。`;
+				if (!confirm(tip)) return;
+
+				const output = $("musicCompressOutput");
+				const button = $("btnCompressMusic");
+				button.disabled = true;
+				output.textContent = dryRun
+					? `正在试算（${compressModeLabel(mode)}）…`
+					: `正在处理（${compressModeLabel(mode)}）…首次可能需要等一会儿`;
+				try {
+					const result = await api("/api/compress-music", { method: "POST", body: { mode, dryRun } });
+					const text = String(result.output || result.message || "（没有输出）");
+					output.textContent = `${text}\n\n$ ${result.command || ""}`;
+					const failed = result.ok === false;
+					toast(result.message || (failed ? "压缩失败" : dryRun ? "试算完成" : "压缩完成"), failed ? "err" : "ok");
+					await loadDiff();
+					if (!failed && willWrite) scheduleAutoPublish("chore: 压缩音乐文件");
+				} catch (error) {
+					output.textContent = `压缩失败：${error.message}`;
+					toast(error.message, "err");
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			// ── 媒体：批量转 WebP ──────────────────────────────────────────
+			/** 媒体目录 key → 后端允许压缩的仓库路径（与 admin/media-compress.mjs 的 COMPRESS_DIRS 对应） */
+			const WEBP_DIR_MAP = {
+				"post-images": "src/content/posts/images",
+				avatar: "public/assets/images",
+				"music-cover": "public/assets/music/cover",
+			};
+
+			/** 字节数展示：null（跳过/失败）显示 —，不显示 0 B */
+			function bytesCell(value) {
+				return value === null || value === undefined ? "—" : humanSize(toNum(value));
+			}
+
+			async function runCompressMedia() {
+				const dryRun = $("webpDry").checked;
+				if (!dryRun && !confirm("确定真的写入 .webp 文件吗？\n\n（只会新增 .webp，不会删除原文件）")) return;
+
+				const button = $("btnWebp");
+				const summary = $("webpSummary");
+				button.disabled = true;
+				summary.textContent = dryRun ? "正在试算…" : "正在转换，请稍等…";
+				$("webpTable").style.display = "none";
+				$("webpBody").innerHTML = "";
+				try {
+					// 只在当前目录可压缩时传 dirs，否则交给后端用完整白名单
+					const repoDir = WEBP_DIR_MAP[$("mediaDir").value];
+					const body = repoDir ? { dryRun, dirs: [repoDir] } : { dryRun };
+					const data = await api("/api/compress-media", { method: "POST", body });
+					const items = Array.isArray(data.items) ? data.items : [];
+					$("webpBody").innerHTML = items.length
+						? items
+								.map((item) => {
+									const before = toNum(item.before);
+									const saved = toNum(item.saved, before - toNum(item.after));
+									const percent =
+										before > 0 && item.after !== null && item.after !== undefined
+											? `${((saved / before) * 100).toFixed(1)}%`
+											: "—";
+									return `<tr>
+										<td class="small">${escapeHtml(String(item.rel || ""))}</td>
+										<td class="small">${escapeHtml(String(item.outRel || "—"))}</td>
+										<td class="small">${bytesCell(item.before)}</td>
+										<td class="small">${bytesCell(item.after)}</td>
+										<td class="small">${bytesCell(item.saved)}（${percent}）</td>
+										<td class="small">${escapeHtml(String(item.status || ""))}</td>
+									</tr>`;
+								})
+								.join("")
+						: '<tr><td colspan="6" class="muted">没有需要处理的图片</td></tr>';
+					$("webpTable").style.display = "";
+					const totals = data.totals || {};
+					const tBefore = toNum(totals.before);
+					const tAfter = toNum(totals.after);
+					const tSaved = toNum(totals.saved, tBefore - tAfter);
+					const tPercent = tBefore > 0 ? `${((tSaved / tBefore) * 100).toFixed(1)}%` : "—";
+					const sizeText = (raw, num) => (raw ? escapeHtml(String(raw)) : humanSize(num));
+					summary.innerHTML = `${dryRun ? "<b>试算结果</b>（没有写入任何文件）" : "<b>转换完成</b>"}：
+						共 ${toNum(totals.total, items.length)} 个文件 ·
+						${sizeText(totals.beforeText, tBefore)} → ${sizeText(totals.afterText, tAfter)} ·
+						节省 <b>${sizeText(totals.savedText, tSaved)}</b>（${tPercent}）
+						${toNum(totals.skipped) > 0 ? ` · 已存在跳过 ${toNum(totals.skipped)}` : ""}
+						${toNum(totals.failed) > 0 ? ` · <span class="ci-fail">失败 ${toNum(totals.failed)}</span>` : ""}
+						${data.error ? `<div class="ci-fail" style="margin-top:4px">${escapeHtml(String(data.error))}</div>` : ""}
+						<div class="small">只新增 .webp，不删除原文件。${dryRun ? "" : "记得到「发布」页推送。"}</div>`;
+					toast(
+						data.error ? String(data.error) : dryRun ? "试算完成，没有写入文件" : `转换完成，共节省 ${humanSize(tSaved)}`,
+						data.error || data.ok === false ? "err" : "ok",
+					);
+					if (!dryRun && data.ok !== false) {
+						await loadMedia();
+						await loadDiff();
+						scheduleAutoPublish("chore: 批量转 WebP");
+					}
+				} catch (error) {
+					summary.textContent = `转换失败：${error.message}`;
+					toast(error.message, "err");
+				} finally {
+					button.disabled = false;
+				}
+			}
+
+			// ── 站点设置：首页横幅副标题（banner.subtitles） ───────────────
+			function bannerSubtitlesText(value) {
+				if (Array.isArray(value)) return value.map((v) => String(v)).join("\n");
+				return value === undefined || value === null ? "" : String(value);
+			}
+
+			function applyBannerSubtitles() {
+				const field = $("bannerSubtitles");
+				if (!field) return;
+				if (!field.value.trim()) {
+					// 多行文本框为空时优先用 defs 里的默认值填上
+					const def = (settingsCache.defs || []).find((d) => d.id === "banner.subtitles");
+					field.value = bannerSubtitlesText(def && def.default !== undefined ? def.default : settingsCache.values["banner.subtitles"]);
+				} else {
+					field.value = bannerSubtitlesText(settingsCache.values["banner.subtitles"]);
+				}
+			}
+
+			// ── 站点设置：导航菜单可视化 ───────────────────────────────────
+			let navCache = [];
+
+			function renderNav() {
+				$("navForm").innerHTML = navCache.length
+					? navCache
+							.map(
+								(item, i) => `<div class="nav-row">
+									<label style="display:flex;gap:6px;align-items:center;margin:0;white-space:nowrap">
+										<input type="checkbox" data-nav-hidden="${i}" ${item.hidden ? "" : "checked"} style="width:auto" /> 显示
+									</label>
+									<input class="nav-label" data-nav-label="${i}" value="${escapeHtml(String(item.label || ""))}"
+										placeholder="显示名" />
+									<code class="small muted">${escapeHtml(String(item.id || ""))}${
+										item.pageKey ? ` · ${escapeHtml(String(item.pageKey))}` : ""
+									}</code>
+									<button class="action ghost" data-nav-move="up" data-nav-index="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+									<button class="action ghost" data-nav-move="down" data-nav-index="${i}" ${
+										i === navCache.length - 1 ? "disabled" : ""
+									}>↓</button>
+								</div>`,
+							)
+							.join("")
+					: '<span class="muted">导航接口没有返回任何菜单项。</span>';
+			}
+
+			/** 从当前表单 DOM 收集状态（保序），用于上移/下移后重渲染不丢改动 */
+			function collectNav() {
+				const items = [];
+				document.querySelectorAll("[data-nav-label]").forEach((el) => {
+					const i = Number(el.dataset.navLabel);
+					items[i] = {
+						id: navCache[i] ? navCache[i].id : undefined,
+						label: el.value.trim(),
+						hidden: !document.querySelector(`[data-nav-hidden="${i}"]`).checked,
+					};
+				});
+				return items.filter(Boolean);
+			}
+
+			function moveNav(index, direction) {
+				if (!Number.isInteger(index) || index < 0 || index >= navCache.length) return;
+				const target = direction === "up" ? index - 1 : index + 1;
+				if (target < 0 || target >= navCache.length) return;
+				const items = collectNav();
+				[items[index], items[target]] = [items[target], items[index]];
+				navCache = items;
+				renderNav();
+			}
+
+			async function loadNav() {
+				$("navForm").innerHTML = "加载中…";
+				try {
+					const data = await api("/api/nav");
+					navCache = (Array.isArray(data.items) ? data.items : []).map((item) => ({
+						id: item.id,
+						label: item.label,
+						pageKey: item.pageKey,
+						hidden: item.hidden === true,
+						order: item.order,
+					}));
+					renderNav();
+				} catch (error) {
+					$("navForm").innerHTML = `<span class="muted">导航菜单读取失败：${escapeHtml(error.message)}（可以点「重新载入」再试）</span>`;
+				}
+			}
+
+			async function saveNav() {
+				if (!navCache.length) {
+					toast("还没有读到导航菜单，先点「重新载入」", "err");
+					return;
+				}
+				const items = collectNav().map((item, i) => ({
+					id: item.id,
+					label: item.label,
+					hidden: item.hidden,
+					order: i,
+				}));
+				if (!confirm(`确定保存导航菜单（共 ${items.length} 项，顺序即当前列表顺序）？`)) return;
+				try {
+					const result = await api("/api/nav", { method: "POST", body: { items } });
+					toast(result.message || "导航菜单已保存", "ok");
+					await loadNav();
+					await loadDiff();
+					scheduleAutoPublish("chore: 更新导航菜单");
+				} catch (error) {
+					toast(error.message, "err");
 				}
 			}
 
@@ -921,6 +1496,35 @@
 			$("btnReloadSettings").addEventListener("click", loadSettings);
 			$("btnDoctor").addEventListener("click", loadDoctor);
 			$("btnBackups").addEventListener("click", loadBackups);
+			$("btnCiReload").addEventListener("click", () => {
+				void loadCi();
+			});
+
+			// 回滚按钮 / 顶部横幅「去体检页」统一用事件委托，避免重渲染后失效
+			document.addEventListener("click", (e) => {
+				if (!(e.target instanceof Element)) return;
+				const revertBtn = e.target.closest("[data-revert]");
+				if (revertBtn) {
+					e.preventDefault();
+					const sha = revertBtn.dataset.revert;
+					if (sha) void doRevertCi(sha, revertBtn);
+					return;
+				}
+				if (e.target.closest("[data-ci-goto]")) {
+					e.preventDefault();
+					document.querySelector('nav button[data-tab="doctor"]')?.click();
+				}
+			});
+			$("navForm").addEventListener("click", (e) => {
+				const btn = e.target instanceof Element ? e.target.closest("[data-nav-move]") : null;
+				if (btn) moveNav(Number(btn.dataset.navIndex), btn.dataset.navMove);
+			});
+			$("btnNavReload").addEventListener("click", () => {
+				void loadNav();
+			});
+			$("btnNavSave").addEventListener("click", () => {
+				void saveNav();
+			});
 
 			// ── 标签切换与事件 ─────────────────────────────────────────────
 			document.querySelectorAll("nav button").forEach((btn) => {
@@ -934,8 +1538,14 @@
 					if (btn.dataset.tab === "music") await loadPlaylist();
 					if (btn.dataset.tab === "media") await loadMedia();
 					if (btn.dataset.tab === "config") await loadConfigList();
-					if (btn.dataset.tab === "settings") await loadSettings();
-					if (btn.dataset.tab === "doctor") await loadBackups();
+					if (btn.dataset.tab === "settings") {
+						await loadSettings();
+						await loadNav();
+					}
+					if (btn.dataset.tab === "doctor") {
+						await loadBackups();
+						await loadCi();
+					}
 					if (btn.dataset.tab === "publish") await loadDiff();
 				});
 			});
@@ -1705,9 +2315,20 @@
 				else toast("暂时取不到部署链接（需要公开仓库且网络可达）", "err");
 			});
 
+			// 音乐页 / 媒体页新增的批量操作
+			$("btnCompressMusic").addEventListener("click", () => {
+				void runCompressMusic();
+			});
+			$("btnWebp").addEventListener("click", () => {
+				void runCompressMedia();
+			});
+
 			bindEditor();
+			void loadTaxonomy();
 			loadStatus();
 			loadDiff();
+			// 进页面就查一次 CI，失败会立刻在顶部显示红色横幅
+			void loadCi();
 		</script>
 	</body>
 </html>
