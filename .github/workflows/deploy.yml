@@ -36,6 +36,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: 校验文档与代码一致（防漂移）
+
+        # 由 scripts/check-docs-sync.mjs 比对文档里的数字/清单与代码事实；不一致则退出码 1 并让部署失败。
+
+        # 加功能/加配置/加路由/加页签/加页面后，请同步更新 docs/PROJECT-CONTEXT.md（附录 E 有清单）。
+
+        run: node scripts/check-docs-sync.mjs
+
       # Firefly 的完整构建流程：LQIP → Astro 构建 → 字体子集化 → Pagefind 索引
       - name: Build site
         run: pnpm run build
