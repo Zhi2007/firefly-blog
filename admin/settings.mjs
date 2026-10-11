@@ -57,7 +57,10 @@ export const SETTINGS_DEFS = [
 	{ id: "display.sakuraSwitchable", file: "src/config/displaySettingsConfig.ts", key: "sakuraSwitchable", type: "boolean", label: "允许访客切换樱花特效" },
 
 	// ── 性能相关：关掉最耗 GPU 的特效（作者实测核显占用高时优先调这些） ──────────
-	{ id: "perf.live2d", file: "src/config/pioConfig.ts", key: "enable", within: "pioConfig", type: "boolean", label: "性能 · Live2D 看板娘（关掉省 651KB 且去掉常驻动画）" },
+	// 注意：这里只能写 spineModelConfig。pioConfig.ts 的 live2dWidgetConfig 块用当前 findBlock 够不到
+		// （正则 \b[^{}]*?\{ 会跨行匹配到过宽区间，写入器因"块内有 2 处 enable"而拒绝），
+		// 早先误标成 perf.live2d 的开关其实读写的是 spineModelConfig，故按其真实语义如实命名。
+		{ id: "perf.spine", file: "src/config/pioConfig.ts", key: "enable", within: "spineModelConfig", type: "boolean", label: "性能 · Spine 看板娘（pioConfig.ts 的 spineModelConfig.enable）" },
 	{ id: "perf.wavesDesktop", file: "src/config/backgroundWallpaper.ts", key: "desktop", within: ["waves", "enable"], type: "boolean", label: "性能 · 水波纹动画（桌面端，主题注明会影响性能）" },
 	{ id: "perf.wavesMobile", file: "src/config/backgroundWallpaper.ts", key: "mobile", within: ["waves", "enable"], type: "boolean", label: "性能 · 水波纹动画（移动端）" },
 	{ id: "perf.gradientDesktop", file: "src/config/backgroundWallpaper.ts", key: "desktop", within: ["gradient", "enable"], type: "boolean", label: "性能 · 底部渐变过渡（桌面端，纯 CSS 开销小）" },
