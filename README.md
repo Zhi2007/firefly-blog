@@ -169,7 +169,7 @@ Indexed 28 pages
 firefly/
 ├── admin/                     # 零依赖本地管理面板（Node 内置模块，无 npm 依赖）
 │   ├── server.mjs             # HTTP 服务：路由、认证、读写文件、调用 git/pnpm
-│   ├── index.html             # 单页面 UI（9 个页签，内联 JS/CSS）
+│   ├── index.html             # 单页面 UI（10 个页签，内联 JS/CSS）
 │   ├── import-doc.mjs         # .docx/.txt/.md → Markdown（自己读 ZIP + inflateRaw）
 │   ├── audio-meta.mjs         # 从 mp3/flac/m4a 读 ID3/Vorbis/ilst 标签、封面、歌词
 │   ├── doctor.mjs             # 体检：JSON 合法性、引用、站内链接、密钥、大文件、配置矛盾、git
@@ -767,7 +767,7 @@ export const tabTitleConfig: TabTitleConfig = {
 - 接口同时兼容 `X-Admin-Token` 请求头与 `?token=`（`<audio>` 试听、ZIP 下载这类走 URL 的请求需要），`/api/logout` 清除 Cookie。
 - 如果看到"认证失败（403）"，用**带令牌的地址**重新打开即可（令牌每次启动都会变）。
 
-### 8.3 九个页签能做什么
+### 8.3 十个页签能做什么
 
 | 页签 | 能做什么 |
 | --- | --- |
