@@ -45,7 +45,7 @@
 | Biome | `2.5.12` | `package.json:100`；本地实测版本一致 |
 | Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.7.0 |
 | 包管理器 | `pnpm@11.22.0`（`preinstall` 强制 pnpm） | `package.json:8,24` |
-| 构建命令 | `pnpm build` → 7 步流水线 | `package.json:13` |
+| 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
 | 构建产物页数 | **28 个 HTML** | `dist/` 实测 28；提交 `704baad`/`bc3f0b2` 等均以「astro build 28 页」为验收 |
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:924-985`、`.github/workflows/deploy.yml:58-63` |
@@ -75,6 +75,8 @@
 - 不要用 `git add -A` / `git add .` / `git commit -a`。
 - 不要改 `public/_headers` 或 `public/_redirects` 并期待它生效 —— `run_worker_first: true` 之后它们**不作用于 Worker 处理的响应**（`public/_headers:3-5` 自己就这么写）。真正生效的是 `worker/index.mjs:23-32`。
 - 不要在 `worker/index.mjs` 里改 CSP 之外的地方而不读第 5 章（301、Range、安全头是一个整体，改动顺序有依赖）。
+
+> 🔴 **新增 / 删除网站功能前，先读 [附录 E「新增功能时的同步契约（防漂移）」](#附录-e新增功能时的同步契约防漂移)**：任何新功能都可能要同时改**代码 / 管理面板 / 文档**三处，附录 E 有「加什么 → 必须同步哪里」对照表。改完跑 `pnpm check-docs`（= `node scripts/check-docs-sync.mjs`，零依赖、只读），它会用代码里的事实核对文档里的数字与清单；对不上就退出码 1。
 
 ---
 
@@ -128,8 +130,8 @@ firefly/
 │   └── anime-list.json
 ├── src/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
-│   ├── config/                 # ③ 配置区（30 个文件：23 个 *Config.ts + backgroundWallpaper.ts
-│   │                           #    + index.ts + README.md + 4 个 JSON）★ 第 4 章
+│   ├── config/                 # ③ 配置区（31 个文件：23 个 *Config.ts + backgroundWallpaper.ts
+│   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
 │   ├── content/                # ③ 内容：posts/（3 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点）
@@ -311,7 +313,7 @@ firefly/
 | --- | --- | --- |
 | `*Config.ts` | **23** | analytics, announcement, booknav, comment, coverImage, displaySettings, dynamic, effects, expressiveCode, font, friends, gallery, license, mermaid, music, navBar, perf, pio, plantuml, profile, sidebar, site, sponsor |
 | 目录下全部 `.ts` | **25** | 上面 23 个 + `backgroundWallpaper.ts`（壁纸，不以 Config 结尾）+ `index.ts`（统一导出，`src/config/index.ts:58-89`） |
-| 目录下全部文件 | **30** | 上面 25 个 + `README.md` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json` |
+| 目录下全部文件 | **31** | 上面 25 个 + `README.md` + `FooterConfig.html` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json` |
 | 面板「配置」页可编辑白名单 | **15** | `admin/server.mjs:72-88` 的 `CONFIG_FILES` |
 | 面板「站点设置」可视化字段 | **33 条 def，落在 5 个文件** | `admin/settings.mjs:25-68` |
 | 面板管理的 JSON 数据 | **3 + 1** | `announcements.json`、`music-playlist.json`（`server.mjs:192-195` 的 `DATA_FILES`）+ `friends.json`（`admin/friends.mjs`）+ `nav-overrides.json`（`admin/nav.mjs`） |
@@ -363,7 +365,13 @@ firefly/
 | 低配模式为什么必须「移除属性」 | 见第 12 章第 12.4 节（`backdrop-filter` 存在即生成合成层，把模糊设 0 无效） | `src/styles/low-spec.css:4-8`、`perfConfig.ts:4-6` |
 | 内容宽度用 `min(px, vw)` 且兜底不用 `min()` | 见第 12 章第 12.3 节（压缩器会简化成裸 `vw` 丢上限） | `src/layouts/Layout.astro:493-494`、`src/styles/variables.styl:170` |
 
-### 4.4 ⚠️ 实测发现：`perf.live2d` 面板开关指向了错误的配置块（疑似缺陷）
+### 4.4 ✅ 已修：`perf.live2d` 面板开关曾指向错误的配置块（现为 `perf.spine`）
+
+> **状态：2026-10-11 已修复**。`admin/settings.mjs` 已把该 def 改名为 `perf.spine`、`within: "spineModelConfig"`（名实相符）。
+> `live2dWidgetConfig` 方案被放弃的原因：`findBlock` 的正则 `\b[^{}]*?\{` 会跨行匹配到过宽区间（块内出现 2 处 `enable`），
+> 写入器以「无法确定改哪一处」拒绝，因此**不再提供误导性开关**；Live2D 只能直接改 `src/config/pioConfig.ts` 的 `live2dWidgetConfig.enable`
+> （当前为 false，配合 `prune-pio-assets.ts` 去掉 651KB 脚本与常驻动画）。
+> 下面保留当初的实测记录，作为「名字对不上行为」这类语义漂移的教材。
 
 | 项 | 内容 |
 | --- | --- |
@@ -372,7 +380,7 @@ firefly/
 | 原因 | `pioConfig.ts` 里根本没有名为 `pioConfig` 的块；正则 `\b pioConfig \b [^{}]*? \{` 先命中第 1 行 import 语句里的 `"../types/pioConfig"`，再吃到它之后第一个 `{` —— 也就是 `spineModelConfig` 对象的 `{`（`pioConfig.ts:4`） |
 | 后果 | 该开关读写的其实是 `spineModelConfig.enable`（`pioConfig.ts:6`），**不是** `live2dWidgetConfig.enable`（`pioConfig.ts:88`）。也就是说：想用面板关 Live2D，实际改的是 Spine；Live2D 是否加载仍只由 `pioConfig.ts:88` 决定 |
 | 当前无感知的原因 | 两者现在都是 `false`（`readSettings` 实测 `perf.live2d = false`），所以表现上看不出差异 |
-| 建议修法（**改前请确认**） | 把 `within: "pioConfig"` 改成 `within: "live2dWidgetConfig"`；或拆成两条 def（`live2d` + `spine`）。改完必须复测：`readSettings` 返回的 `perf.live2d` 应与 `live2dWidgetConfig.enable` 同步变化，且 `applySettings` 写回后 `pioConfig.ts` 只动了第 88 行 |
+| 建议修法（**已实施**：改名 `perf.spine`；`live2dWidgetConfig` 方案因写入器拒绝而放弃） | 把 `within: "pioConfig"` 改成 `within: "live2dWidgetConfig"`；或拆成两条 def（`live2d` + `spine`）。改完必须复测：`readSettings` 返回的 `perf.live2d` 应与 `live2dWidgetConfig.enable` 同步变化，且 `applySettings` 写回后 `pioConfig.ts` 只动了第 88 行 |
 | 状态 | 本次**未修改**（任务限定只交付文档），仅作为「读代码时发现的缺陷」记录 |
 
 ---
@@ -919,7 +927,7 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 | --- | --- | --- | --- |
 | 1 | 类型检查 | `tsc --noEmit --isolatedDeclarations`（`package.json:16`） | ✅ **exit 0**（无输出）。因为本机 `npx` 可能被执行策略挡，我用的是等价命令 `node node_modules/typescript/bin/tsc --noEmit --isolatedDeclarations` |
 | 2 | Lint / 格式 | `biome ci src`（CI 口径）或 `pnpm lint`（`biome check --write ./src ./scripts`，`package.json:23`） | ✅ **exit 0**：`Checked 315 files in 330ms. No fixes applied.`（等价命令 `node node_modules/@biomejs/biome/bin/biome ci src`；本地 biome 版本 2.5.12，与 `package.json:100` 一致） |
-| 3 | 构建 | `pnpm build`（`package.json:13`，7 步链路） | ⚠️ **本次未跑**（耗时长且会重写 `dist/`）。可核实的事实：`dist/` 现有 **28 个 HTML**；提交 `704baad`/`89a4246`/`bc3f0b2`/`5123b6d` 的验收标准都是「astro build 28 页」 |
+| 3 | 构建 | `pnpm build`（`package.json:13`，8 步链路） | ⚠️ **本次未跑**（耗时长且会重写 `dist/`）。可核实的事实：`dist/` 现有 **28 个 HTML**；提交 `704baad`/`89a4246`/`bc3f0b2`/`5123b6d` 的验收标准都是「astro build 28 页」 |
 
 `pnpm build` 的完整链路（`package.json:13`）：
 
@@ -1184,14 +1192,14 @@ pnpm build
 
 | # | 位置 | 不一致 | 影响 |
 | --- | --- | --- | --- |
-| 1 | `admin/settings.mjs:60` | `perf.live2d` 的 `within: "pioConfig"` 实际解析到 `spineModelConfig` 块（4.4 节，已实测） | 面板那个开关控制错了对象（**功能缺陷**） |
+| 1 | `admin/settings.mjs:60` | `perf.live2d` 的 `within: "pioConfig"` 实际解析到 `spineModelConfig` 块（4.4 节，已实测） | 面板那个开关控制错了对象（**功能缺陷**）→ **已修：改名 `perf.spine` + `within: "spineModelConfig"`**（见 4.4 状态行） |
 | 2 | `README.md` 第 8.3 节标题、第 5 节目录树注释 | 写「**九个**页签」，实际 **10 个**（`admin/index.html:185-194`） | 误导阅读者 |
 | 3 | `d34f995` 提交正文 | 声称「遍历产物…`esm.sh` 命中数为 **0**」，实测 `dist/` 全文搜索有 **1 处**（`dist/vendor/giscus-1.6.0.mjs:1` 的 banner 注释 `/* esm.sh - giscus@1.6.0 */`） | 数字口径不同（引用 vs 注释文本），但会让人以为有残留依赖 |
 | 4 | `src/config/siteConfig.ts:311` | `mal.clientId` 的值里**以一个制表符开头**（`"\t0ef34371450f9c6c809deaadec6aa8f3"`），实测确认 | 可能让 MAL API 鉴权失败；**需确认**是否为有意为之（看起来是复制粘贴带入） |
 | 5 | `bc3f0b2` 标题 vs 正文 | 标题说 14 项（1+2+6+5），正文列了 16 个编号（含 M3、L7）；父任务转述的清单只有 12 个（缺 M3、L7） | 编号口径混乱，容易漏读已修项（13.3 节已列表归正） |
 | 6 | `AGENTS.md` / `CLAUDE.md` | 多处与现状不符（2.5 节：`--isolatedDeclarations`、build 步骤、`Firefly-Docs` 目录不存在、Vercel 部署、"lint 只针对 ./src"） | 上游文件，**不要照抄** |
 | 7 | `bc3f0b2` 正文 | 说「25 个 POST 路由」坏 body 会 500；实测 `POST_BODY_FIELDS` 是 **31** 条、POST 可执行的 switch 路由也多于 25 | 属历史快照口径，不影响修复本身 |
-| 8 | 父任务描述 | 说 `src/config` 有「14 个」文件、`admin/` 有「9 个页签」 | 实测分别是 23 个 `*Config.ts`（含 `backgroundWallpaper.ts` 共 25 个 `.ts`、30 个文件）与 10 个页签 |
+| 8 | 父任务描述 | 说 `src/config` 有「14 个」文件、`admin/` 有「9 个页签」 | 实测分别是 23 个 `*Config.ts`（含 `backgroundWallpaper.ts` 共 25 个 `.ts`、31 个文件）与 10 个页签 |
 
 ---
 
@@ -1360,4 +1368,103 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 4. **发布用面板**（会自动体检 + 只暂存 `PUBLISH_SCOPE`）；改了范围外文件就自己 `git` 提交。
 5. **看到反直觉的写法先来第 12 章找原因**（`min()` 兜底、`lowSpec` 去属性、`cancelled` 不算失败、Range 非法忽略头、`_headers` 是文档……都是刻意的）。
 6. **不确定就标「需确认」**，不要把它写成结论 —— 本文档就是这么做的。
+
+---
+
+## 附录 E：新增功能时的同步契约（防漂移）
+
+> 这一节只回答一个问题：**「我加了功能，除了代码还要动什么？」**
+> 一句话规则：**代码改了、面板没改、文档没改 = 漂移。** 漂移不会当场报错，它只会在几周后以「agent 按旧文档改错地方」的形式爆炸（E.3 有三个真实例子）。
+
+### E.1 三处同步原则
+
+任何一个「网站新功能」都可能要同时改三处，缺一处就是漂移：
+
+```text
+① 代码实现        src/**、worker/**、admin/*.mjs
+      ↕ 必须一致
+② 管理面板        admin/index.html（页签 / 表单）、admin/settings.mjs 的 SETTINGS_DEFS、
+                  admin/server.mjs 的 CONFIG_FILES / POST_BODY_FIELDS
+      ↕ 必须一致
+③ 文档与 README    docs/PROJECT-CONTEXT.md（本文档）、README.md、admin/README.md
+```
+
+两条自检（用它判断「这个功能要不要进面板」）：
+
+- 它是**内容 / 配置数据**吗（站点标题、歌单、友链、公告、页面开关…）→ 就该有面板入口；面板里没有，说明缺了一块（E.3 事故 1 就是这么来的）。
+- 它**会写盘**吗 → 必须挂上第 9.5 节的写入安全链（白名单 → 类型/范围校验 → 写前快照 → 回读校验），并在 9.3 路由表的「写盘 / 写前快照」两列如实登记。
+
+### E.2 「加什么 → 必须同步哪里」对照表
+
+「检查器」列 = `pnpm check-docs` 能不能自动抓到；⚠️ 表示只覆盖其中一部分。
+
+| # | 改动的类型 | 必须同步的文件与章节 | 检查器 |
+| --- | --- | --- | --- |
+| 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:72-88` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
+| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（33 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1204`，**接受 POST body 就必须登记**，否则该路由跳过字段校验）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1312-1315`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
+| 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 10 个）；② `admin/README.md` 的功能表（`:42-53`）；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
+| 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-41` + `:358`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
+| 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
+| 6 | **新增构建步骤（`package.json` 的 `build`）** | ① 本文档 11.2 的 8 步链路与「8 步」说法（§1.3 也有一处）；② `CLAUDE.md` / `AGENTS.md` 里的构建说明（上游文件，改动要就地标注「本仓库修正」） | ✅（步骤序列逐条比对 + 三处「N 步」声明，含 `CLAUDE.md`） |
+| 7 | **新增 `public/vendor/` 类自托管资源** | ① 缓存规则：`worker/index.mjs:122-129` 与 `public/_headers:38-45`（两边都要写）；② CSP（自托管一般不用放行，除非是 worker / iframe / wasm）；③ 本文档第 5 / 6 章 | ⚠️ 部分（只保证 CSP 三处一致；缓存规则要人看） |
+| 8 | **新增第三方脚本 / 样式来源** | ① `worker/index.mjs:31` 的 CSP（**唯一生效处**）；② `public/_headers:32` 必须与它**逐字节一致**；③ 本文档 6.4 的 CSP 全文 + 逐条放行说明（写清为什么放行）；④ 按来源选指令：`script-src` / `style-src` / `connect-src` / `frame-src` / `img-src` | ✅（三处 CSP 逐字节一致 + 文档声明的字符数） |
+| 9 | **面板新增会写盘的能力** | ① `admin/README.md`（接口说明 + 安全链）；② 本文档第 9 章（9.3 表格的「写盘 / 写前快照」列、9.5 写入安全链）；③ `PUBLISH_SCOPE`（`admin/publish-scope.mjs`）—— 若它写的是**提交范围之外**的路径（`worker/`、`admin/`、`src/styles/`…），要么把路径纳入 `PUBLISH_SCOPE`，要么在 10.3 明说「面板发布不会提交它」 | ⚠️ 部分（`PUBLISH_SCOPE` 逐条 ↔ 10.3；「写盘 / 快照」列不检查） |
+| 10 | **删除功能（必须反向清理）** | 按 1–9 反向删：文档段落、面板入口（`index.html` 的页签 / 按钮）、`SETTINGS_DEFS` 条目、`CONFIG_FILES` 白名单、CSP 放行、缓存规则、构建步骤、`navBarConfig.ts` 菜单项、`PUBLISH_SCOPE` 前缀。删完跑 `pnpm check-docs`，数字 / 清单对不上就会报 ❌ | ⚠️ 部分（「该删的忘了删」会被数字抓到；「不该删的删错了」抓不到） |
+
+### E.3 为什么光靠「记得更新」不行（三个真实历史事故）
+
+| # | 事故 | 漂移是怎么产生的 | 为什么长期没人发现 |
+| --- | --- | --- | --- |
+| 1 | **`perf.live2d` 开关控制错了对象**（本文档 4.4 / 13.6 #1）—— **已修（改名 `perf.spine`）**，记录保留为教材 | `admin/settings.mjs` 里写了 `within: "pioConfig"`，而 `pioConfig.ts` 里**根本没有这个块** —— 正则先命中第 1 行 import 里的 `"../types/pioConfig"`，再吃到它后面第一个 `{`，也就是 `spineModelConfig` 的块。于是那个 label 写着「Live2D」的开关，实际读写的是 **Spine** | 代码能跑、面板不报错，两项又恰好都是 `false`（表现一致）。**两个月后**才有人读代码发现；一旦有人只开其中一项，行为就和开关名对不上 |
+| 2 | **`README.md` 写「九个页签」，实际 10 个** | 面板先加了 `publish` 页签：`admin/index.html` 改了，`README.md` 第 8 章与目录树注释没跟着改 | 页签数没人天天数；直到本文档逐个数 `data-tab` 才发现（9.4 的注记） |
+| 3 | **上游 `AGENTS.md` / `CLAUDE.md` 的构建链路漏了 3 步、`pnpm lint` 目标写错、`Firefly-Docs/` 目录不存在** | 上游说明是按另一个版本的主题写的；本仓库改过构建脚本（加了 github-card / minify / pagefind 三步）却没回头改说明 | 新 agent 照抄「7 步链路」就会漏跑生成步骤（`CLAUDE.md` 里写着 `pnpm lint` 只针对 `./src`）；`Firefly-Docs/` 在本仓库**根本不存在**，按它去找文档必然扑空 |
+
+同一类事故还有两个（本文档 12.6 / 12.8）：CSP 漏放行 `esm.sh` 让**评论区整个打不开**；`git add -A` 把在制品（半成品 `admin/ci.mjs` + 约 20 个 webp）一起推上生产。
+
+它们的共同点：**漂移是「静默」的** —— 代码不会因为文档写错而报错，构建也不会。所以必须先用一道机器门禁（E.4）把能算的数字钉死，再由人补语义（E.5）。
+
+### E.4 用法：`pnpm check-docs`
+
+```bash
+pnpm check-docs                                                  # = node scripts/check-docs-sync.mjs
+node scripts/check-docs-sync.mjs                                 # 等价（npx 被执行策略挡时用这条）
+node scripts/check-docs-sync.mjs --doc docs/PROJECT-CONTEXT.md  # 指定其它文档副本
+```
+
+- **什么时候跑**：加功能 / 加配置 / 加路由 / 加页签 / 加页面之后，以及**提交前** —— 它是「改完功能后的第 4 条门禁」（前三条见 11.2）。
+- **它检查什么**（8 组，全部从**代码**算出来，再和文档比对）：
+  1. `/api/*` 路由数（`admin/server.mjs` 的 `case` + switch 外前置处理）↔ §1.3 / §9.3 表格逐行；
+  2. 面板页签数（`admin/index.html` 的 `data-tab` **去重**）↔ §1.3 / §9.4 表格；
+  3. `src/config` 的 `*Config.ts` / `.ts` / 文件总数 ↔ §4.1 口径表、§4.2 表格逐行、§2.3 目录树；
+  4. `SETTINGS_DEFS` 条数（`admin/settings.mjs`）↔ §4.1 / §9.4 / §2.3，并校验附录 A 提到的设置 id 真实存在（对全篇残留的旧 id 只打一条 `ℹ️` 提示，不计失败）；
+  5. `posts` frontmatter 字段（`src/content.config.ts`）↔ §3.3 表格逐行 / 附录 C.3；
+  6. `package.json` 的 `build` 步骤 ↔ §1.3 / §11.2 代码块逐条 / `CLAUDE.md`；
+  7. `PUBLISH_SCOPE` 前缀（`admin/publish-scope.mjs`）↔ §10.3 代码块逐条；
+  8. CSP 在 `worker/index.mjs`、`public/_headers`、§6.4 正文**三处逐字节一致**（含文档声明的 407 字符）。
+- **输出格式**：每组先打印代码事实（`·` 行），再逐条打印 `✅ / ❌`；不符时给可操作指令 ——
+  `代码里是 X，文档里写的是 Y，请更新 docs/PROJECT-CONTEXT.md:<行号>（§章节）`。
+- **退出码**：`0` = 全部一致；`1` = 至少一项 ❌（可直接用于提交前脚本）；`2` = 参数错误或文档读不到。
+- **容错**：`⚠️` = 文档里找不到这条声明（措辞改了或整段被删）。它**不算失败**（退出码仍为 0），但会出现在末尾的「未覆盖」汇总里 —— 看到 ⚠️ 要么把文档措辞改回去，要么同步更新检查器里的锚点。
+- **零依赖、只读**：只用 `node:` 内置模块；不联网、不写文件、不执行被测代码。
+
+**改完功能的 60 秒自查**（机器能查的交给机器，剩下的照这张纸）：
+
+1. 跑 `pnpm check-docs` → 期望退出码 0（若有 ❌，按它给的行号改文档；⚠️ 则按 E.4 的说明处理）。
+2. 对照 E.2 找到你这个改动落在哪几行，逐条勾掉「必须同步」的项。
+3. 动了 CSP？`public/_headers` 同步了吗？§6.4 的逐条说明补了吗？
+4. 动了 `package.json` 的 `build`？§1.3、§11.2、`CLAUDE.md` 同步了吗？
+5. 动了面板 / `worker/` / 文档这类 `PUBLISH_SCOPE` 之外的路径？**面板发布按钮不会提交它们**（10.3），自己 `git add -- <显式路径>` 后提交。
+6. 跑三条门禁（11.2）→ 全绿。
+
+### E.5 检查器覆盖不到的部分（语义漂移仍需人读文档）
+
+`pnpm check-docs` 只能比**数字与清单**。以下必须人工判断：
+
+- **说明性文字是否仍然成立**：数字没变、含义变了（字段默认值 / 取值范围 / 影响描述），或者「该怎么做」的步骤已经过时。
+- **`README.md` / `admin/README.md` / `AGENTS.md` 的正文**：只有 `CLAUDE.md` 的构建步骤数被覆盖。用户向文档最容易长期说谎（E.3 事故 2）。
+- **配置字段的语义与面板开关的真实行为**：`SETTINGS_DEFS` 的 `within` 到底指向哪个配置块、label 与行为是否一致 —— E.3 事故 1 是纯语义漂移，任何数字比对都抓不到。
+- **9.3 表格的「写盘 / 写前快照」列、`POST_BODY_FIELDS` 登记、缓存规则**（`worker/index.mjs` 与 `public/_headers` 的 `Cache-Control`）：脚本不检查。
+- **CSP 是否「该放行的都放行了」**：脚本只保证三处副本一致；漏放行（评论区打不开）与多余放行都发现不了。
+- **设计判断**：这个新功能**应该**有面板入口吗？应该纳入 `PUBLISH_SCOPE` 吗？应该写进 `README.md` 吗？—— 脚本回答不了，只能靠 E.1 的两条自检。
+- **不在本文档里的声明**：`README.md` 的行数 / 章节数、`admin/README.md` 的功能表、面板页签的**实际行为**等，脚本一概不看。
 

@@ -3,6 +3,7 @@
 > **硬性要求**：不要 `git add -A`、不要改 `dist/`、不要动 `public/vendor/giscus-*.mjs`、不要在 `admin/` 里加依赖；提交前跑三条门禁（`tsc --noEmit --isolatedDeclarations`、`biome ci src`、`astro build` 28 页）。
 > 该文档里的路径、字段与路由数都经过实测核对，无法验证的项一律标注「需确认」。
 > 下面是本仓库沿用上游主题的原始说明。**与现状不符处已就地在行内标注「本仓库修正」**（已修：`--isolatedDeclarations`、8 步构建链路、`Firefly-Docs` 目录、`pnpm lint` 目标、部署平台应为 Cloudflare Workers）；未标注的语句仍按上游原样保留，逐条差异见 `docs/PROJECT-CONTEXT.md` 第 2.5 节。
+> **改完功能后的第 4 条门禁**：`pnpm check-docs`（= `node scripts/check-docs-sync.mjs`，零依赖、只读）。**加功能 / 加配置 / 加路由 / 加页签 / 加页面后，必须同步更新 `docs/PROJECT-CONTEXT.md`（附录 E 有「加什么 → 必须同步哪里」清单）以及受影响的面板与 README，否则 `pnpm check-docs` 会失败（退出码 1）。**
 
 # Repository Guidelines
 

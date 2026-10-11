@@ -21,6 +21,7 @@
     "compress-music": "node scripts/compress-music.mjs",
     "format": "biome format --write ./src ./scripts",
     "lint": "biome check --write ./src ./scripts",
+    "check-docs": "node scripts/check-docs-sync.mjs",
     "preinstall": "npx only-allow pnpm",
     "lqips": "npx tsx scripts/generate-lqips.ts",
     "github-cards": "npx tsx scripts/generate-github-card-data.ts"
