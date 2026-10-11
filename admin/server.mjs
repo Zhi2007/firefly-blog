@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
 import { runDoctor } from "./doctor.mjs";
+import { handleFriends, handleFriendsFetch } from "./friends.mjs";
 import { COMPRESS_DIRS, compressImages } from "./media-compress.mjs";
 import { MAX_IMPORT_BYTES, convertToMarkdown } from "./import-doc.mjs";
 import { handleNav } from "./nav.mjs";
@@ -58,6 +59,7 @@ const CONFIG_FILES = [
 	"src/config/announcementConfig.ts",
 	"src/config/announcements.json",
 	"src/config/music-playlist.json",
+	"src/config/friends.json",
 	"src/config/commentConfig.ts",
 	"src/config/analyticsConfig.ts",
 	"src/config/effectsConfig.ts",
@@ -78,6 +80,11 @@ const MEDIA_DIRS = {
 const POSTS_DIR = "src/content/posts";
 // 快照目录（与 backups.mjs 里的 BACKUP_DIR 保持一致），导出 ZIP 时要按它拼路径
 const BACKUP_DIR = "admin-backups";
+
+// /media-file 的读取白名单 = 上面这些媒体目录 + 友链图标目录。
+// 友链图标单独列出来，是因为「友链」页签要显示 public/friends 里的缩略图，
+// 但它**不允许**通过上传/删除接口写入，所以不能塞进 MEDIA_DIRS。
+const MEDIA_READ_DIRS = [...Object.values(MEDIA_DIRS), "public/friends"];
 
 // 音乐压缩脚本的参数白名单：用户只能选这三个动作，命令行参数由服务端拼出来
 const MUSIC_MODES = {
@@ -1241,7 +1248,8 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/media-file": {
-				// 本地试听/预览：把媒体目录里的文件读出来（管理面板不是静态服务器，不能直接开 /assets 路径）
+				// 本地试听/预览：把媒体目录（以及友链图标目录）里的文件读出来
+				// （管理面板不是静态服务器，不能直接开 /assets、/friends 路径）
 				const repoPath = url.searchParams.get("path");
 				if (!repoPath) {
 					sendJson(res, 400, { error: "只能读取媒体目录里的文件" });
@@ -1249,7 +1257,7 @@ const server = createServer(async (req, res) => {
 				}
 				let file;
 				try {
-					file = resolveInside(repoPath, Object.values(MEDIA_DIRS));
+					file = resolveInside(repoPath, MEDIA_READ_DIRS);
 				} catch {
 					sendJson(res, 400, { error: "只能读取媒体目录里的文件" });
 					return;
@@ -1271,6 +1279,9 @@ const server = createServer(async (req, res) => {
 					".jpeg": "image/jpeg",
 					".webp": "image/webp",
 					".gif": "image/gif",
+					// 友链图标常见这两种：svg 走 <img> 加载不会执行脚本，ico 直接按图标类型返回
+					".svg": "image/svg+xml",
+					".ico": "image/x-icon",
 					".lrc": "text/plain; charset=utf-8",
 				};
 				const headers = {
@@ -1507,6 +1518,30 @@ const server = createServer(async (req, res) => {
 					snapshotBefore,
 				});
 				sendJson(res, navResult.status, navResult.payload);
+				return;
+			}
+
+			case "/api/friends": {
+				// 友链的增删改排序：只读写 src/config/friends.json（不改 TS 源码）
+				const friendsResult = await handleFriends({
+					repoRoot: REPO_ROOT,
+					method: req.method,
+					body,
+					snapshotBefore,
+				});
+				sendJson(res, friendsResult.status, friendsResult.payload);
+				return;
+			}
+
+			case "/api/friends-fetch": {
+				// 抓取目标站点猜标题 / 简介 / 图标：会联网，但**不写 friends.json**，
+				// 结果只回给前端填表单，由人确认后再走 /api/friends 保存
+				if (req.method !== "POST") {
+					sendJson(res, 405, { error: "请用 POST 调用 /api/friends-fetch" });
+					return;
+				}
+				const fetchResult = await handleFriendsFetch({ repoRoot: REPO_ROOT, body });
+				sendJson(res, fetchResult.status, fetchResult.payload);
 				return;
 			}
 

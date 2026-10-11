@@ -143,6 +143,16 @@
 			.ci-ok { color: var(--ok); font-weight: 700; }
 			.nav-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 			.nav-row .nav-label { flex: 1; min-width: 160px; }
+			.friend-icon {
+				width: 34px; height: 34px; border-radius: 8px; object-fit: cover; display: block;
+				background: rgba(127,127,127,.15); border: 1px solid var(--border);
+			}
+			.friend-icon.broken { opacity: .25; }
+			.friend-fetch-warn { margin-top: 8px; }
+			.friend-fetch-warn ul { margin: 6px 0 0; padding-left: 18px; }
+			.friend-fetch-warn li { color: var(--warn); font-size: 12px; margin-bottom: 2px; }
+			#friendsBody td { vertical-align: middle; }
+			#friendsBody .friend-ops { white-space: nowrap; }
 			#webpTable td, #webpTable th { font-size: 12px; }
 			[data-drop-dir] { position: relative; }
 			[data-drop-dir].drag-target { outline: 2px dashed var(--primary); outline-offset: 2px; }
@@ -165,6 +175,7 @@
 			<button data-tab="posts">文章</button>
 			<button data-tab="announce">公告</button>
 			<button data-tab="music">音乐</button>
+			<button data-tab="friends">友链</button>
 			<button data-tab="media">媒体</button>
 			<button data-tab="config">配置</button>
 			<button data-tab="settings">站点设置</button>
@@ -403,6 +414,69 @@
 						<b>会直接重写音频文件</b>（原地覆盖，不进 git 历史），执行前请先勾选「先试算」确认影响范围；压缩后需要到「发布」页推送才会生效。
 					</div>
 					<pre class="log" id="musicCompressOutput">（还没有执行过压缩）</pre>
+				</div>
+			</section>
+
+			<!-- 友链 -->
+			<section class="panel" id="panel-friends">
+				<div class="card">
+					<h2>从网址抓取</h2>
+					<div class="hint">
+						填对方站点首页，面板会去抓 <code>og:title</code> / <code>&lt;title&gt;</code>、简介和图标，
+						<b>只填进下面的表单，不会自动保存</b>，请确认无误后再点「保存」。
+						抓取只访问公网 http(s) 地址（本机 / 内网会被拒绝），15 秒超时、最大 3 MB。
+					</div>
+					<div class="row" style="margin-top:10px">
+						<input id="frFetchUrl" placeholder="https://friend-site.com/" style="flex:1;min-width:260px" />
+						<button class="action" id="btnFriendFetch">从网址抓取</button>
+					</div>
+					<div class="friend-fetch-warn" id="frFetchWarnings"></div>
+				</div>
+
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">友链列表</h2>
+						<span class="muted small">列表顺序 = 面板里的管理顺序（页面上按权重排序，权重大的靠前）</span>
+						<span style="flex:1"></span>
+						<button class="action" id="btnNewFriend">新增友链</button>
+					</div>
+					<table>
+						<thead>
+							<tr><th style="width:44px">#</th><th style="width:52px">图标</th><th>站名 / 简介</th><th>网址</th><th style="width:70px">权重</th><th style="width:70px">显示</th><th style="width:240px">操作</th></tr>
+						</thead>
+						<tbody id="friendsBody"></tbody>
+					</table>
+					<div class="hint" id="friendsCount"></div>
+				</div>
+
+				<div class="card" id="friendEditor" style="display:none">
+					<div class="row">
+						<h2 style="margin:0" id="friendEditorTitle">编辑友链</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnCancelFriend">取消</button>
+						<button class="action danger" id="btnDeleteFriend">删除</button>
+						<button class="action" id="btnSaveFriend">保存</button>
+					</div>
+					<div class="grid" style="margin-top:12px">
+						<div><label>站名（最多 60 字）</label><input id="frTitle" /></div>
+						<div><label>站点链接（http / https）</label><input id="frSiteurl" placeholder="https://friend-site.com/" /></div>
+						<div><label>头像（站内路径 /friends/xxx.png 或图片直链）</label><input id="frImgurl" placeholder="/friends/xxx.png" /></div>
+						<div><label>标签（逗号分隔，最多 4 个、每个 ≤12 字）</label><input id="frTags" placeholder="友链, 博客" /></div>
+						<div><label>权重（-999 ~ 999 的整数，越大越靠前）</label><input id="frWeight" type="number" min="-999" max="999" step="1" value="0" /></div>
+						<div style="display:flex;align-items:flex-end">
+							<label style="display:flex;gap:6px;align-items:center;margin:0">
+								<input type="checkbox" id="frEnabled" style="width:auto" checked /> 在友链页显示
+							</label>
+						</div>
+					</div>
+					<div style="margin-top:10px">
+						<label>简介（最多 120 字）</label>
+						<textarea id="frDesc" rows="3"></textarea>
+					</div>
+					<div class="row" style="margin-top:8px">
+						<img id="frPreview" class="friend-icon" alt="" style="display:none" />
+						<span class="muted small" id="frPreviewHint">填写头像后会在这里预览</span>
+					</div>
 				</div>
 			</section>
 
@@ -1543,6 +1617,7 @@
 					if (btn.dataset.tab === "posts") await loadPosts();
 					if (btn.dataset.tab === "announce") await loadAnnouncements();
 					if (btn.dataset.tab === "music") await loadPlaylist();
+					if (btn.dataset.tab === "friends") await loadFriends();
 					if (btn.dataset.tab === "media") await loadMedia();
 					if (btn.dataset.tab === "config") await loadConfigList();
 					if (btn.dataset.tab === "settings") {
@@ -2295,6 +2370,228 @@
 				}
 				await loadMedia();
 			}
+
+			// ── 友链 ───────────────────────────────────────────────────────
+			// 数据存在 src/config/friends.json，后端负责校验 + 快照 + 读回校验；
+			// 前端这边只做「填表 / 确认」，所有拼进 DOM 的值一律 escapeHtml
+			// （站名、简介都可能带引号和尖括号）。
+			let friendCache = [];
+			let friendIndex = -1;
+			const FRIEND_SAVED_HINT = "已保存，去「发布」页推送即可上线";
+
+			/** 头像地址 → <img src>：站内路径走后端只读预览，外链直连 */
+			function friendIconSrc(url) {
+				const text = String(url || "").trim();
+				if (!text) return "";
+				if (text.startsWith("/")) {
+					return `/media-file?token=${TOKEN}&path=${encodeURIComponent(publicToRepo(text))}`;
+				}
+				return safeUrl(text);
+			}
+
+			/** 列表里的缩略图；加载失败只降低透明度，不弹错误 */
+			function friendIconTag(url) {
+				const src = friendIconSrc(url);
+				if (!src) return '<span class="muted small">无</span>';
+				return `<img class="friend-icon" src="${escapeHtml(src)}" alt="" loading="lazy" onerror="this.classList.add('broken')" />`;
+			}
+
+			async function loadFriends() {
+				try {
+					const { items } = await api("/api/friends");
+					friendCache = items;
+					$("friendsBody").innerHTML = items.length
+						? items
+								.map(
+									(item, i) => `<tr>
+										<td class="muted small">${i + 1}</td>
+										<td>${friendIconTag(item.imgurl)}</td>
+										<td>${escapeHtml(item.title)}<div class="muted small">${escapeHtml(item.desc || "（没有简介）")}</div>${
+											(item.tags || []).length
+												? `<div>${item.tags.map((t) => `<span class="tag">${escapeHtml(String(t))}</span>`).join("")}</div>`
+												: ""
+										}</td>
+										<td class="small">${escapeHtml(item.siteurl)}</td>
+										<td class="small">${escapeHtml(String(item.weight))}</td>
+										<td>${item.enabled ? "✅" : '<span class="muted">停用</span>'}</td>
+										<td class="friend-ops">
+											<button class="action ghost" data-fr="up" data-i="${i}" ${i === 0 ? "disabled" : ""} title="上移">↑</button>
+											<button class="action ghost" data-fr="down" data-i="${i}" ${i === items.length - 1 ? "disabled" : ""} title="下移">↓</button>
+											<button class="action ghost" data-fr="toggle" data-i="${i}">${item.enabled ? "停用" : "启用"}</button>
+											<button class="action ghost" data-fr="edit" data-i="${i}">编辑</button>
+											<button class="action danger" data-fr="delete" data-i="${i}">删除</button>
+										</td>
+									</tr>`,
+								)
+								.join("")
+						: '<tr><td colspan="7" class="muted">还没有友链，点右上角「新增友链」</td></tr>';
+					$("friendsCount").textContent = `共 ${items.length} 条（上限 200 条）；启用 ${items.filter((i) => i.enabled).length} 条。页面上按权重从大到小排序。`;
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			/**
+			 * 统一提交：成功就用后端返回的列表刷新界面。
+			 * @param prefix 自定义提示前缀（省略则直接用后端返回的完整提示）
+			 */
+			async function friendPost(body, prefix) {
+				const result = await api("/api/friends", { method: "POST", body });
+				friendCache = result.items;
+				toast(prefix ? `${prefix}；${FRIEND_SAVED_HINT}` : result.message, "ok");
+				await loadFriends();
+				await loadDiff();
+				scheduleAutoPublish("feat: 更新友链");
+				return result;
+			}
+
+			function updateFriendPreview() {
+				const src = friendIconSrc($("frImgurl").value);
+				const img = $("frPreview");
+				if (!src) {
+					img.style.display = "none";
+					$("frPreviewHint").style.display = "";
+					return;
+				}
+				img.src = src;
+				img.style.display = "";
+				$("frPreviewHint").style.display = "none";
+			}
+
+			function openFriend(index) {
+				friendIndex = index;
+				const item = friendCache[index] || {};
+				$("frTitle").value = item.title || "";
+				$("frSiteurl").value = item.siteurl || "";
+				$("frDesc").value = item.desc || "";
+				$("frImgurl").value = item.imgurl || "";
+				$("frTags").value = Array.isArray(item.tags) ? item.tags.join(", ") : "";
+				$("frWeight").value = Number.isFinite(Number(item.weight)) ? Number(item.weight) : 0;
+				$("frEnabled").checked = item.enabled !== false;
+				$("friendEditor").style.display = "";
+				$("friendEditorTitle").textContent = index >= 0 ? `编辑友链：${item.title || ""}` : "新增友链";
+				$("btnDeleteFriend").style.display = index >= 0 ? "" : "none";
+				updateFriendPreview();
+				$("friendEditor").scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+
+			/** 收集表单；权重不是整数时直接返回 null（后端也会拦，但没必要跑一趟） */
+			function currentFriend() {
+				const weightText = $("frWeight").value.trim();
+				const weight = weightText === "" ? 0 : Number(weightText);
+				if (!Number.isInteger(weight)) {
+					toast("权重必须是 -999 ~ 999 之间的整数", "err");
+					return null;
+				}
+				return {
+					title: $("frTitle").value.trim(),
+					siteurl: $("frSiteurl").value.trim(),
+					desc: $("frDesc").value.trim(),
+					imgurl: $("frImgurl").value.trim(),
+					tags: $("frTags")
+						.value.split(",")
+						.map((t) => t.trim())
+						.filter(Boolean),
+					weight,
+					enabled: $("frEnabled").checked,
+				};
+			}
+
+			async function saveFriend() {
+				const item = currentFriend();
+				if (!item) return;
+				const body = friendIndex >= 0 ? { action: "update", index: friendIndex, item } : { action: "add", item };
+				try {
+					await friendPost(body);
+					friendIndex = -1;
+					$("friendEditor").style.display = "none";
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			/** 删除一定要二次确认：删错了虽然能恢复快照，但也要人工去备份页翻 */
+			async function deleteFriend(index) {
+				const item = friendCache[index] || {};
+				if (!confirm(`确定删除友链「${item.title || ""}」？\n\n删除前会自动快照备份，万一删错可以去「体检 / 备份」页恢复。`)) return;
+				try {
+					await friendPost({ action: "delete", index }, `已删除「${item.title || ""}」`);
+					if (friendIndex === index) {
+						friendIndex = -1;
+						$("friendEditor").style.display = "none";
+					} else if (friendIndex > index) {
+						friendIndex -= 1;
+					}
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			/** 抓取只填表单、不保存：猜出来的标题/简介必须让人过一眼 */
+			async function fetchFriendInfo() {
+				const url = $("frFetchUrl").value.trim();
+				if (!url) {
+					toast("先填一个要抓取的网址", "err");
+					return;
+				}
+				const box = $("frFetchWarnings");
+				box.innerHTML = '<div class="muted small">正在抓取…（最多等 15 秒）</div>';
+				$("btnFriendFetch").disabled = true;
+				try {
+					const data = await api("/api/friends-fetch", { method: "POST", body: { url } });
+					if ($("friendEditor").style.display === "none") openFriend(-1);
+					if (data.url) $("frSiteurl").value = data.url;
+					if (data.title) $("frTitle").value = data.title;
+					if (data.desc) $("frDesc").value = data.desc;
+					if (data.iconPath) $("frImgurl").value = data.iconPath;
+					else if (data.iconUrl) $("frImgurl").value = data.iconUrl;
+					updateFriendPreview();
+					const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+					box.innerHTML = [
+						`<div class="small" style="color:var(--ok)">已抓取（页面编码 ${escapeHtml(String(data.charset || "utf-8"))}）。请检查后再点「保存」，不会自动写入。</div>`,
+						warnings.length
+							? `<ul>${warnings.map((w) => `<li>${escapeHtml(String(w))}</li>`).join("")}</ul>`
+							: "",
+					].join("");
+				} catch (error) {
+					box.innerHTML = `<div class="ci-fail small">抓取失败：${escapeHtml(error.message)}</div>`;
+				} finally {
+					$("btnFriendFetch").disabled = false;
+				}
+			}
+
+			$("friendsBody").addEventListener("click", (event) => {
+				const button = event.target instanceof Element ? event.target.closest("button[data-fr]") : null;
+				if (!button) return;
+				const index = Number(button.dataset.i);
+				const action = button.dataset.fr;
+				if (action === "edit") return void openFriend(index);
+				if (action === "delete") return void deleteFriend(index);
+				if (action === "up" || action === "down") {
+					void friendPost({ action: "move", index, direction: action }, "顺序已调整").catch((error) =>
+						toast(error.message, "err"),
+					);
+					return;
+				}
+				if (action === "toggle") {
+					void friendPost(
+						{ action: "toggle", index, enabled: !(friendCache[index] && friendCache[index].enabled) },
+						"已切换显示状态",
+					).catch((error) => toast(error.message, "err"));
+				}
+			});
+			$("btnNewFriend").addEventListener("click", () => openFriend(-1));
+			$("btnCancelFriend").addEventListener("click", () => {
+				friendIndex = -1;
+				$("friendEditor").style.display = "none";
+			});
+			$("btnSaveFriend").addEventListener("click", saveFriend);
+			$("btnDeleteFriend").addEventListener("click", () => void deleteFriend(friendIndex));
+			$("btnFriendFetch").addEventListener("click", fetchFriendInfo);
+			$("frFetchUrl").addEventListener("keydown", (event) => {
+				if (event.key === "Enter") void fetchFriendInfo();
+			});
+			$("frImgurl").addEventListener("input", updateFriendPreview);
 
 			// ── 自动同步（保存后自动 commit + push） ────────────────────────
 			let autoPublishTimer = null;
