@@ -1,0 +1,42 @@
+[
+	{
+		"domain": "www.pandadatech.cn",
+		"name": "PanDaTech's Blog",
+		"desc": "PanDaTech's Blog - &#24895;&#27492;&#34892;&#65292;&#32456;&#25269;&#32676;&#26143;&#12290",
+		"avatar": "",
+		"canonical": "https://www.pandadatech.cn/",
+		"file": "PanDaTech's Blog.html"
+	},
+	{
+		"domain": "www.91biu.work",
+		"name": "噗呲先生",
+		"desc": "site.seo.description",
+		"avatar": "",
+		"canonical": "${site.url}",
+		"file": "噗呲先生 - 差生工具多.html"
+	},
+	{
+		"domain": "osu.ppy.sh",
+		"name": "osu!",
+		"desc": "osu! - 节奏跃然指上！内含来自「押忍！战斗应援团」、「精英节拍特工」、「太鼓达人」及原创的 osu! 游戏玩法，更有全功能谱面编辑器等你来创作。",
+		"avatar": "/friends/osu-ppy-sh.png",
+		"canonical": "",
+		"file": "欢迎_ _ _osu!_.html"
+	},
+	{
+		"domain": "moliranran.com:5245",
+		"name": "莫离然然资源站",
+		"desc": "",
+		"avatar": "",
+		"canonical": "",
+		"file": "首页 _ 莫离然然资源站.html"
+	},
+	{
+		"domain": "www.yhcres.top",
+		"name": "萤火虫资源站",
+		"desc": "萤火虫资源站，原酷米基地，提供多达22TB+的安卓玩机资源，包括各品牌手机的官方固件、第三方ROM、内核、TWRP、救砖包等。分类明确，免登录不限速下载。",
+		"avatar": "/friends/yhcres-top.png",
+		"canonical": "",
+		"file": "首页 _ 萤火虫资源站.html"
+	}
+]
