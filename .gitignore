@@ -16,6 +16,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# 「重建依赖.cmd」等本地脚本的运行日志（只留在本机，不提交也不发布）
+logs/
+
 # 管理面板的本地快照备份（只留在本机，不提交也不发布）
 admin-backups/
 
