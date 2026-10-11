@@ -51,8 +51,15 @@ if (pnpmMatch) {
 	pnpmVersion = `v${pnpmMatch[1]}`;
 }
 
-// 构建时间
-const buildTime = formatDateI18nWithTime(new Date());
+// 构建时间：优先用 SOURCE_DATE_EPOCH（可复现构建的通用约定，CI 里通常由构建系统给出），
+// 没设置时回退到当前时间（保持原来的行为）。
+// 页面可见的「构建时间」信息本身不变，只是允许外部把它钉死，从而让两次构建逐字节一致。
+const sourceDateEpoch = Number(process.env.SOURCE_DATE_EPOCH);
+const buildDate =
+	Number.isFinite(sourceDateEpoch) && sourceDateEpoch > 0
+		? new Date(sourceDateEpoch * 1000)
+		: new Date();
+const buildTime = formatDateI18nWithTime(buildDate);
 
 // 构建平台检测（使用 ci-info 自动识别 CI 环境）
 const unknownBuildPlatform =

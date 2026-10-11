@@ -52,6 +52,90 @@ export function summarizeConclusion(checks) {
 }
 
 /**
+ * 从「某次提交的 workflow runs」归并出一条结论。
+ *
+ * 和 summarizeConclusion（check-run 版）的区别：Actions 的 workflow run 会明确给出
+ * cancelled / skipped，这里如实映射。但**绝不把 cancelled 当成失败**——
+ * FAILURE_CONCLUSIONS 里没有 cancelled，所以 lastFailure 不会被一次手动取消挂住。
+ */
+export function conclusionFromWorkflowRuns(workflowRuns) {
+	const runs = Array.isArray(workflowRuns) ? workflowRuns.filter((run) => run && typeof run === "object") : [];
+	if (runs.length === 0) return "unknown";
+	const conclusions = runs
+		.map((run) => (typeof run.conclusion === "string" ? run.conclusion : ""))
+		.filter(Boolean);
+	if (conclusions.length === 0) return "pending"; // 都还在跑
+	if (conclusions.some((c) => FAILURE_CONCLUSIONS.has(c))) return "failure";
+	if (conclusions.every((c) => c === "success")) return "success";
+	// 只剩 cancelled / skipped / neutral 这类「非失败也非成功」的结论
+	if (conclusions.some((c) => c === "cancelled")) {
+		return conclusions.some((c) => c === "success") ? "success" : "cancelled";
+	}
+	return "pending";
+}
+
+/**
+ * 从「某次提交的 workflow runs」归并出 status 字段。
+ * 刻意不再用 "pending" 表示「查不到」：查询失败/限流时前端会把它显示成「进行中」，
+ * 让人误以为有构建在排队。查不到就是 unknown（限流时调用方会改成 rate_limited）。
+ */
+export function statusFromWorkflowRuns(workflowRuns) {
+	const runs = Array.isArray(workflowRuns) ? workflowRuns.filter((run) => run && typeof run === "object") : [];
+	if (runs.length === 0) return "unknown";
+	if (runs.every((run) => run.status === "completed")) return "completed";
+	const pending = runs.find((run) => typeof run.status === "string" && run.status !== "completed");
+	return pending ? pending.status : "unknown";
+}
+
+/** 按 head_sha 把 workflow runs 分组（同一个提交可能有多个 workflow） */
+export function groupWorkflowRunsBySha(workflowRuns) {
+	const map = new Map();
+	for (const run of Array.isArray(workflowRuns) ? workflowRuns : []) {
+		if (!run || typeof run !== "object") continue;
+		const sha = typeof run.head_sha === "string" ? run.head_sha : "";
+		if (!sha) continue;
+		const list = map.get(sha);
+		if (list) list.push(run);
+		else map.set(sha, [run]);
+	}
+	return map;
+}
+
+/** 这个请求结果是不是「GitHub 匿名配额被限流」（403 / 429 或 x-ratelimit-remaining: 0） */
+export function isRateLimitedResponse(result) {
+	if (!result || typeof result !== "object") return false;
+	const status = Number(result.status) || 0;
+	if (status === 403 || status === 429) return true;
+	const remaining = result.rateLimit?.remaining;
+	return remaining !== null && remaining !== undefined && Number(remaining) === 0;
+}
+
+/**
+ * 限流提示文案（中文、简短）。GitHub 会给出 x-ratelimit-reset（Unix 秒），
+ * 能算出「约 X 分钟后重试」就直接写出来。
+ */
+export function rateLimitWarning(result, now = Date.now()) {
+	const resetSeconds = Number(result?.rateLimit?.reset);
+	if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
+		const minutes = Math.max(1, Math.ceil((resetSeconds * 1000 - now) / 60000));
+		return `GitHub 匿名接口限流中，请约 ${minutes} 分钟后重试`;
+	}
+	return "GitHub 匿名接口限流中，请稍后重试";
+}
+
+/** 从响应头里挑出跟配额有关的两项（其余响应头不留） */
+function readRateLimit(headers) {
+	if (!headers || typeof headers.get !== "function") return null;
+	const remaining = headers.get("x-ratelimit-remaining");
+	const reset = headers.get("x-ratelimit-reset");
+	if (remaining === null && reset === null) return null;
+	return {
+		remaining: remaining === null ? null : Number(remaining),
+		reset: reset === null ? null : Number(reset),
+	};
+}
+
+/**
  * 从 check-run 的 details_url 里取出 Actions 运行 id。
  * 真实形态：https://github.com/<o>/<r>/actions/runs/123456789/job/987654321
  * 取不到（空值 / 不是这种链接 / id 不是数字）一律返回 ""，调用方据此降级。
@@ -100,8 +184,7 @@ export function pickFailingSteps(jobsJson) {
 	return names;
 }
 
-/** 取第一行有效文本并压平空白（GitHub 的 title/summary 常带换行与 markdown），过长则截断 */
-export function firstLine(text, maxLength = 200) {
+/** 取第一行有效文本并压平空白（GitHub 的 title/summary 常带换行与 markdown），过长则截断 */export function firstLine(text, maxLength = 200) {
 	if (typeof text !== "string") return "";
 	const line =
 		text
@@ -189,8 +272,7 @@ export function summarizeFailure(checkRun, jobsJson, options = {}) {
 /**
  * 把「某次运行的条目」与失败详情合成 /api/ci 的 lastFailure。
  * 运行条目（sha/status/createdAt/message…）优先，详情提供 checkName / runUrl / failingSteps / reason / logExcerpt。
- */
-export function describeFailure(runEntry, checkRun, jobsJson, options = {}) {
+ */export function describeFailure(runEntry, checkRun, jobsJson, options = {}) {
 	const run = runEntry && typeof runEntry === "object" ? runEntry : {};
 	const detail = summarizeFailure(checkRun, jobsJson, options);
 	const sha = String(run.sha || checkRun?.head_sha || "");
@@ -265,7 +347,15 @@ export async function fetchWithCache(url, options = {}) {
 
 	if (!res || !res.ok) {
 		const status = Number(res?.status) || 0;
-		return { ok: false, status, data: null, error: `GitHub 返回 ${status}`, cached: false };
+		return {
+			ok: false,
+			status,
+			data: null,
+			error: `GitHub 返回 ${status}`,
+			// 限流要靠响应头判断（403 也可能是别的权限问题，x-ratelimit-remaining: 0 才是铁证）
+			rateLimit: readRateLimit(res?.headers),
+			cached: false,
+		};
 	}
 
 	let data = null;
@@ -282,7 +372,7 @@ export async function fetchWithCache(url, options = {}) {
 		return { ok: false, status: Number(res.status) || 0, data: null, error: `读取响应失败：${error?.message ?? String(error)}`, cached: false };
 	}
 
-	const value = { ok: true, status: Number(res.status) || 200, data, error: "" };
+	const value = { ok: true, status: Number(res.status) || 200, data, error: "", rateLimit: readRateLimit(res.headers) };
 	remember(key, value, ttlMs);
 	return { ...value, cached: false };
 }

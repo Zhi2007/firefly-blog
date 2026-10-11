@@ -737,6 +737,18 @@
 				if (/^(https?:)?\/\//i.test(text) || text.startsWith("/")) return text;
 				return "";
 			}
+
+			/**
+			 * Markdown 链接地址过滤。
+			 * 为什么要先去掉空白与控制字符：浏览器解析 href 时会忽略它们，
+			 * `java\nscript:alert(1)`、`  javascript:` 这类混淆写法照样会执行。
+			 * 非法协议一律返回 ""，由调用方退化成纯文本。
+			 */
+			function safeMarkdownUrl(url) {
+				const probe = String(url ?? "").replace(/[\s\u0000-\u001f\u007f]/g, "");
+				if (/^(?:javascript|vbscript|data|file|blob):/i.test(probe)) return "";
+				return safeUrl(url);
+			}
 			function renderMarkdown(markdown) {
 				const blocks = [];
 				let text = escapeHtml(markdown).replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
@@ -753,7 +765,11 @@
 					.replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>")
 					.replace(/^---$/gm, "<hr />")
 					.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-					.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+					.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (whole, label, url) => {
+						// 非法协议（javascript: / data: / vbscript: …）退化成纯文本，不给可点的链接
+						const href = safeMarkdownUrl(url);
+						return href ? `<a href="${href}" target="_blank" rel="noopener">${label}</a>` : label;
+					})
 					.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
 					.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
 					.replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -1202,14 +1218,15 @@
 			let ciDismissedSha = null;
 
 			// 契约：conclusion 为 success | failure | cancelled | null（null=还在跑）；
-			// 后端另外会返回 pending / unknown（查不到 check-runs），一并兜住。
+			// 后端另外会返回 pending / unknown（查不到运行记录）/ rate_limited（GitHub 限流），一并兜住。
 			const CI_LABEL = {
 				success: "✅ 成功",
 				failure: "❌ 失败",
 				cancelled: "⏳ 已取消",
 				pending: "⏳ 进行中",
+				rate_limited: "⏳ 限流中",
 			};
-			const CI_ICON = { success: "✅", failure: "❌", cancelled: "⏳", pending: "⏳" };
+			const CI_ICON = { success: "✅", failure: "❌", cancelled: "⏳", pending: "⏳", rate_limited: "⏳" };
 
 			/** CI 链接优先用后端解析出的「那次 Actions 运行」地址（runUrl），退回 check-run 的 html_url */
 			function actionsRunUrl(run) {
@@ -1288,10 +1305,29 @@
 					</div>`;
 			}
 
+			/**
+			 * 限流横幅：GitHub 匿名配额用光时 /api/ci 会返回 rateLimited，
+			 * 这时**不能**把「查不到状态」渲染成「CI 部署失败」，也不能显示成「进行中」，
+			 * 就明确说一句「限流中，请稍后重试」。
+			 */
+			function ciRateLimitBlock(warning) {
+				const text = String(warning || "").trim() || "GitHub 匿名接口限流中，请稍后重试";
+				return `<div class="banner-title">⏳ CI 状态暂时查不到：${escapeHtml(text)}</div>`;
+			}
+
 			/** 渲染失败横幅：页面顶部（所有页签可见）+ 体检页顶部 */
 			function renderCiBanner() {
 				const bannerEl = $("ciBanner");
 				const topEl = $("topBanner");
+				// 限流优先：配额用光时连结论都拿不到，任何"失败/成功"的判断都没有依据
+				if (ciCache && ciCache.rateLimited === true) {
+					const block = ciRateLimitBlock(ciCache.warning);
+					bannerEl.innerHTML = block;
+					bannerEl.classList.toggle("show", true);
+					topEl.innerHTML = block;
+					topEl.classList.toggle("show", true);
+					return;
+				}
 				const failed = currentCiFailure();
 				// 失败信号变化时重新展示（用户手动关掉后不再反复弹）
 				if (failed && failed.sha !== ciKnownFailureSha) {
