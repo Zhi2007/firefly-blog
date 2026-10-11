@@ -130,8 +130,15 @@ function onKeydown(event: KeyboardEvent) {
 let touchStartX = 0;
 let touchStartY = 0;
 let touching = false;
+// 本次手势是否已被判定为「翻页滑动」：判定成功的那一下要吃掉随后浏览器补发的
+// click，否则横向拖过条目会顺手把用户带走（明明是想翻页）。
+// 用一次性标志而不是「一直禁用」：一次手势只影响它自己补发的那一次 click，
+// 下一次真正的点按仍然正常跳转 —— 避免链接出现「点不动」的死区。
+let swipeSettled = false;
 
 function onTouchStart(event: TouchEvent) {
+	// 新手势开始，先清掉上一轮可能残留的抑制标志
+	swipeSettled = false;
 	if (!swipe || totalPages <= 1) return;
 	const touch = event.touches[0];
 	if (!touch) return;
@@ -151,8 +158,17 @@ function onTouchEnd(event: TouchEvent) {
 		FEATURE_TOUR_SWIPE_THRESHOLD_PX,
 	);
 	if (!direction) return;
+	// 够格的水平滑动 = 翻页，不是点击
+	swipeSettled = true;
 	autoplayStopped = true;
 	goAdjacent(direction);
+}
+
+// 滑动刚结束的那次 click 直接吞掉；横向拖动因此永远不会触发跳转
+function onItemClick(event: MouseEvent) {
+	if (!swipeSettled) return;
+	swipeSettled = false;
+	event.preventDefault();
 }
 </script>
 
@@ -185,21 +201,26 @@ function onTouchEnd(event: TouchEvent) {
       {#each currentPage.items as item (item.name)}
         <li>
           {#if item.href}
+            <!-- 有 href 才渲染成真链接：键盘可 Tab 聚焦、可读文本就是条目标题+简介，
+                 不额外加 aria-label（否则会盖掉可读文本）。无 href 的条目走下面的普通文本分支，
+                 绝不渲染成假链接（半可点的卡片比不可点更糟）。 -->
             <a
               href={item.href}
               target={item.href.startsWith("http") ? "_blank" : undefined}
               rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
               class="feature-tour-item group -mx-2 flex items-baseline gap-2.5 rounded-lg px-2 py-1.5"
+              onclick={onItemClick}
             >
               <span class="feature-tour-bullet mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"></span>
-              <span class="min-w-0">
-                <span class="block text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <span class="flex min-w-0 flex-1 flex-col">
+                <span class="feature-tour-name block text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                   {item.name}
                 </span>
                 <span class="block text-xs leading-relaxed text-neutral-600 dark:text-neutral-300">
                   {item.desc}
                 </span>
               </span>
+              <span class="feature-tour-arrow shrink-0 text-xs" aria-hidden="true">→</span>
             </a>
           {:else}
             <div class="flex items-baseline gap-2.5 px-2 py-1.5">
@@ -294,8 +315,38 @@ function onTouchEnd(event: TouchEvent) {
     background-color: var(--btn-plain-bg-hover);
   }
 
-  .feature-tour-item:hover :global(.text-sm) {
+  /* 有 href 的条目给「可点」的可见反馈：标题跟随主题色 + 出现一个指向右侧的箭头。
+     箭头只为鼠标/触控板准备，默认透明且 aria-hidden，不进入无障碍树。 */
+  .feature-tour-item:hover .feature-tour-name,
+  .feature-tour-item:focus-visible .feature-tour-name {
     color: var(--primary);
+  }
+
+  .feature-tour-arrow {
+    margin-left: auto;
+    opacity: 0;
+    transform: translateX(-2px);
+    transition:
+      opacity 150ms ease-out,
+      transform 150ms ease-out;
+  }
+
+  @media (hover: hover) {
+    .feature-tour-item:hover .feature-tour-arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* 键盘焦点必须看得见：用主题色描边 + 偏移，不改变条目尺寸（不触发重排） */
+  .feature-tour-item:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  .feature-tour-item:focus-visible .feature-tour-arrow {
+    opacity: 1;
+    transform: translateX(0);
   }
 
   .feature-tour-nav {

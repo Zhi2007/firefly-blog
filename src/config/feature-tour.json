@@ -12,11 +12,13 @@
 			"items": [
 				{
 					"name": "目录导航",
-					"desc": "长文自动生成目录，桌面端悬浮球随时展开，点标题就能跳到对应章节。"
+					"desc": "长文自动生成目录，桌面端悬浮球随时展开，点标题就能跳到对应章节。",
+					"href": "/posts/markdown-cheatsheet/#sidebar-toc"
 				},
 				{
 					"name": "代码块增强",
-					"desc": "Expressive Code 高亮、语言徽章、可折叠代码块与一键复制。"
+					"desc": "Expressive Code 高亮、语言徽章、可折叠代码块与一键复制。",
+					"href": "/posts/markdown-cheatsheet/"
 				},
 				{
 					"name": "数学公式",
@@ -34,19 +36,23 @@
 			"items": [
 				{
 					"name": "视图设置面板",
-					"desc": "调主题色、亮暗模式、文章列表布局、卡片边框与全屏壁纸参数。"
+					"desc": "调主题色、亮暗模式、文章列表布局、卡片边框与全屏壁纸参数。",
+					"href": "/#display-settings-switch"
 				},
 				{
 					"name": "特效开关",
-					"desc": "毛玻璃、渐变、水波纹、樱花特效都能一键关掉，方便低配设备。"
+					"desc": "毛玻璃、渐变、水波纹、樱花特效都能一键关掉，方便低配设备。",
+					"href": "/#display-settings-switch"
 				},
 				{
 					"name": "音乐播放器",
-					"desc": "左下角悬浮播放器，内置本地歌单、封面与滚动歌词，可收起成小圆钮。"
+					"desc": "左下角悬浮播放器，内置本地歌单、封面与滚动歌词，可收起成小圆钮。",
+					"href": "/#floating-music-player"
 				},
 				{
 					"name": "公告与首访弹窗",
-					"desc": "站点公告固定在公告页，发布新公告时可选择让访客首访弹窗看一次。"
+					"desc": "站点公告固定在公告页，发布新公告时可选择让访客首访弹窗看一次。",
+					"href": "/announcement/"
 				}
 			]
 		},
@@ -56,15 +62,18 @@
 			"items": [
 				{
 					"name": "评论系统",
-					"desc": "Giscus 把评论存在 GitHub Discussions，支持亮暗主题与懒加载。"
+					"desc": "Giscus 把评论存在 GitHub Discussions，支持亮暗主题与懒加载。",
+					"href": "/posts/hello-world/#post-comments"
 				},
 				{
 					"name": "站内搜索",
-					"desc": "Pagefind 全站索引，标题、正文、标签都能搜，输入即出结果。"
+					"desc": "Pagefind 全站索引，标题、正文、标签都能搜，输入即出结果。",
+					"href": "/search/"
 				},
 				{
 					"name": "友情链接",
-					"desc": "友链页整页展示朋友站点，图标与简介都写在配置里。"
+					"desc": "友链页整页展示朋友站点，图标与简介都写在配置里。",
+					"href": "/friends/"
 				}
 			]
 		},
@@ -86,7 +95,8 @@
 				},
 				{
 					"name": "置顶与系列",
-					"desc": "pinned 把文章置顶，series + seriesOrder 自动串起系列的下一篇。"
+					"desc": "pinned 把文章置顶，series + seriesOrder 自动串起系列的下一篇。",
+					"href": "/posts/hello-world/"
 				}
 			]
 		},
@@ -101,15 +111,18 @@
 				},
 				{
 					"name": "站点地图",
-					"desc": "构建时生成 sitemap，只收录真正存在的页面，方便搜索引擎收录。"
+					"desc": "构建时生成 sitemap，只收录真正存在的页面，方便搜索引擎收录。",
+					"href": "/sitemap-index.xml"
 				},
 				{
 					"name": "无刷新切页",
-					"desc": "Swup 接管路由，切页有过渡动画，不整页重载。"
+					"desc": "Swup 接管路由，切页有过渡动画，不整页重载。",
+					"href": "/#feature-tour"
 				},
 				{
 					"name": "低配模式",
-					"desc": "配置里开一个开关，就移除全部毛玻璃与装饰性循环动画。"
+					"desc": "配置里开一个开关，就移除全部毛玻璃与装饰性循环动画。",
+					"href": "/#feature-tour"
 				}
 			]
 		}
