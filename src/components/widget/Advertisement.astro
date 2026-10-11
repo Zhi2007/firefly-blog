@@ -1,4 +1,5 @@
 ---
+import { createHash } from "node:crypto";
 import { Icon } from "astro-icon/components";
 import WidgetLayout from "@/components/common/WidgetLayout.astro";
 import I18nKey from "@/i18n/i18nKey";
@@ -51,8 +52,16 @@ const getPaddingStyle = (): string => {
 };
 
 const paddingStyle = getPaddingStyle();
-// 使用随机 ID 避免多个广告实例冲突
-const widgetId = `advertisement-${Math.random().toString(36).slice(2, 8)}`;
+// 使用确定性 id 避免多个广告实例冲突：参与哈希的是「广告自身内容 + 槽位」。
+// 原来用 Math.random 会让同一份配置的两次构建产出不同的 HTML（构建不可复现）；
+// 这个 id 还决定 displayCount 的 localStorage key，所以必须跨页面、跨构建都稳定。
+const adSlotKey = [
+	adConfig.title ?? "",
+	adConfig.image?.src ?? "",
+	adConfig.link?.url ?? "",
+	style ?? "",
+].join("|");
+const widgetId = `advertisement-${createHash("sha1").update(adSlotKey).digest("hex").slice(0, 8)}`;
 // 当配置了自定义 padding 时，禁用 WidgetLayout 默认的 px-4
 const useContentPadding = !adConfig.padding;
 ---

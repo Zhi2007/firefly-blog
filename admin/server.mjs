@@ -26,12 +26,16 @@ import {
 	CI_TIMEOUT_MS,
 	FAILURE_CONCLUSIONS,
 	GITHUB_HEADERS,
+	conclusionFromWorkflowRuns,
 	describeFailure,
 	extractRunId,
 	fetchWithCache,
+	groupWorkflowRunsBySha,
+	isRateLimitedResponse,
 	pickFailingJobs,
 	pickFailingSteps,
-	summarizeConclusion,
+	rateLimitWarning,
+	statusFromWorkflowRuns,
 	tailLines,
 } from "./ci.mjs";
 import { runDoctor } from "./doctor.mjs";
@@ -93,6 +97,10 @@ const MEDIA_DIRS = {
 };
 
 const POSTS_DIR = "src/content/posts";
+// 文章 slug 的唯一合法形态：字母 / 数字 / 点 / 下划线 / 连字符。
+// 它会被拼进 `src/content/posts/<slug>.md`，所以**任何**拼路径的接口都必须先用它卡一遍
+// （只要放行 `/` 或 `..`，就等于允许读写任意外部路径）。
+const POST_SLUG_RE = /^[A-Za-z0-9._-]+$/;
 // 快照目录（与 backups.mjs 里的 BACKUP_DIR 保持一致），导出 ZIP 时要按它拼路径
 const BACKUP_DIR = "admin-backups";
 
@@ -684,35 +692,54 @@ async function latestAction() {
 	}
 }
 
-/** 单个提交的 check-runs：8 秒超时 + 60 秒内存缓存，任何异常都返回空数组（调用方负责降级，不抛错） */
-async function checkRunsFor(owner, repo, sha) {
-	const url = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`;
-	const res = await fetchWithCache(url, {
+/** 一次拉取多少个 Actions 运行：要够覆盖最近 N 个提交（同一提交可能有多个 workflow） */
+const CI_RUNS_PER_PAGE = 20;
+
+/**
+ * 拉一次「本分支最近的 Actions 运行」。
+ *
+ * 之前是**逐个提交**查 `/commits/{sha}/check-runs`：8 个提交 = 8~10 个请求，
+ * GitHub 匿名配额（每小时 60 次）几下就打光了。改成一次列表 + 按 head_sha 归并到本地提交。
+ */
+async function workflowRunsFor(owner, repo, branch, perPage) {
+	const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs?branch=${encodeURIComponent(branch)}&per_page=${perPage}`;
+	return fetchWithCache(url, {
 		ttlMs: CI_CACHE_TTL_MS,
 		timeoutMs: CI_TIMEOUT_MS,
 		headers: GITHUB_HEADERS,
 	});
-	if (!res.ok) return { ok: false, runs: [], error: res.error };
-	const data = res.data;
-	return { ok: true, runs: Array.isArray(data?.check_runs) ? data.check_runs : [], error: "" };
 }
 
 /**
- * 失败详情：details_url → 运行 id → 作业列表 → 失败步骤 → 失败作业日志尾部。
+ * 失败详情：workflow run → 作业列表 → 失败步骤 → 失败作业日志尾部。
  *
  * 每一步都是「尽力而为」：任何一步失败都只往 detailWarning 里写一句中文，
- * 基本字段（sha / conclusion / checkName / detailsUrl / reason）照常返回，
+ * 基本字段（sha / conclusion / checkName / runUrl / reason）照常返回，
  * 所以 /api/ci 永远不会因为详情拿不到而变成 5xx。
  */
-async function failureDetail(owner, repo, run, checks) {
-	const checkRun = checks.find((c) => FAILURE_CONCLUSIONS.has(c?.conclusion)) ?? checks[0] ?? null;
+async function failureDetail(owner, repo, run, workflowRuns) {
+	const list = Array.isArray(workflowRuns) ? workflowRuns : [];
+	// 优先挑真的失败的那次运行；没有就退回第一条（保持和原来 check-run 版一样的兜底）
+	const failed = list.find((item) => FAILURE_CONCLUSIONS.has(item?.conclusion)) ?? list[0] ?? null;
+	// 把 workflow run 拼成 describeFailure 认识的 check-run 形态：
+	// name=workflow 名（checkName）、html_url=运行页（runUrl/detailsUrl）、head_sha=提交
+	const checkRun = failed
+		? {
+				name: typeof failed.name === "string" ? failed.name : "",
+				conclusion: typeof failed.conclusion === "string" ? failed.conclusion : "",
+				details_url: typeof failed.html_url === "string" ? failed.html_url : "",
+				html_url: typeof failed.html_url === "string" ? failed.html_url : "",
+				head_sha: run.sha,
+				status: failed.status,
+			}
+		: null;
 
-	// 1) details_url 里的运行 id（GitHub 的 Actions check-run 形如 .../actions/runs/<id>/job/<jobId>）
+	// 1) 运行 id：workflow run 自带 id，取不到再从 html_url 里解析
+	const runId = Number.isFinite(Number(failed?.id)) && Number(failed.id) > 0 ? String(failed.id) : extractRunId(failed?.html_url);
 	let jobsJson = null;
 	let jobsWarning = "";
-	const runId = extractRunId(checkRun?.details_url);
 	if (!runId) {
-		jobsWarning = "check-run 的 details_url 里没有 Actions 运行 id，无法定位失败步骤";
+		jobsWarning = "这次运行没有可用的 Actions 运行 id，无法定位失败步骤";
 	} else {
 		const jobs = await fetchWithCache(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, {
 			ttlMs: CI_CACHE_TTL_MS,
@@ -748,9 +775,23 @@ async function failureDetail(owner, repo, run, checks) {
 	return describeFailure(run, checkRun, jobsJson, { jobsWarning, logExcerpt, logWarning });
 }
 
+/** 查不到任何运行记录时，给前端用的降级 runs（status 一律不是 pending，避免被读成"构建排队中"） */
+function fallbackRuns(entries, status) {
+	return entries.map((entry) => ({
+		sha: entry.sha,
+		shortSha: entry.sha.slice(0, 7),
+		status,
+		conclusion: "unknown",
+		url: "",
+		createdAt: entry.createdAt,
+		message: entry.message,
+	}));
+}
+
 /**
  * 最近 8 个提交的 CI 状态：坏版本挡住发布时，一眼能看出"从哪个提交开始红的"。
  * 注意：这是 Node 主动发起的 HTTP 请求（不是 spawn 子进程），断网/被墙时按降级返回而不是抛 500。
+ * 每次只发**一个**列表请求（GitHub 匿名配额一小时只有 60 次）。
  */
 async function ciStatus() {
 	const info = await repoInfo();
@@ -771,27 +812,46 @@ async function ciStatus() {
 		})
 		.filter((e) => e.sha);
 
-	// 逐个提交查 check-runs；某个提交查不到就记 pending，不影响其它提交
-	const runs = [];
-	// sha → check-runs，只有在真的要展示失败详情时才用到（最多 8 条，内存可忽略）
-	const checksBySha = new Map();
-	let firstError = "";
-	for (const entry of entries) {
-		const result = await checkRunsFor(info.owner, info.repo, entry.sha);
-		if (!result.ok && !firstError) firstError = result.error;
-		const checks = result.runs;
-		const conclusion = summarizeConclusion(checks);
-		checksBySha.set(entry.sha, checks);
-		runs.push({
+	const branch = info.branch || "main";
+	// 拉够覆盖 8 个提交的量（同一个提交可能跑多个 workflow）
+	const perPage = Math.min(100, Math.max(entries.length * 2, CI_RUNS_PER_PAGE));
+	const list = await workflowRunsFor(info.owner, info.repo, branch, perPage);
+
+	// 限流：明确告诉用户"是 GitHub 限流，不是构建在排队"，而且不要误报失败
+	if (!list.ok && isRateLimitedResponse(list)) {
+		return {
+			ok: true,
+			rateLimited: true,
+			warning: rateLimitWarning(list),
+			runs: fallbackRuns(entries, "rate_limited"),
+			lastSuccess: null,
+			lastFailure: null,
+		};
+	}
+	if (!list.ok) {
+		return {
+			ok: true,
+			rateLimited: false,
+			warning: list.error || "没有拿到任何 Actions 运行记录（仓库可能未开 Actions，或当前网络不可达）",
+			runs: fallbackRuns(entries, "unknown"),
+			lastSuccess: null,
+			lastFailure: null,
+		};
+	}
+
+	const runsBySha = groupWorkflowRunsBySha(list.data?.workflow_runs);
+	const runs = entries.map((entry) => {
+		const matched = runsBySha.get(entry.sha) ?? [];
+		return {
 			sha: entry.sha,
 			shortSha: entry.sha.slice(0, 7),
-			status: checks.length > 0 && checks.every((c) => c.status === "completed") ? "completed" : "pending",
-			conclusion,
-			url: checks.find((c) => c.html_url)?.html_url ?? "",
+			status: statusFromWorkflowRuns(matched),
+			conclusion: conclusionFromWorkflowRuns(matched),
+			url: matched.find((item) => item.html_url)?.html_url ?? "",
 			createdAt: entry.createdAt,
 			message: entry.message,
-		});
-	}
+		};
+	});
 
 	const lastSuccessIndex = runs.findIndex((r) => r.conclusion === "success");
 	const lastFailureIndex = runs.findIndex((r) => FAILURE_CONCLUSIONS.has(r.conclusion));
@@ -800,14 +860,15 @@ async function ciStatus() {
 	const failedRun = lastFailureIndex >= 0 && (lastSuccessIndex < 0 || lastFailureIndex < lastSuccessIndex) ? runs[lastFailureIndex] : null;
 	// 失败详情（作业列表 + 日志）只在这个失败真的要展示时才去拉，避免白耗匿名配额
 	const lastFailure = failedRun
-		? await failureDetail(info.owner, info.repo, failedRun, checksBySha.get(failedRun.sha) ?? [])
+		? await failureDetail(info.owner, info.repo, failedRun, runsBySha.get(failedRun.sha) ?? [])
 		: null;
 	return {
 		ok: true,
+		rateLimited: false,
 		runs,
 		lastSuccess: lastSuccess ? { sha: lastSuccess.sha, url: lastSuccess.url } : null,
 		lastFailure,
-		...(runs.every((r) => r.conclusion === "unknown") ? { warning: firstError || "没有拿到任何 check-runs（仓库可能未开 Actions，或当前网络不可达）" } : {}),
+		...(runs.every((r) => r.conclusion === "unknown") ? { warning: "没有拿到任何运行记录（仓库可能未开 Actions，或当前网络不可达）" } : {}),
 	};
 }
 
@@ -1028,11 +1089,74 @@ async function collectSnapshotFiles(dir, prefix, out) {
 	}
 }
 
+// ── 媒体文件的单段 Range ────────────────────────────────────────────────────
+/**
+ * 解析单段 Range（只支持 `bytes=` 单段）。
+ *
+ * 返回值：
+ *   - null        没有 Range 头 → 按 200 返回完整文件
+ *   - "invalid"   语法非法 / 多段 / 越界 → 416（带 `Content-Range: bytes *\/size`）
+ *   - {start,end} 合法，且已夹到 [0, size-1]
+ *
+ * 两个刻意的决定：
+ *   1. RFC 7233 允许服务器忽略非法 Range，这里选择回 416 —— 面板是本地播放器专用，
+ *      明确报错比悄悄返回整段更容易暴露前端越界请求（审计要求）。
+ *   2. 一律夹取：`bytes=0-99999999999999` 的 end 会被夹到 size-1，
+ *      不会出现「声明 1e14 字节、实际 0 字节」这种自相矛盾的 206。
+ */
+function parseByteRange(header, size) {
+	if (typeof header !== "string" || !header.trim()) return null;
+	const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+	if (!match) return "invalid";
+	const [, rawStart, rawEnd] = match;
+	if (rawStart === "" && rawEnd === "") return "invalid";
+	let start;
+	let end;
+	if (rawStart === "") {
+		// 后缀形式 bytes=-N：取最后 N 字节
+		const suffix = Number(rawEnd);
+		if (!Number.isSafeInteger(suffix) || suffix <= 0) return "invalid";
+		start = Math.max(0, size - suffix);
+		end = size - 1;
+	} else {
+		start = Number(rawStart);
+		end = rawEnd === "" ? size - 1 : Number(rawEnd);
+	}
+	if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) return "invalid";
+	if (start > end || start >= size) return "invalid";
+	return { start, end: Math.min(end, size - 1) };
+}
+
+/**
+ * 把文件（或文件区间）流式写给响应。
+ * createReadStream 的参数越界会**同步**抛错，读流本身也可能异步报错（文件被删等），
+ * 两者都必须在这里兜住：头已经发出去了，能做的只有断开连接，绝不能让异常冒到最外层。
+ * @returns false 表示连流都没建起来（调用方负责销毁响应）
+ */
+function streamFile(res, file, options) {
+	try {
+		const stream = options ? createReadStream(file, options) : createReadStream(file);
+		stream.on("error", () => res.destroy());
+		// 客户端提前断开（暂停/切歌）时别把 fd 留着
+		res.on("close", () => stream.destroy());
+		stream.pipe(res);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 // ── HTTP ────────────────────────────────────────────────────────────────────
 /**
  * 统一 JSON 响应。第四个参数用于附加响应头（例如登录时下发 Set-Cookie）。
+ * headersSent 之后绝不能再 writeHead（会抛 ERR_HTTP_HEADERS_SENT，且没人接），只能收尾。
  */
 function sendJson(res, status, payload, extraHeaders) {
+	if (res.headersSent) {
+		// 头已经发出去了（例如 /media-file 已经开始推流）：改不了状态码，安全地结束即可
+		res.end();
+		return;
+	}
 	const body = JSON.stringify(payload);
 	res.writeHead(status, {
 		"Content-Type": "application/json; charset=utf-8",
@@ -1042,12 +1166,98 @@ function sendJson(res, status, payload, extraHeaders) {
 	res.end(body);
 }
 
+/**
+ * 带 HTTP 状态码的错误。抛出它的地方都是「客户端请求有问题」，最外层 catch 会照 status 返回。
+ * 为什么不直接把 Error 当 400：只有我们自己明确标记过的错误才配当 4xx，
+ * 其它意外异常一律 500，且不回显 JS 内部消息。
+ */
+function httpError(status, message) {
+	const error = new Error(message);
+	error.status = status;
+	return error;
+}
+
+/**
+ * 面向用户的中文错误文案。
+ * 规则：带 status 的（我们自己抛的校验错误）原样返回；其余意外异常一律回通用文案，
+ * 绝不把 `Cannot read properties of null (reading 'items')` 这类 JS 内部消息回显给用户。
+ */
+const INTERNAL_MESSAGE_RE =
+	/Cannot read propert|Cannot destructure|is not a function|is not defined|as it is (?:null|undefined)|undefined \(reading|TypeError|ReferenceError|RangeError|SyntaxError|Maximum call stack|\bE[A-Z]{2,}\b/;
+
+function publicErrorText(error) {
+	const message = error instanceof Error ? error.message : String(error ?? "");
+	const ours = typeof error?.status === "number";
+	if (ours && message && !INTERNAL_MESSAGE_RE.test(message)) return message;
+	return "服务器内部错误，请查看启动面板的命令行窗口获取详情";
+}
+
+/**
+ * 每个 POST 接口允许出现的请求体字段。
+ * 为什么要有这张表：
+ *   1. body 是 null / 数组 / 字符串时直接 400，不再让各 handler 解构出 TypeError 变成 500；
+ *   2. 出现表里没有的字段直接 400，避免"字段名打错却真的执行了破坏性操作"
+ *      （例如 /api/compress-media 少写一个 dryRun 就会真的去改图片）；
+ *   3. 新增接口时忘了登记字段 → 一律 400，噪声很大但不会静默放行。
+ * 只对 POST 生效；GET 请求体不参与校验。
+ */
+const POST_BODY_FIELDS = {
+	"/api/save-post": ["slug", "originalSlug", "frontmatter", "body"],
+	"/api/delete-post": ["slug"],
+	"/api/upload": ["dir", "filename", "dataBase64"],
+	"/api/delete-media": ["repoPath"],
+	"/api/announcements": ["items"],
+	"/api/playlist": ["songs"],
+	"/api/save-lyrics": ["url", "text", "duration"],
+	"/api/extract-audio": ["repoPath", "url"],
+	"/api/config-file": ["path", "content"],
+	"/api/sync": [],
+	"/api/publish": ["message", "force"],
+	"/api/doctor": [],
+	"/api/settings": ["values"],
+	"/api/backups": [],
+	"/api/restore": ["id", "rel"],
+	"/api/revert": ["sha"],
+	"/api/import-document": ["filename", "dataBase64", "slug"],
+	"/api/nav": ["items"],
+	"/api/friends": ["action", "item", "index", "direction", "enabled"],
+	"/api/friends-fetch": ["url"],
+	"/api/compress-music": ["mode", "dryRun"],
+	"/api/compress-media": ["dirs", "dryRun"],
+	"/api/run": ["script"],
+	"/api/diff": [],
+	"/api/status": [],
+	"/api/media": [],
+	"/api/posts": [],
+	"/api/taxonomy": [],
+	"/api/configs": [],
+	"/api/ci": [],
+	"/api/backup-export": [],
+};
+
+/**
+ * 校验 POST 请求体：必须是 JSON 对象，且只含该接口声明过的字段。
+ * 不合法 → 抛 400（而不是让 handler 里冒出 500）。
+ */
+function assertPostBody(route, body) {
+	if (body === null || typeof body !== "object" || Array.isArray(body)) {
+		throw httpError(400, "请求体必须是一个 JSON 对象");
+	}
+	const allowed = POST_BODY_FIELDS[route];
+	if (!allowed) return body; // 没登记的接口不做字段校验（保守：保持原有行为）
+	const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
+	if (unknown.length > 0) {
+		throw httpError(400, `请求体包含不支持的字段：${unknown.join("、")}`);
+	}
+	return body;
+}
+
 async function readBody(req) {
 	const chunks = [];
 	let size = 0;
 	for await (const chunk of req) {
 		size += chunk.length;
-		if (size > 64 * 1024 * 1024) throw new Error("请求体过大（上限 64 MB）");
+		if (size > 64 * 1024 * 1024) throw httpError(400, "请求体过大（上限 64 MB）");
 		chunks.push(chunk);
 	}
 	if (chunks.length === 0) return {};
@@ -1055,7 +1265,8 @@ async function readBody(req) {
 	try {
 		return JSON.parse(text);
 	} catch {
-		throw new Error("请求体不是合法 JSON");
+		// 客户端发了坏 JSON：这是 400，不是服务端 500
+		throw httpError(400, "请求体不是合法 JSON");
 	}
 }
 
@@ -1086,7 +1297,8 @@ const server = createServer(async (req, res) => {
 			return;
 		}
 
-		// 退出登录：不需要先通过认证（没登录时调一下也无害），前端调完刷新页面即可
+		// 退出登录：**故意免认证**（设计如此）—— 它只清掉本地会话 Cookie，
+		// 没登录时调用也无害，前端调完刷新页面即可。除了它，其余接口一律要凭证。
 		if (route === "/api/logout") {
 			if (req.method !== "POST") {
 				sendJson(res, 405, { error: "请用 POST 调用 /api/logout" });
@@ -1102,7 +1314,9 @@ const server = createServer(async (req, res) => {
 			return;
 		}
 
-		const body = req.method === "POST" ? await readBody(req) : {};
+		// POST 的请求体必须先过统一校验：坏 JSON / null / 数组 / 多余字段 → 400，
+		// 不能让它们在各 handler 的解构里炸成 500，也不能让字段写错就真去执行破坏性操作
+		const body = req.method === "POST" ? assertPostBody(route, await readBody(req)) : {};
 
 		switch (route) {
 			case "/api/status": {
@@ -1129,6 +1343,12 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "缺少 slug" });
 					return;
 				}
+				// 先卡格式再拼路径：否则 `../../Windows/win.ini` 会被拼成越界路径，
+				// safeResolve 抛出的「路径越界: src/content/posts/../../..」会连同内部路径一起回显给用户
+				if (!POST_SLUG_RE.test(slug)) {
+					sendJson(res, 400, { error: "slug 只能包含字母、数字、点、下划线和连字符" });
+					return;
+				}
 				const file = `${POSTS_DIR}/${slug}.md`;
 				if (!(await exists(safeResolve(file)))) {
 					sendJson(res, 404, { error: `文章不存在: ${file}` });
@@ -1142,8 +1362,14 @@ const server = createServer(async (req, res) => {
 
 			case "/api/save-post": {
 				const { slug, originalSlug, frontmatter, body: md } = body;
-				if (!slug || !/^[A-Za-z0-9._-]+$/.test(slug)) {
+				if (!slug || !POST_SLUG_RE.test(slug)) {
 					sendJson(res, 400, { error: "slug 只能包含字母、数字、点、下划线和连字符" });
+					return;
+				}
+				// originalSlug 会参与「删掉改名前的旧文件」和「打快照」两件事，必须和 slug 同一套校验：
+				// 否则 originalSlug="../config/navBarConfig" 就能删掉 src/config 下的任意 .md
+				if (originalSlug !== undefined && originalSlug !== null && originalSlug !== "" && !POST_SLUG_RE.test(String(originalSlug))) {
+					sendJson(res, 400, { error: "originalSlug 只能包含字母、数字、点、下划线和连字符" });
 					return;
 				}
 				const content = await stringifyPost(frontmatter || {}, md || "");
@@ -1168,7 +1394,7 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "缺少 slug" });
 					return;
 				}
-				if (!/^[A-Za-z0-9._-]+$/.test(String(slug))) {
+				if (!POST_SLUG_RE.test(String(slug))) {
 					sendJson(res, 400, { error: "slug 只能包含字母、数字、点、下划线和连字符" });
 					return;
 				}
@@ -1251,6 +1477,11 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 200, { items: await readJsonData("announcements") });
 					return;
 				}
+				// 先自己卡类型：sanitizeAnnouncements 抛的是普通 Error，会让整条链路变成 500
+				if (!Array.isArray(body.items)) {
+					sendJson(res, 400, { error: "公告数据必须是数组（items）" });
+					return;
+				}
 				const items = sanitizeAnnouncements(body.items);
 				await writeJsonData("announcements", items);
 				sendJson(res, 200, {
@@ -1264,6 +1495,10 @@ const server = createServer(async (req, res) => {
 			case "/api/playlist": {
 				if (req.method === "GET") {
 					sendJson(res, 200, { songs: await readJsonData("playlist") });
+					return;
+				}
+				if (!Array.isArray(body.songs)) {
+					sendJson(res, 400, { error: "歌单数据必须是数组（songs）" });
 					return;
 				}
 				const songs = sanitizePlaylist(body.songs);
@@ -1285,13 +1520,18 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "歌词内容为空" });
 					return;
 				}
+				const lrcRel = `public/assets/music/lrc/${base}.lrc`;
+				// 和其它写接口一样先打快照：这是唯一漏掉的一处，补上之后
+				// 「面板写过的任何文件都能从 admin-backups 里找回来」这条承诺才成立
+				const snapshot = await snapshotBefore(lrcRel, "保存歌词");
 				await fs.mkdir(safeResolve("public/assets/music/lrc"), { recursive: true });
-				await fs.writeFile(
-					safeResolve(`public/assets/music/lrc/${base}.lrc`),
-					lrc,
-					"utf-8",
-				);
-				sendJson(res, 200, { ok: true, path: `/assets/music/lrc/${base}.lrc` });
+				await fs.writeFile(safeResolve(lrcRel), lrc, "utf-8");
+				sendJson(res, 200, {
+					ok: true,
+					path: `/assets/music/lrc/${base}.lrc`,
+					backup: snapshot?.id ?? null,
+					snapshot: snapshot ?? null,
+				});
 				return;
 			}
 
@@ -1359,20 +1599,31 @@ const server = createServer(async (req, res) => {
 					"Cache-Control": "no-store",
 				};
 				const range = req.headers.range;
-				const match = range ? /bytes=(\d*)-(\d*)/.exec(range) : null;
-				if (match) {
-					const start = match[1] ? Number(match[1]) : 0;
-					const end = match[2] ? Number(match[2]) : stat.size - 1;
+				const parsed = parseByteRange(range, stat.size);
+				if (parsed === "invalid") {
+					// 越界 / 语法非法：明确回 416，并按 RFC 7233 告知真实长度。
+					// （不能像以前那样把 start/end 直接丢给 createReadStream：越界会同步抛
+					// ERR_OUT_OF_RANGE，冒到最外层 catch 时头已经发出，进程直接被打死。）
+					res.writeHead(416, {
+						...headers,
+						"Content-Range": `bytes */${stat.size}`,
+						"Content-Length": 0,
+					});
+					res.end();
+					return;
+				}
+				if (parsed) {
+					// start/end 已夹到 [0, size-1]，Content-Length 与实际发出的字节数必然一致
 					res.writeHead(206, {
 						...headers,
-						"Content-Range": `bytes ${start}-${end}/${stat.size}`,
-						"Content-Length": end - start + 1,
+						"Content-Range": `bytes ${parsed.start}-${parsed.end}/${stat.size}`,
+						"Content-Length": parsed.end - parsed.start + 1,
 					});
-					createReadStream(file, { start, end }).pipe(res);
-				} else {
-					res.writeHead(200, { ...headers, "Content-Length": stat.size });
-					createReadStream(file).pipe(res);
+					if (!streamFile(res, file, { start: parsed.start, end: parsed.end })) res.destroy();
+					return;
 				}
+				res.writeHead(200, { ...headers, "Content-Length": stat.size });
+				if (!streamFile(res, file)) res.destroy();
 				return;
 			}
 
@@ -1409,6 +1660,11 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/api/publish": {
+				// message 会直接进 git commit -m：必须是字符串（否则 execFile 拿到数字会抛 TypeError → 500）
+				if (body.message !== undefined && typeof body.message !== "string") {
+					sendJson(res, 400, { error: "提交说明必须是字符串" });
+					return;
+				}
 				const result = await publish(body.message, { force: body.force === true });
 				sendJson(res, 200, result);
 				return;
@@ -1430,6 +1686,10 @@ const server = createServer(async (req, res) => {
 					return;
 				}
 				const patch = body?.values && typeof body.values === "object" ? body.values : body;
+				if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+					sendJson(res, 400, { error: "设置数据格式不对（需要 values 对象）" });
+					return;
+				}
 				const result = await applySettings(REPO_ROOT, patch, async (rel) => {
 					await snapshotBefore(rel, "修改站点设置");
 				});
@@ -1447,6 +1707,10 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/api/restore": {
+				if (!body.id) {
+					sendJson(res, 400, { error: "缺少快照 id" });
+					return;
+				}
 				const result = await restoreSnapshot(REPO_ROOT, body.id, body.rel);
 				sendJson(res, 200, result);
 				return;
@@ -1618,10 +1882,11 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 405, { error: "请用 POST 调用 /api/compress-music" });
 					return;
 				}
-				// 参数只从白名单拼，绝不把用户输入直接塞进命令行
-				const mode = String(body.mode ?? "check");
+				// 参数只从白名单拼，绝不把用户输入直接塞进命令行。
+				// mode 必须显式给出：省掉它就会默认去跑一次真正的压缩脚本（有副作用）
+				const mode = String(body.mode ?? "");
 				if (!(mode in MUSIC_MODES)) {
-					sendJson(res, 400, { error: `不支持的 mode: ${mode}（可选 all / covers / check）` });
+					sendJson(res, 400, { error: `不支持的 mode: ${mode || "(缺少 mode)"}（可选 all / covers / check）` });
 					return;
 				}
 				const scriptArgs = ["scripts/compress-music.mjs", ...MUSIC_MODES[mode]];
@@ -1705,7 +1970,15 @@ const server = createServer(async (req, res) => {
 				sendJson(res, 404, { error: `未知接口: ${route}` });
 		}
 	} catch (error) {
-		sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+		// 头已经发出去了（例如 /media-file 已经 writeHead(206) 并开始推流）：这时再 sendJson
+		// 会抛 ERR_HTTP_HEADERS_SENT，而它没人接 → 整个面板进程 exit 1。
+		// 所以这里必须先判断 headersSent，只做收尾。
+		if (res.headersSent) {
+			res.end();
+			return;
+		}
+		// error.status 是我们自己标记的 4xx；其它意外异常统一 500，且不回显 JS 内部消息
+		sendJson(res, typeof error?.status === "number" ? error.status : 500, { error: publicErrorText(error) });
 	}
 });
 

@@ -961,8 +961,13 @@ function resolveAssetUrl(href, base) {
 	}
 }
 
-/** 图标候选顺序：apple-touch-icon → link[rel~=icon] → og:image */
-function extractIconUrl(html, base) {
+/**
+ * 图标候选顺序：apple-touch-icon → link[rel~=icon] → og:image
+ * meta 必须由调用方（本次请求的 parseFriendPage）显式传进来：
+ * 之前用的是模块级缓存，两个并发的 /api/friends-fetch 会互相覆盖，
+ * 后果是 A 站点拿到 B 站点的 og:image（图标张冠李戴）。
+ */
+function extractIconUrl(html, base, meta) {
 	const links = [];
 	for (const tag of html.match(/<link\b[^>]*>/gi) || []) {
 		const attrs = parseAttributes(tag);
@@ -986,12 +991,9 @@ function extractIconUrl(html, base) {
 		return resolveAssetUrl(preferred.href, base);
 	}
 
-	const ogImage = collectMetaCache.get("og:image") || collectMetaCache.get("og:image:url") || collectMetaCache.get("og:image:secure_url");
+	const ogImage = meta.get("og:image") || meta.get("og:image:url") || meta.get("og:image:secure_url");
 	return ogImage ? resolveAssetUrl(ogImage, base) : "";
 }
-
-// collectMeta 的结果在一次解析中复用（extractIconUrl 需要 og:image）
-let collectMetaCache = new Map();
 
 /** 去掉 script/style 后的可见文本长度，用来判断「是不是 JS 动态渲染的空壳页」 */
 function visibleTextLength(html) {
@@ -1016,31 +1018,32 @@ export function parseFriendPage(html, baseUrl) {
 		.replace(/<!--[\s\S]*?-->/g, " ")
 		.replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ");
 
-	collectMetaCache = collectMeta(cleaned);
+	// 本次解析独立的 meta 表：不能放在模块级，否则并发的两次 /api/friends-fetch 会互相串
+	const meta = collectMeta(cleaned);
 	const titleTag = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(cleaned);
 
 	// 标题：og:title → <title>
 	const title = pickText(
-		[collectMetaCache.get("og:title"), collectMetaCache.get("twitter:title"), titleTag?.[1]],
+		[meta.get("og:title"), meta.get("twitter:title"), titleTag?.[1]],
 		"标题",
 		warnings,
 	);
 	// 简介：og:description → meta[name=description] → twitter:description
 	const desc = pickText(
 		[
-			collectMetaCache.get("og:description"),
-			collectMetaCache.get("description"),
-			collectMetaCache.get("twitter:description"),
+			meta.get("og:description"),
+			meta.get("description"),
+			meta.get("twitter:description"),
 		],
 		"简介",
 		warnings,
 	);
 
 	const base = baseUrl ? new URL(baseUrl) : undefined;
-	const iconUrl = extractIconUrl(cleaned, base);
+	const iconUrl = extractIconUrl(cleaned, base, meta);
 
 	const textLength = visibleTextLength(cleaned);
-	const looksBlocked = isBlockedPageText(title) || isBlockedPageText(collectMetaCache.get("og:title") || "");
+	const looksBlocked = isBlockedPageText(title) || isBlockedPageText(meta.get("og:title") || "");
 	if (!desc && (textLength < 200 || looksBlocked)) {
 		warnings.push("页面没有可用的静态介绍（正文很短，可能是 JS 动态渲染或防爬页），请手动填写简介");
 	}
@@ -1141,44 +1144,73 @@ export async function storeIcon(repoRoot, buffer, hostname) {
 	throw new Error(`同名图标太多（${slug}-1 … ${slug}-999 都被占用了），请先清理 public/friends/`);
 }
 
-/** 下载图标（同样过一遍 SSRF 守卫，因为图标常挂在 CDN 上、主机可能与页面不同） */
+/**
+ * 下载图标（同样过一遍 SSRF 守卫，因为图标常挂在 CDN 上、主机可能与页面不同）。
+ *
+ * 为什么**不用** fetch 的 `redirect:"follow"`：
+ *   跟随重定向意味着那一发请求**已经打到**最终主机上了，事后拿 res.url 再看一眼只能把响应丢掉，
+ *   挡不住已经发生的 SSRF（内网服务已经收到请求、可能已经产生副作用）。
+ *   改成手动跟随（`redirect:"manual"`）：每一跳都先校验 Location 的协议与主机，再决定要不要请求。
+ */
 async function downloadIcon(repoRoot, iconUrl, pageUrl) {
-	const parsed = validateFetchUrl(iconUrl);
-	await assertPublicAddress(parsed.hostname);
+	const requested = validateFetchUrl(iconUrl);
+	await assertPublicAddress(requested.hostname);
+	let current = requested;
 
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 	try {
-		let res;
-		try {
-			res = await fetch(parsed, {
-				redirect: "follow",
-				signal: controller.signal,
-				headers: {
-					"user-agent": BROWSER_UA,
-					accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-					referer: pageUrl.href,
-				},
-			});
-		} catch (error) {
-			if (error?.name === "AbortError" || error?.name === "TimeoutError") {
-				throw new Error(`图标下载超时（${FETCH_TIMEOUT_MS / 1000} 秒）`);
+		for (let hop = 0; hop <= FETCH_MAX_REDIRECTS; hop++) {
+			let res;
+			try {
+				res = await fetch(current, {
+					redirect: "manual",
+					signal: controller.signal,
+					headers: {
+						"user-agent": BROWSER_UA,
+						accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+						referer: pageUrl.href,
+					},
+				});
+			} catch (error) {
+				if (error?.name === "AbortError" || error?.name === "TimeoutError") {
+					throw new Error(`图标下载超时（${FETCH_TIMEOUT_MS / 1000} 秒）`);
+				}
+				throw new Error(`图标下载失败：${error?.cause?.code || error?.message || error}`);
 			}
-			throw new Error(`图标下载失败：${error?.cause?.code || error?.message || error}`);
+
+			// 跳转：先校验，再请求下一跳（校验不通过就直接断在这里）
+			if (res.status >= 300 && res.status < 400) {
+				const location = res.headers.get("location");
+				await drain(res);
+				if (!location) throw new Error(`图标地址返回 ${res.status} 跳转但没有 Location 头`);
+				let next;
+				try {
+					next = new URL(location, current);
+				} catch {
+					throw new Error(`图标跳转地址不合法：${truncate(location, 80)}`);
+				}
+				if (next.protocol !== "http:" && next.protocol !== "https:") {
+					throw new Error(`图标跳转到了不允许的协议：${next.protocol}`);
+				}
+				if (isPrivateHostname(next.hostname)) {
+					throw new Error(`图标跳转到了内网地址：${next.hostname}，已拒绝下载`);
+				}
+				// 每一跳都重新解析一次域名（防「公网域名解析到内网」这类绕过）
+				await assertPublicAddress(next.hostname);
+				current = next;
+				continue;
+			}
+
+			if (!res.ok) {
+				await drain(res);
+				throw new Error(`图标地址返回 HTTP ${res.status}`);
+			}
+			const buffer = await readCapped(res, ICON_MAX_BYTES + 1);
+			// 文件名仍然按「页面里写的那个图标主机」取，跟随 CDN 跳转后命名保持一致
+			return await storeIcon(repoRoot, buffer, requested.hostname);
 		}
-		if (!res.ok) {
-			await drain(res);
-			throw new Error(`图标地址返回 HTTP ${res.status}`);
-		}
-		// 跟着重定向落到了别处：再核一次最终主机
-		try {
-			const finalHost = new URL(res.url).hostname;
-			if (isPrivateHostname(finalHost)) throw new Error(`图标跳转到了内网地址：${finalHost}`);
-		} catch (error) {
-			if (error instanceof Error && error.message.startsWith("图标跳转")) throw error;
-		}
-		const buffer = await readCapped(res, ICON_MAX_BYTES + 1);
-		return await storeIcon(repoRoot, buffer, parsed.hostname);
+		throw new Error(`图标跳转次数过多（超过 ${FETCH_MAX_REDIRECTS} 次），已放弃`);
 	} finally {
 		clearTimeout(timer);
 	}

@@ -13,8 +13,10 @@ const { class: className, style, id } = Astro.props;
 
 const config = musicPlayerConfig;
 
-const widgetId =
-	id || `music-widget-${Math.random().toString(36).substring(2, 9)}`;
+// 播放器的 DOM id 必须是**确定性**的：原来用 Math.random 会让每次构建产出的 HTML 都不一样
+// （构建不可复现）。唯一不传 id 的调用方是 Navbar.astro；侧边栏（Music.astro）与悬浮播放器
+// （FloatingMusicPlayer.astro）都会显式传 id，所以这里用固定槽位名即可保证同一页面上互不冲突。
+const widgetId = id || "music-widget-navbar";
 ---
 
 <div id={widgetId} class:list={["music-player-widget w-full relative transition-all duration-300", className]} style={style} role="region" aria-label={i18n(I18nKey.music)}>

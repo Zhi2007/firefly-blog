@@ -41,7 +41,9 @@ export default {
 				const target = new URL(url.toString());
 				target.protocol = "https:";
 				target.hostname = CANONICAL_HOST;
-				return Response.redirect(target.toString(), 301);
+				// 每个出口都要过 withSecurityHeaders：301 也是给浏览器的正式响应，
+				// 少了 HSTS / CSP 就等于这条路径裸奔（之前这里直接 return，7 个头全丢）
+				return withSecurityHeaders(Response.redirect(target.toString(), 301));
 			}
 
 			// 2) 旧站地址 301
@@ -50,7 +52,7 @@ export default {
 				const target = new URL(url.toString());
 				target.protocol = "https:";
 				target.pathname = legacy;
-				return Response.redirect(target.toString(), 301);
+				return withSecurityHeaders(Response.redirect(target.toString(), 301));
 			}
 
 			// 3) 音乐目录：自己实现 Range，保证边下边播与拖动进度条
@@ -63,7 +65,7 @@ export default {
 		} catch (error) {
 			// 出问题时尽量保底：直接把请求交给静态资源；再失败才返回 503（不回显内部错误细节）
 			try {
-				return await env.ASSETS.fetch(request);
+				return withSecurityHeaders(await env.ASSETS.fetch(request));
 			} catch {
 				return new Response("服务暂时不可用，请稍后重试。", {
 					status: 503,
@@ -74,20 +76,48 @@ export default {
 	},
 };
 
-/** 旧站 /blog 系列地址 → 新地址（返回新的 pathname，不需要跳转时返回 null） */
+/**
+ * 旧站 /blog 系列地址 → 新地址（返回新的 pathname，不需要跳转时返回 null）。
+ * 大小写不敏感：Cloudflare 的路径匹配区分大小写，而用户手输地址时大小写很随意
+ * （/Blog/x、/BLOG/x 之前会直接落到静态资源上返回 200/404，而不是跳到新地址）。
+ */
 function legacyRedirect(pathname) {
-	if (pathname === "/blog" || pathname === "/blog/") return "/archive/";
-	if (pathname.startsWith("/blog/")) return `/posts/${pathname.slice("/blog/".length)}`;
+	const lower = String(pathname ?? "").toLowerCase();
+	if (lower === "/blog" || lower === "/blog/") return "/archive/";
+	// 只按小写前缀判断，后缀（slug）保留原始大小写
+	if (lower.startsWith("/blog/")) return `/posts/${pathname.slice("/blog/".length)}`;
 	return null;
+}
+
+/**
+ * 复制一份响应头，并**覆盖**安全响应头。
+ * 注意是 set 而不是 append：上游（静态资源 / 平台默认）如果带了宽松的 CSP、X-Frame-Options，
+ * 必须被这里换掉，绝不能出现两份同名头。
+ */
+function applySecurityHeaders(base) {
+	const headers = new Headers(base);
+	for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+		headers.set(name, value);
+	}
+	return headers;
+}
+
+/**
+ * 所有响应出口的统一收口：返回一个带齐安全响应头的新响应。
+ * 301 跳转、媒体 404、异常兜底、静态资源都必须从这里返回，保证「每个响应都补头」这句话成立。
+ */
+function withSecurityHeaders(response) {
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: applySecurityHeaders(response.headers),
+	});
 }
 
 /** 静态资源：补安全响应头，并按路径设置缓存策略 */
 async function serveAsset(request, env) {
 	const response = await env.ASSETS.fetch(request);
-	const headers = new Headers(response.headers);
-	for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-		headers.set(name, value);
-	}
+	const headers = applySecurityHeaders(response.headers);
 	const { pathname } = new URL(request.url);
 	if (pathname.startsWith("/_astro/")) {
 		headers.set("cache-control", "public, max-age=31536000, immutable");
@@ -114,7 +144,8 @@ async function serveMedia(request, env) {
 
 	// 取原始资源（不带 Range，拿全量数据后自己切片）
 	const upstream = await env.ASSETS.fetch(new Request(request.url, { method: "GET" }));
-	if (!upstream.ok) return upstream;
+	// 媒体 404 等非 2xx 也要走统一收口，否则这条路径会漏掉全部安全头
+	if (!upstream.ok) return withSecurityHeaders(upstream);
 
 	const body = await upstream.arrayBuffer();
 	const total = body.byteLength;
