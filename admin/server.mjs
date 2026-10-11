@@ -705,7 +705,6 @@ async function checkRunsFor(owner, repo, sha) {
  */
 async function failureDetail(owner, repo, run, checks) {
 	const checkRun = checks.find((c) => FAILURE_CONCLUSIONS.has(c?.conclusion)) ?? checks[0] ?? null;
-	const warnings = [];
 
 	// 1) details_url 里的运行 id（GitHub 的 Actions check-run 形如 .../actions/runs/<id>/job/<jobId>）
 	let jobsJson = null;
@@ -745,8 +744,6 @@ async function failureDetail(owner, repo, run, checks) {
 			}
 		}
 	}
-	if (warnings.length === 0 && logWarning) warnings.push(logWarning);
-
 	return describeFailure(run, checkRun, jobsJson, { jobsWarning, logExcerpt, logWarning });
 }
 
