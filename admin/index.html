@@ -696,10 +696,11 @@
 						<button class="action" id="btnDoctor">开始体检</button>
 					</div>
 					<div class="hint">
-						只读检查：JSON 合法性、歌单/文章的引用是否存在、站内链接、疑似密钥、异常大文件、配置矛盾。
-						每次「发布」前也会自动跑一遍，发现 error 会拦住推送（可在发布页强制跳过）。
+						只读检查（唯一例外：会跑一次真实 <code>astro build</code> 校验文章 frontmatter，产物写进 <code>.astro/doctor-build/</code>，不动 <code>dist/</code>）：
+						JSON 合法性、歌单/文章引用、<b>文章 frontmatter（YAML 速查 + 真实 schema 构建校验）</b>、站内链接、疑似密钥、异常大文件、配置矛盾。
+						每次「发布」前也会自动跑一遍，发现 error 会拦住推送（可在发布页强制跳过）；坏 frontmatter（例如 <code>published: "2026-10-11"</code> 多了一对引号）会在发布前就报出来。
 					</div>
-					<div id="doctorBox" class="small">点右上角开始（几秒完成）</div>
+					<div id="doctorBox" class="small">点右上角开始（含一次真实构建，约 10 秒）</div>
 				</div>
 				<div class="card">
 					<div class="row">
@@ -1652,8 +1653,38 @@
 			}
 
 			// ── 体检 / 备份 ───────────────────────────────────────────────
+			/**
+			 * 体检详情里「文件」相关的一条：后端会把文章类问题返回成 { file, field, text }，
+			 * 这里用统一的 filePathBadge() 显示真实路径（它已把反斜杠归一化为正斜杠）——
+			 * 作者点一下就能复制路径或打开所在文件夹，不用自己去猜文件在哪。
+			 * 老检查项返回的是纯字符串，原样转义即可。
+			 */
+			function doctorDetailHtml(detail) {
+				if (detail && typeof detail === "object") {
+					// file 为空 = 后端给的是「没有具体文件的说明」（例如构建日志行），只渲染文本；
+					// 少了这一支就会渲染成 "[object Object]"（真实踩过一次）。
+					const text = escapeHtml(String(detail.text ?? ""));
+					const fieldTag = detail.field ? `<code>${escapeHtml(detail.field)}</code>` : "";
+					if (!detail.file) return fieldTag ? `${fieldTag} — ${text}` : text;
+					return `${filePathBadge(detail.file, { reveal: false })}${detail.field ? ` ${fieldTag}` : ""} — ${text}`;
+				}
+				return escapeHtml(String(detail));
+			}
+
+			/** 体检某个检查项的详情列表（含「还有 N 条未显示」提示） */
+			function doctorDetailsHtml(check, limit = 20) {
+				const details = Array.isArray(check.details) ? check.details : [];
+				if (!details.length) return "";
+				const items = details
+					.slice(0, limit)
+					.map((d) => `<li>${doctorDetailHtml(d)}</li>`)
+					.join("");
+				const more = toNum(check.truncated) > 0 ? `<li class="muted">…还有 ${toNum(check.truncated)} 条未显示（修完上面的再体检一次）</li>` : "";
+				return `<ul style="margin:6px 0 0 18px">${items}${more}</ul>`;
+			}
+
 			async function loadDoctor() {
-				$("doctorBox").innerHTML = "体检中…";
+				$("doctorBox").innerHTML = "体检中…（有一项会跑真实构建校验文章 frontmatter，约 10 秒；文件没变会复用结果）";
 				try {
 					const report = await api("/api/doctor");
 					const icon = { error: "❌", warn: "⚠️", ok: "✅" };
@@ -1666,7 +1697,7 @@
 							.map(
 								(c) => `<div style="margin:8px 0;padding:8px 10px;border-left:3px solid ${color[c.level] || "#888"};background:rgba(127,127,127,.08)">
 									<b>${icon[c.level] || ""} ${escapeHtml(c.title)}</b> — ${escapeHtml(c.summary)}
-									${c.details && c.details.length ? `<ul style="margin:6px 0 0 18px">${c.details.slice(0, 12).map((d) => `<li>${escapeHtml(String(d))}</li>`).join("")}</ul>` : ""}
+									${doctorDetailsHtml(c)}
 								</div>`,
 							)
 							.join("");
@@ -2239,6 +2270,12 @@
 				if (e.target.closest("[data-ci-goto]")) {
 					e.preventDefault();
 					document.querySelector('nav button[data-tab="doctor"]')?.click();
+				}
+				// 发布被拦住时的「去体检页」按钮（见 renderBlockedDoctor）
+				if (e.target.closest("[data-doctor-goto]")) {
+					e.preventDefault();
+					document.querySelector('nav button[data-tab="doctor"]')?.click();
+					$("doctorBox").scrollIntoView?.({ block: "center" });
 				}
 			});
 
@@ -3508,6 +3545,27 @@
 				$("publishFiles").innerHTML = bits.join("");
 			}
 
+			/**
+			 * 体检把发布拦住时：把「改哪个文件（可复制/定位）→ 哪个字段 → 怎么改」直接列在发布日志里。
+			 * 为什么不用纯文本 toast：作者要一眼看到该打开哪个文件，路径必须走 filePathBadge()
+			 * （反斜杠归一化 + 复制 + 打开所在文件夹，见上面的约定）。
+			 */
+			function renderBlockedDoctor(result) {
+				const errors = (result?.report?.checks ?? []).filter((c) => c.level === "error");
+				if (!errors.length) {
+					$("publishFiles").innerHTML = "";
+					return;
+				}
+				const blocks = errors
+					.map(
+						(check) => `<div style="margin:6px 0"><b>❌ ${escapeHtml(check.title)}</b> — ${escapeHtml(check.summary)}${doctorDetailsHtml(check, 6)}</div>`,
+					)
+					.join("");
+				$("publishFiles").innerHTML =
+					`<div class="small">发布已被体检拦住，先改这些文件，再点「立即发布」：</div>${blocks}` +
+					`<div class="small">完整清单在「体检 / 备份」页。<button type="button" class="action ghost" data-doctor-goto style="font-size:12px;padding:4px 10px">去体检页</button></div>`;
+			}
+
 			async function doPublish(message) {
 				$("publishOutput").textContent = "正在提交并推送…";
 				try {
@@ -3516,7 +3574,8 @@
 						body: { message: (message || $("commitMessage").value).trim() },
 					});
 					$("publishOutput").textContent = formatSteps(result.steps) || result.message;
-					renderPublishFiles(result);
+					if (result.blocked) renderBlockedDoctor(result);
+					else renderPublishFiles(result);
 					toast(result.message, result.ok ? "ok" : "err");
 					await loadStatus();
 					if (result.ok && !result.dryRun) watchActions();

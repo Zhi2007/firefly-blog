@@ -102,16 +102,17 @@
 
 ```text
 firefly/
-├── admin/                      # ② 零依赖本地管理面板（16 个文件，只用 node: 内置模块）
-│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2271 行）
-│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，127 KB）
-│   ├── README.md               #    面板完整用法（603 行）★ 改面板前必读
+├── admin/                      # ② 零依赖本地管理面板（17 个文件，只用 node: 内置模块）
+│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2536 行）
+│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，155 KB）
+│   ├── README.md               #    面板完整用法（689 行）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
 │   ├── avatar.mjs              #    站点头像：魔数校验 + 可选缩放 → 写新文件并改 profileConfig.avatar
 │   ├── announcement-draft.mjs  #    更新公告草稿：提交解析 / 分组 / 中文整理 / Markdown 转义（纯函数）
 │   ├── nav.mjs                 #    导航隐藏/改名/排序 → 只写 nav-overrides.json
-│   ├── doctor.mjs              #    体检 8 项（只读）
+│   ├── doctor.mjs              #    体检 10 项（只读；其中 2 项查文章 frontmatter，见 9.11）
+│   ├── content-check.mjs       #    文章 frontmatter 两层校验：YAML 速查（秒级）+ 真实 astro build（权威）
 │   ├── backups.mjs             #    写前快照 admin-backups/（保留 40 份）
 │   ├── ci.mjs                  #    GitHub Actions 状态（60s 缓存 / 8s 超时 / 限流识别）
 │   ├── zip.mjs                 #    快照导出 ZIP（store 模式）
@@ -701,7 +702,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 ### 9.1 这一章解决什么问题
 
-面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（519 行，章节索引在它开头）。
+面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（689 行，章节索引在它开头）。
 
 ### 9.2 认证模型
 
@@ -723,7 +724,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 ### 9.3 全部 `/api/*` 路由表（36 条）
 
-**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **35** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **36** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1445-1482`）登记 **34** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
+**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **35** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **36** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1564-1602`）登记 **34** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
 
 > ⚠️ 新增 `/api/*` 路由时**必须同时往 `POST_BODY_FIELDS` 加一行**：未登记的接口跳过字段校验（`assertPostBody` 里 `if (!allowed) return body;`，`admin/server.mjs:1592`），等于放弃「字段打错不许静默执行」这道保护。
 
@@ -753,8 +754,8 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 16 | `/api/configs` | GET | 否 | 否 | 返回 `CONFIG_FILES`（15 个） | `:2032-2035` |
 | 17 | `/api/config-file` | GET 读 / POST 写 | **是** | 是 | `path` 必须在 `CONFIG_FILES` 白名单内 | `:2036-2057` |
 | 18 | `/api/sync` | GET/POST | 否（git 操作） | 否 | 本地有未提交改动则拒绝 | `:2058-2063` |
-| 19 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检，有 error 拦住（`force: true` 跳过）；只暂存 `PUBLISH_SCOPE`；返回 `files` / `skipped`（都是真实相对路径） | `:2064-2074` |
-| 20 | `/api/doctor` | GET/POST | 否（只读） | 否 | 8 项体检；Git 那一项用 `info.changed` 列出待提交文件 | `:2075-2080` |
+| 19 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检（**10 项**，含文章 frontmatter 的 YAML 速查 + 真实 `astro build`），有 error 拦住（`force: true` 跳过）；被拦住时 `blocked: true`，`message` 直接列出「文件 → 字段 → 怎么改」（见 9.11）；只暂存 `PUBLISH_SCOPE`；返回 `files` / `skipped`（都是真实相对路径） | `:2085-2095` |
+| 20 | `/api/doctor` | GET/POST | 否（唯一的写盘是 `astro build` 的产物 `.astro/doctor-build/`，不碰 `dist/` 与仓库内容） | 否 | **10 项**体检；其中 `content-frontmatter`（YAML 速查）与 `content-schema`（真实构建）专查文章 frontmatter，见 9.11；Git 那一项用 `info.changed` 列出待提交文件 | `:2096-2101` |
 | 21 | `/api/settings` | 非 POST 读 / POST 写 | **是** | 是（每个涉及文件） | `SETTINGS_DEFS` 白名单 + 类型/范围/枚举 + 结构体检 + 回读校验 + 失败回滚；GET 返回 `defs`（含 `file`/`within`/`key`）与 `pageToggle:{file,block}` | `:2081-2107` |
 | 22 | `/api/backups` | GET | 否 | 否 | 列出 `admin-backups/`；每份含快照目录 `dir` | `:2108-2112` |
 | 23 | `/api/restore` | POST | **是** | **是**（恢复前再给「当前版本」留一份） | `id` 格式校验；`rel` 双重校验（`1940c1c`） | `:2113-2122` |
@@ -786,7 +787,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
 | 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
 | 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
-| 9 | 体检 / 备份 | `doctor` | 一键体检（8 项）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；CI 失败横幅与「回滚该提交」 |
+| 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；CI 失败横幅与「回滚该提交」 |
 | 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
 
 > 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），现已改成 **10 个**（`README.md:771`、`README.md:172`）；`admin/README.md:45-56` 的功能表也是 10 行。这个是附录 E.3 事故 2 的现场，留作教材。
@@ -845,7 +846,8 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 面板不新增导航项 | 见 4.3 节 | `admin/nav.mjs:99` |
 | `/api/import-document` 不建快照 | 它不写文章（没有旧版本可备份），只转 Markdown + 落图片 | `admin/server.mjs:2203-2209` |
 | `compress-media` 只新增 `.webp` | 不删也不覆盖原图；默认先试算 | `admin/README.md:585` |
-| 体检「站内链接」依赖 `dist/` | 没有 `dist/` 时动态路由判定会退化（它先看 `dist/` 是否存在） | `admin/doctor.mjs:183-184` |
+| 体检「站内链接」依赖 `dist/` | 没有 `dist/` 时动态路由判定会退化（它先看 `dist/` 是否存在） | `admin/doctor.mjs:182-183` |
+| 体检的「文章 schema」会真的跑一次 `astro build` | 约 8～13 秒（本机实测 12～13 秒；坏 frontmatter 时约 6 秒就报错退出）；这是**唯一**会写盘的体检项，产物写进 `.astro/doctor-build/`（已 gitignore），**不覆盖 `dist/`**。跑不起来（没装依赖 / 超时）只给 warning、不阻断发布；结果按「`src/` + 根配置文件指纹」在**同一进程内**缓存，文件没变就复用 —— 所以「先点体检、再点发布」不会构建两次 | `admin/content-check.mjs` 文件头、9.11 节 |
 | **更新公告草稿不写盘、不自动发布** | `/api/announcement-draft` 只读 `git log` + 只读 `announcements.json`，**不打快照、不改任何文件**；生成的草稿只回给前端填表单，保存仍走 `POST /api/announcements`，上线仍要人点「发布」（实测：整轮请求前后 `git status` 逐字节不变、`admin-backups/` 不新增） | 9.9 节、`admin/announcement-draft.mjs` 顶部注释 |
 | **英文提交说明只能机械整理，不能算翻译** | 只把英文首词映射成「新增/修复/优化…」，剩下的英文原样留着，并强制给一条 warning 让人润色；非 Conventional 的提交（含真实历史里的 `perf/security(comment): …`）一律原样放进「其它维护」+ warning，绝不猜 | `admin/announcement-draft.mjs` 的 `localizeCommitText` / `buildAnnouncementDraft` |
 | 公告正文是纯文本，不解析 Markdown | 站点侧 `splitParagraphs()` 按空行切段后原样输出，所以草稿里的 `### 新增` 与行首 `-` 会**原样显示**；草稿据此在 warnings 里明说。要改渲染得动 `src/components/common/AnnouncementList.astro`（本次没动） | `src/utils/announcement-utils.ts:43`、`admin/announcement-draft.mjs` |
@@ -938,6 +940,33 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 **没做的部分**：徽章里的「打开所在文件夹」只在 Windows 上真正执行（`explorer /select,`），macOS / Linux 明确回 `ok:false` 并给出**手动路径**，不猜其它命令；不提供「在编辑器里打开」（面板不知道用户装了哪个编辑器，也不该替用户拉起任意程序）。
 
+### 9.11 体检里的文章 frontmatter 校验（`content-frontmatter` + `content-schema`）
+
+**要解决的问题**（真实事故）：面板发了一篇 frontmatter 写成 `published: "2026-10-11"`（多了一对引号 → YAML 当字符串）的文章，`src/content.config.ts` 的 schema 要 `Date`，CI 立刻红：
+
+```text
+src/content/posts/vmware-workstation-pro-26h1u1.md:0:0
+published: Expected type `"date"`, received `"string"`
+```
+
+当时的体检**没有**校验 frontmatter，坏数据被推上去了 —— 用户等 1 分钟看到红叉，还得找人救。
+
+| 检查项 | 级别 | 查什么 | 依据 |
+| --- | --- | --- | --- |
+| `content-frontmatter`（标题「文章 frontmatter（YAML 速查）」） | error / warn | **只查不依赖 schema 的通用坑**：引号把日期变字符串、日期不是 ISO / 日历上不存在、`tags` 写成字符串或 null、frontmatter 缺失或 YAML 语法坏（Tab 缩进 / 括号不配对 / 键重复 / 引号未闭合）、缺 `title`/`published`；顺带查封面图是否存在、文件名（slug）是否重复。**不枚举 schema 字段、不断言字段类型** | `admin/content-check.mjs` 的 `lintPostFrontmatter` / `buildFrontmatterCheck` |
+| `content-schema`（标题「文章 schema（真实构建校验）」） | error（跑不起来时 warn） | 跑**真实的** `astro build`（`node node_modules/astro/bin/astro.mjs build --outDir .astro/doctor-build`），用 `src/content.config.ts` 的真实 schema 校验真实文件；把 Astro 的报错翻译成「文件 + 字段 + 期望类型 + 实际类型 + 怎么改」 | `admin/content-check.mjs` 的 `buildContentSchemaCheck` / `parseContentBuildErrors` |
+
+**为什么不是「另写一套平行 schema」**（硬约束）：字段名与类型只有 `src/content.config.ts` 一个来源，手抄一份必然漂移。所以这里分两层 —— YAML 层只认「引号 / 日期写法 / 列表写法 / YAML 语法」这类**与 schema 无关**的问题（`published: "2026-10-11"` 在任何 schema 下都是字符串），**字段与类型的判定权 100% 在真实构建那一层**。新增校验项时的同步契约见附录 E.2 第 12 行。
+
+**实测行为**（`admin/content-check.mjs` 的注释与 `%TEMP%` 测试脚本都是同一口径）：
+
+- 反例全部命中：`published: "2026-10-11"`、`published: 2026/10/11`、`published: 2026-13-45`、`published: 2026-10-11 10:30`（带时间但没秒 → YAML 当字符串）、`tags: 虚拟机, VMware`、`tags:`（null）、少结尾 `---`、`tags: [a, b`（少右括号）、Tab 缩进、`published` 重复 → 都是 `error`，提示里带**文件 + 字段 + 怎么改**。
+- 其中 `published: 2026-13-45` 是 **YAML 层比真实构建更严**的一条：Astro / js-yaml 会把「13 月」静默滚成别的日期、构建照样通过（实测 status=0），但文章日期就不是作者写的那个了，所以这里按 error 拦住。
+- 4 篇真实文章、`tags` 块列表写法、块标量（`|`）里含 `[`、行尾注释 `#` 都不误报（夹具 + 真实仓库实测）。
+- 失败用例约 6 秒、成功用例约 12～13 秒；超时默认 90 秒，可用环境变量 `ADMIN_DOCTOR_BUILD_TIMEOUT_MS`（毫秒）覆盖。
+
+**发布时怎么拦住**：`publish()` 先跑 `runDoctor`，只要有任何 `error` 就直接返回 `blocked: true`（不执行任何 git 命令），并且 `message` 里带「文件 → 字段 → 怎么改」；面板「发布日志」区还会用 `filePathBadge()` 把每个文件渲染成可复制 / 可定位的路径徽章 + 「去体检页」按钮（见 `admin/index.html` 的 `renderBlockedDoctor`）。`force: true` 仍是逃生门。
+
 ---
 
 ## 10. 部署链路（从本地改到线上生效）
@@ -952,9 +981,10 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 ① 本地改内容/配置（面板 或 手写 src/config、src/content）
         ↓
 ② 面板「发布」页点「立即发布」（或开自动同步，保存即触发；2.5s 内合并为一次提交）
-   ├─ (a) 先跑体检 runDoctor：有 error 级问题 → 直接拦住         server.mjs:1255-1267
+   ├─ (a) 先跑体检 runDoctor（10 项，含文章 frontmatter 的 YAML 速查 + 真实构建）
+   │      有 error 级问题 → 直接拦住（不执行任何 git 命令，message 列出「文件 → 字段 → 怎么改」）  server.mjs:1284-1300
    ├─ (b) stageForPublish：只 git add 白名单内的路径             publish-scope.mjs:67-84
-   ├─ (c) git commit -m "<提交说明>"                            server.mjs:1301
+   ├─ (c) git commit -m "<提交说明>"                            server.mjs:1322
    └─ (d) git fetch origin → 落后则 pull --rebase --autostash → git push   :893-922
         ↓
 ③ GitHub Actions 被 push 触发（.github/workflows/deploy.yml:3-7）
@@ -1223,6 +1253,17 @@ pnpm build
 | 处理 | `server.on("error")` 里识别 `EADDRINUSE`，打印可读提示（「可能已有一个管理面板在运行…或换个端口 `--port=8800`」）并 `process.exit(1)` | `server.mjs:2486-2493` |
 | 备注 | 仓库历史里出现过成对提交（`05b5c94` 与 `36869ea` 内容相近），说明作者曾把同一修复提交两次；**读历史时不要以为漏了一个修复** |
 
+### 12.13 面板发布了一篇坏 frontmatter 的文章，CI 红在 `published: Expected type "date"`（本次修复）
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | 面板里发新文章 → 约 1 分钟后 GitHub Actions 失败：`src/content/posts/<slug>.md:0:0` + `published: Expected type \`"date"\`, received \`"string"\`` |
+| 根因 | frontmatter 写成 `published: "2026-10-11"`。YAML 里**加了引号就是字符串**，而 `src/content.config.ts` 的 `posts` schema 是 `z.date()`；Astro 只在「不带引号的 `YYYY-MM-DD`」时才把它解析成日期。注意 `published: 2026-10-11 10:30`（带时间但**没秒**）也会掉进同一个坑 |
+| 为什么没被拦住 | 当时的体检**完全不看 frontmatter**（唯一的文章检查只查 `title`/`published` 是否存在、日期是否以 `YYYY-MM-DD` 开头 —— 而它的正则 `["']?([^"'\n]+)` 会**吃掉引号**，所以这个坑恰好穿过）。坏数据被推上去，CI 才红 |
+| 修复 | 体检新增两项（9.11 节）：`content-frontmatter`（YAML 层速查，秒级，直接给「第几行 / 哪个字段 / 怎么改」）+ `content-schema`（跑**真实的** `astro build`，用真实 schema 校验并把报错翻成中文）。`publish()` 一见到 error 就拦住（`blocked: true`，不执行任何 git 命令），`message` 与面板「发布日志」都直接列出「文件 → 字段 → 怎么改」 |
+| 关键约束 | **不许另写一套平行 schema**：字段名与类型只有 `src/content.config.ts` 一个来源；YAML 层只查「与 schema 无关」的通用坑（引号 / 日期写法 / 列表写法 / YAML 语法），字段与类型一律由真实构建判定。新增体检项时按附录 E.2 第 12 行同步 |
+| 实测 | 10 类坏 frontmatter 全部在发布前被拦住（含本次事故的原文），4 篇真实文章零误报；失败用例约 6 秒、成功用例约 12～13 秒；跑不起来（没装依赖 / 超时 90 秒）只给 warning，**不阻断发布也不静默通过** |
+
 ---
 
 ## 13. 审计与安全基线
@@ -1316,13 +1357,13 @@ pnpm build
 
 ---
 
-## 附录 A：快问快答（25 条）
+## 附录 A：快问快答（26 条）
 
 | # | 问题 | 答案（含位置） |
 | --- | --- | --- |
 | 1 | **想加一个友链，改哪？** | 优先：面板「友链」页 → 新增（写 `src/config/friends.json`，`admin/friends.mjs`）。手工：直接编辑 `src/config/friends.json`，字段见 `friendsConfig.ts:9` 与 `admin/README.md:535-544`（`title` ≤60 字、`siteurl` 只允许 http(s)、`imgurl` 必填、`weight` -999~999）。图标要放进 `public/friends/` 再填路径（**面板不能上传到这个目录**） |
 | 2 | **想调页面宽度 / 内容宽度，改哪？** | 面板「站点设置」：`site.pageWidth`（rem，50-200）、`site.contentWidth`（px，600-2400）、`site.contentWidthVw`（%，60-100）。手工等价位置：`siteConfig.ts:71,73,74`。⚠️ **不要动 `variables.styl:170` 的 1280px 静态兜底**（12.3 节） |
-| 3 | **构建失败先查什么？** | ① 本地 `node_modules` 是否与 lockfile 一致 → 跑 `重建依赖.cmd`（11.3）；② 面板「体检」页看 8 项检查（JSON 合法性、歌单/文章引用、站内链接、密钥、大文件、配置矛盾、git 状态，`admin/doctor.mjs:64-347`）；③ 看你改的是不是 `src/config/*.ts` 这种一改就可能破语法的地方；④ 跑三条门禁（11.2）定位是类型、lint 还是构建 |
+| 3 | **构建失败先查什么？** | ① 本地 `node_modules` 是否与 lockfile 一致 → 跑 `重建依赖.cmd`（11.3）；② 面板「体检」页看 10 项检查（JSON 合法性、歌单/文章引用、**文章 frontmatter（YAML 速查 + 真实构建）**、站内链接、密钥、大文件、配置矛盾、git 状态，`admin/doctor.mjs:79-345`、9.11 节）；③ 看你改的是不是 `src/config/*.ts` 这种一改就可能破语法的地方；④ 跑三条门禁（11.2）定位是类型、lint 还是构建 |
 | 4 | **面板起不来？** | 先看是不是 `EADDRINUSE`（提示已写在 `server.mjs:2468-2470`）：① 用已经开着的那个窗口；② 结束任务管理器里的 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。注意默认端口是 **8799**（`server.mjs:72`），别名里写的 8899 只是示例 |
 | 5 | **评论区空白？** | 按 12.6 节的排查顺序：① 浏览器控制台有没有 **CSP 报错**（要改就改 `worker/index.mjs:31`，改 `_headers` 无效）；② `public/vendor/giscus-1.6.0.mjs` 是否真的部署上去了（`Giscus.astro:68` 的 import 是否 200）；③ `commentConfig.ts:57,59,63` 的 `repo` / `repoId` / `categoryId` 是否与 GitHub Discussions 配置一致；④ Swup 换页后重新初始化是否还在（`Giscus.astro:85-91`） |
 | 6 | **音乐不能拖进度条 / 不能边下边播？** | 这是 Workers 静态资源不处理 `Range` 的固有问题，必须靠 Worker：确认 `wrangler.jsonc:11` 的 `run_worker_first: true` 还在、`worker/index.mjs:59-61` 的 `/assets/music/` 分支还在。`README.md:988` 有同样的问答 |
@@ -1345,6 +1386,7 @@ pnpm build
 | 23 | **想换站点头像？** | 面板「站点设置 → 站点头像」→「上传新头像…」（支持 png/jpg/jpeg/webp/avif/gif，≤25 MB；静态大图自动缩到最长边 512px，动图/GIF 不缩）。它会**另存新文件**并改写 `profileConfig.ts:14` 的 `avatar`，原头像保留，可「恢复默认」（9.8 节）。手工等价：把图片放进 `public/assets/images/`，再改 `profileConfig.ts:14` 为 `/assets/images/<文件名>`（动图**必须**走 public，见 3.5 节红线） |
 | 24 | **面板能上传友链图标吗？** | **不能**。`public/friends/` 只在 `/media-file` 的**只读**白名单里（`MEDIA_READ_DIRS`），请手工放文件再填路径（9.7 节） |
 | 25 | **我加了新功能，怎么让回访的老访客知道？** | 面板「公告」页顶部「**从最近改动生成更新公告草稿**」：留空起始点 = 自「上次公告」之后（取最后一次改动 `announcements.json` 的提交），也可手填「提交 sha / 天数（如 30）/ 日期 2026-10-01」。点「生成草稿」→ 它会读 `git log`（**只读**）把 `feat:` / `fix:` / `perf:` 分成「新增 / 修复 / 优化」填进下面的表单（`chore:` / `docs:` / 合并提交跳过），**不会自动发布**：确认/删减后点「保存」，再去「发布」页推送即可上线（想让它顶掉首访弹窗就手动勾「固定为弹窗公告」，同时改「弹窗版本号」）。细节与边界见 9.9 节 |
+| 26 | **发布后 CI 红了，但本地看着没事？（`published: Expected type "date", received "string"`）** | 多半是文章 frontmatter 的**类型**问题，最常见就一个：日期被引号包住 —— `published: "2026-10-11"` 在 YAML 里是**字符串**，而 schema 要日期（9.11 节、12.13 节）。**面板现在会在发布前就拦住它**：体检页看 `content-frontmatter`（YAML 速查，秒级，直接告诉你「第几行、哪个字段、怎么改」）与 `content-schema`（跑一次真实 `astro build`，报「期望 date / 实际 string」）。修法：**去掉引号**写成 `published: 2026-10-11`；改完再点「体检」→ 全绿再发。要本地复现 CI 的报错就跑 `node node_modules/astro/bin/astro.mjs build` |
 
 ---
 
@@ -1527,6 +1569,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 9 | **面板新增会写盘的能力** | ① `admin/README.md`（接口说明 + 安全链）；② 本文档第 9 章（9.3 表格的「写盘 / 写前快照」列、9.5 写入安全链）；③ `PUBLISH_SCOPE`（`admin/publish-scope.mjs`）—— 若它写的是**提交范围之外**的路径（`worker/`、`admin/`、`src/styles/`…），要么把路径纳入 `PUBLISH_SCOPE`，要么在 10.3 明说「面板发布不会提交它」 | ⚠️ 部分（`PUBLISH_SCOPE` 逐条 ↔ 10.3；「写盘 / 快照」列不检查） |
 | 10 | **删除功能（必须反向清理）** | 按 1–9 反向删：文档段落、面板入口（`index.html` 的页签 / 按钮）、`SETTINGS_DEFS` 条目、`CONFIG_FILES` 白名单、CSP 放行、缓存规则、构建步骤、`navBarConfig.ts` 菜单项、`PUBLISH_SCOPE` 前缀。删完跑 `pnpm check-docs`，数字 / 清单对不上就会报 ❌ | ⚠️ 部分（「该删的忘了删」会被数字抓到；「不该删的删错了」抓不到） |
 | 11 | **面板新增展示项 / 接口（只要涉及文件）** | ① **必须复用 `admin/index.html` 的 `filePathBadge()`**（复制 / 已复制反馈 / 打开所在文件夹只有这一份实现，别各页抄一遍）；② 要显示的路径**必须由后端返回**（`fs.readdir` / `git status --porcelain -z` / 实际写入路径 / 快照目录），或按站点约定拼好后**当场 `stat` 核对**，**前端不许自己拼路径**；③ 后端 `stat` 过之后要如实带上 `exists`（不存在就标 ⚠️ 并隐藏「打开文件夹」按钮）；④ 新增 `/api/*` 字段/路由按第 2 行同步（路由数、9.3 表、`POST_BODY_FIELDS`）；⑤ 本文档 9.10 节的覆盖表 + `admin/README.md` 的「路径徽章」一节 | ❌（人工核对；`pnpm check-docs` 只保证路由/页签/配置/字段的数字与清单） |
+| 12 | **新增 / 修改体检项、内容校验规则** | ① **绝对不许另写平行 schema**：字段名与类型的唯一来源是 `src/content.config.ts`；「类型对不对」必须交给**真实构建**（`admin/content-check.mjs` 的 `content-schema`：`node node_modules/astro/bin/astro.mjs build`），YAML 层只允许查「与 schema 无关的通用坑」（引号把值变字符串 / 日期写法 / 列表写法 / YAML 语法）；② 本文档 9.11 节（新检查项要写清「查什么、什么级别、怎么修」）+ 9.3 / 9.4 / 2.3 / 附录 A 第 3 条里的「N 项」计数；③ `admin/README.md` 的「体检（发布前的安全闸）」表 + `README.md` 第 8 章面板表；④ 若有新的写盘产物，必须在 9.3 的「写盘」列如实登记（当前 `content-schema` 写 `.astro/doctor-build/`，**不覆盖 `dist/`**）；⑤ 跑不起来 / 超时必须降级成 `warn`，**既不阻断发布也不静默通过** | ⚠️ 部分（`check-docs` 不数体检项；改写「N 项」的措辞会变成人工核对） |
 
 > 补充（2026-10-11）：新增 `src/config` 下的**数据文件（JSON）**同样会改变 §4.1 与 §2.3 的文件计数，
 > 必须同步；`pnpm check-docs` 的第 3 组会直接报出来。

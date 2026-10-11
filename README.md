@@ -173,7 +173,8 @@ firefly/
 │   ├── index.html             # 单页面 UI（10 个页签，内联 JS/CSS）
 │   ├── import-doc.mjs         # .docx/.txt/.md → Markdown（自己读 ZIP + inflateRaw）
 │   ├── audio-meta.mjs         # 从 mp3/flac/m4a 读 ID3/Vorbis/ilst 标签、封面、歌词
-│   ├── doctor.mjs             # 体检：JSON 合法性、引用、站内链接、密钥、大文件、配置矛盾、git
+│   ├── doctor.mjs             # 体检 10 项：JSON 合法性、引用、文章 frontmatter（YAML 速查 + 真实构建）、站内链接、密钥、大文件、配置矛盾、git
+│   ├── content-check.mjs      # 文章 frontmatter 两层校验：YAML 速查（秒级）+ 真实 astro build（唯一权威）
 │   ├── settings.mjs           # 「站点设置」白名单表单：正则定位 + 写前快照 + 回读校验
 │   ├── nav.mjs                # 导航菜单隐藏/改名/排序 → 只写 nav-overrides.json
 │   ├── backups.mjs            # 写前快照（admin-backups/）与恢复
@@ -780,8 +781,8 @@ export const tabTitleConfig: TabTitleConfig = {
 | **媒体** | 按目录查看文章图片、音乐、封面、歌词、头像；上传（可多选）、复制路径、删除；批量转 WebP（默认先试算，只新增 `.webp`，不删原图）。每条显示 `public/assets/...` 下的真实仓库路径 + 体积。**换站点头像请去「站点设置 → 站点头像」**：这里只放文件，不会改配置 |
 | **配置** | 直接编辑 `src/config/*` 的白名单文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
 | **站点设置** | 可视化表单：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像、壁纸模式与暗度、主页横幅标题与副标题（每行一条）、显示设置面板各项开关、页面开关、导航菜单（隐藏/改名/排序）。顶部还有**站点头像**卡片：缩略图 + 「上传新头像…」+「恢复默认」（另存新文件、不覆盖原图、可回滚；见 8.4 示例 D）。**每一项都显示它写进哪个文件的哪个块/字段**（如 `src/config/siteConfig.ts → navbar.title`）。所有写入前自动备份，写完回读校验，不一致立即回滚 |
-| **体检 / 备份** | 一键体检（JSON 合法性、歌单引用、公告完整性、文章 frontmatter、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + 导出 ZIP；CI 部署状态（失败时全页红色横幅 + 一键回滚该提交） |
-| **发布** | 同步状态（待推送/落后远端/最后提交时间/最近部署结果）、自动同步开关、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；推送前自动体检，有 error 会拦住 |
+| **体检 / 备份** | 一键体检（10 项：JSON 合法性、歌单引用、公告完整性、**文章 frontmatter**、**文章 schema（跑真实 `astro build`）**、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + 导出 ZIP；CI 部署状态（失败时全页红色横幅 + 一键回滚该提交） |
+| **发布** | 同步状态（待推送/落后远端/最后提交时间/最近部署结果）、自动同步开关、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住** —— 文章 frontmatter 写错（例如日期被引号包住 `published: "2026-10-11"`，会让 CI 报 `Expected type "date", received "string"`）现在会在发布前被拦下，并直接告诉你「改哪个文件、哪个字段、怎么改」 |
 
 拖拽上传的落点按当前页签判断（音乐页 → `public/assets/music/`；媒体页 → 下拉框选中的目录；其它页 → `src/content/posts/images/`）。
 
