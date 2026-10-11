@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
+import { PUBLISH_SCOPE, stageForPublish } from "./publish-scope.mjs";
 // CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
 import {
 	CI_CACHE_TTL_MS,
@@ -877,12 +878,23 @@ async function publish(message, options = {}) {
 		}
 	}
 
-	const add = await git(["add", "-A"]);
-	steps.push({ name: "git add -A", ...add });
+	// 只暂存面板自己管理的路径（见 publish-scope.mjs）。
+	// 用 git add -A 会把在制品一起提交推送：admin/ 的半成品无害，但 src/ 的半成品会直接让构建失败。
+	const scoped = await stageForPublish(git, REPO_ROOT);
+	steps.push({ name: `git add（仅面板管理范围：${PUBLISH_SCOPE.join("、")}）`, ...scoped.result });
 
 	const staged = await git(["diff", "--cached", "--name-only"]);
 	if (!staged.stdout) {
-		return { ok: false, dryRun: DRY_RUN_PUBLISH, steps, message: "没有需要提交的改动" };
+		const outside = scoped.skipped;
+		return {
+			ok: false,
+			dryRun: DRY_RUN_PUBLISH,
+			steps,
+			skipped: outside,
+			message: outside.length
+				? `面板管理范围内没有改动。另有 ${outside.length} 个改动不在面板管理范围，已跳过（不会提交）：${outside.slice(0, 8).join("、")}${outside.length > 8 ? " 等" : ""} —— 需要提交请用 git 命令手动处理`
+				: "没有需要提交的改动",
+		};
 	}
 	const changedFiles = staged.stdout.split("\n").filter(Boolean);
 
