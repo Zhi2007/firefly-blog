@@ -1,43 +1,105 @@
 /**
- * Cloudflare Worker 入口
+ * Cloudflare Worker 入口（wrangler.jsonc 里 run_worker_first: true，接管所有请求）
  *
- * 只接管 /assets/music/*（见 wrangler.jsonc 里 assets.run_worker_first 的路径数组），
- * 其余请求仍然由 Workers 静态资源直接响应，不受这里影响。
+ * 为什么需要它：Workers 静态资源既不处理 Range 请求，也不支持按域名匹配的跳转，
+ * 而 `_redirects` / `_headers` 里的规则又**不作用于 Worker 处理的响应**，
+ * 所以下面这些只能在代码里做：
  *
- * 为什么需要它：
- * Workers 静态资源不返回 Content-Length / Accept-Ranges，也不处理 Range 请求，
- * 浏览器因此无法边下边播音乐、无法拖动进度条 —— 对 10 MB 级的音频文件表现为"放不了"。
- * 这里自己实现 206 Partial Content、ETag 缓存校验与 HEAD 支持。
+ *   1. 裸域 zhihaisblog.top → 301 到主域 www.zhihaisblog.top（保留路径与查询串）
+ *   2. 旧站地址 301：/blog → /archive/、/blog/ → /archive/、/blog/<slug>/ → /posts/<slug>/
+ *   3. /assets/music/* 自己实现 Range（206）、ETag 304、HEAD、416
+ *   4. 其余请求交给静态资源，并补上安全响应头与缓存策略（等价于 public/_headers 的内容）
+ *
+ * 任何异常都会回退为直接取静态资源，保证 Worker 出问题时站点仍能打开。
  */
 
+const CANONICAL_HOST = "www.zhihaisblog.top"; // 主域（裸域会 301 过来）
+const APEX_HOST = "zhihaisblog.top"; // 需要跳转到主域的裸域
 const MEDIA_PREFIX = "/assets/music/";
 const AUDIO_RE = /\.(mp3|m4a|flac|ogg|oga|wav|aac)$/i;
 const COVER_RE = /\/cover\//i;
 
-// 与 public/_headers 保持一致（Worker 返回的响应不会应用 _headers 文件）
+// 与 public/_headers 保持一致（该文件不作用于 Worker 响应，这里才是实际生效的地方）
 const SECURITY_HEADERS = {
 	"strict-transport-security": "max-age=15552000; includeSubDomains",
 	"x-content-type-options": "nosniff",
 	"referrer-policy": "strict-origin-when-cross-origin",
 	"x-frame-options": "SAMEORIGIN",
+	"permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+	"x-xss-protection": "0",
+	"content-security-policy":
+		"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'",
 };
 
 export default {
 	async fetch(request, env) {
-		const url = new URL(request.url);
-		if (!url.pathname.startsWith(MEDIA_PREFIX)) {
-			return env.ASSETS.fetch(request);
-		}
 		try {
-			return await serveMedia(request, env);
+			const url = new URL(request.url);
+
+			// 1) 裸域 → 主域（301，保留路径与查询串）
+			if (url.hostname === APEX_HOST) {
+				const target = new URL(url.toString());
+				target.protocol = "https:";
+				target.hostname = CANONICAL_HOST;
+				return Response.redirect(target.toString(), 301);
+			}
+
+			// 2) 旧站地址 301
+			const legacy = legacyRedirect(url.pathname);
+			if (legacy) {
+				const target = new URL(url.toString());
+				target.protocol = "https:";
+				target.pathname = legacy;
+				return Response.redirect(target.toString(), 301);
+			}
+
+			// 3) 音乐目录：自己实现 Range，保证边下边播与拖动进度条
+			if (url.pathname.startsWith(MEDIA_PREFIX)) {
+				return await serveMedia(request, env);
+			}
+
+			// 4) 其余交给静态资源 + 安全头与缓存策略
+			return await serveAsset(request, env);
 		} catch (error) {
-			return new Response(`媒体服务异常：${error?.message ?? error}`, {
-				status: 500,
-				headers: SECURITY_HEADERS,
-			});
+			// 出问题时尽量保底：直接把请求交给静态资源；再失败才返回 503
+			try {
+				return await env.ASSETS.fetch(request);
+			} catch {
+				return new Response(`服务暂时不可用：${error?.message ?? error}`, {
+					status: 503,
+					headers: SECURITY_HEADERS,
+				});
+			}
 		}
 	},
 };
+
+/** 旧站 /blog 系列地址 → 新地址（返回新的 pathname，不需要跳转时返回 null） */
+function legacyRedirect(pathname) {
+	if (pathname === "/blog" || pathname === "/blog/") return "/archive/";
+	if (pathname.startsWith("/blog/")) return `/posts/${pathname.slice("/blog/".length)}`;
+	return null;
+}
+
+/** 静态资源：补安全响应头，并按路径设置缓存策略 */
+async function serveAsset(request, env) {
+	const response = await env.ASSETS.fetch(request);
+	const headers = new Headers(response.headers);
+	for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+		headers.set(name, value);
+	}
+	const { pathname } = new URL(request.url);
+	if (pathname.startsWith("/_astro/")) {
+		headers.set("cache-control", "public, max-age=31536000, immutable");
+	} else if (pathname.startsWith("/pagefind/")) {
+		headers.set("cache-control", "public, max-age=604800");
+	}
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
+}
 
 async function serveMedia(request, env) {
 	if (request.method !== "GET" && request.method !== "HEAD") {
@@ -66,7 +128,7 @@ async function serveMedia(request, env) {
 	const lastModified = upstream.headers.get("last-modified");
 	if (lastModified) headers.set("last-modified", lastModified);
 
-	// 缓存校验：内容没变就直接 304，不重传 10 MB
+	// 缓存校验：内容没变就直接 304，不重传整个文件
 	const ifNoneMatch = request.headers.get("if-none-match");
 	if (
 		ifNoneMatch &&
