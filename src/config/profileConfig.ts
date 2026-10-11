@@ -11,7 +11,7 @@ export const profileConfig: ProfileConfig = {
 	// 现在是 320×426 的动态 WebP（576KB），比原来的 GIF（1.96MB）小 70% 且画质更好；
 	// 旧 GIF 如需恢复：git checkout 5c05ff5 -- public/assets/images/avatar-zhi.gif
 	// 想换回静态图可用 src/assets/images/avatar-zhi.png（改下面这行即可）。
-	avatar: "/assets/images/avatar-zhi.webp",
+	avatar: "/assets/images/avatar-55fa398e807e.png",
 
 	// 名字（页脚版权、文章作者、OG 卡片等处都会用到）
 	name: "栀海",
