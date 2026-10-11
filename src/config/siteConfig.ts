@@ -55,7 +55,7 @@ export const siteConfig: SiteConfig = {
 		"用 Astro 7 + Firefly 主题搭建的个人博客，托管在 Cloudflare Workers 上：静态生成、自动 HTTPS、零服务器成本。",
 
 	// 站点关键词
-	keywords: ["博客", "Astro", "Cloudflare", "技术笔记", "个人站点"],
+	keywords: ["博客","Astro","Cloudflare","技术笔记","个人站点"],
 
 	// 主题色
 	themeColor: {
@@ -71,7 +71,7 @@ export const siteConfig: SiteConfig = {
 	pageWidth: 100,
 	// 主内容区宽度：实际取 min(下面两个值)，屏幕越宽自动越宽；≥1280px 屏幕生效
 	contentWidth: 1600, // 最大宽度（px）
-	contentWidthVw: 94, // 最多占屏比例（%）
+	contentWidthVw: 98, // 最多占屏比例（%）
 
 	// 网站Card样式配置
 	card: {
