@@ -141,6 +141,8 @@
 			<button data-tab="music">音乐</button>
 			<button data-tab="media">媒体</button>
 			<button data-tab="config">配置</button>
+			<button data-tab="settings">站点设置</button>
+			<button data-tab="doctor">体检 / 备份</button>
 			<button data-tab="publish">发布</button>
 		</nav>
 
@@ -377,6 +379,54 @@
 					</div>
 					<textarea id="configContent" rows="30" spellcheck="false"
 						style="margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
+				</div>
+			</section>
+
+			<!-- 站点设置（可视化表单） -->
+			<section class="panel" id="panel-settings">
+				<div class="card">
+					<h2>站点设置</h2>
+					<div class="hint">
+						这些字段来自 <code>src/config</code> 的白名单。<b>保存前会自动备份原文件</b>，写入后会回读校验，校验不过立即回滚 —— 不会留下改坏的文件。
+					</div>
+					<div id="settingsForm" class="small">加载中…</div>
+					<div class="row" style="margin-top:12px">
+						<button class="action" id="btnSaveSettings">保存设置</button>
+						<button class="action ghost" id="btnReloadSettings">放弃改动并重载</button>
+						<span class="muted small">保存后到「发布」页推送即生效</span>
+					</div>
+				</div>
+				<div class="card">
+					<h2>页面开关</h2>
+					<div class="hint">关掉的页面会返回 404，并自动从导航栏隐藏（对应 <code>siteConfig.ts</code> 顶部的 <code>resolvePageToggles</code>）。</div>
+					<div id="pageToggles" class="small">加载中…</div>
+				</div>
+			</section>
+
+			<!-- 体检 / 备份 -->
+			<section class="panel" id="panel-doctor">
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">仓库体检</h2>
+						<span style="flex:1"></span>
+						<button class="action" id="btnDoctor">开始体检</button>
+					</div>
+					<div class="hint">
+						只读检查：JSON 合法性、歌单/文章的引用是否存在、站内链接、疑似密钥、异常大文件、配置矛盾。
+						每次「发布」前也会自动跑一遍，发现 error 会拦住推送（可在发布页强制跳过）。
+					</div>
+					<div id="doctorBox" class="small">点右上角开始（几秒完成）</div>
+				</div>
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">本地备份（写前快照）</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnBackups">刷新列表</button>
+					</div>
+					<div class="hint">
+						保存文章 / 设置 / 公告 / 歌单 / 配置文件之前，面板都会把原文件另存到 <code>admin-backups/</code>（已 gitignore，不会提交也不会发布）。点下面的按钮即可恢复。
+					</div>
+					<div id="backupBox" class="small">加载中…</div>
 				</div>
 			</section>
 
@@ -724,6 +774,154 @@
 				}
 			}
 
+			// ── 站点设置（可视化表单） ─────────────────────────────────────
+			let settingsCache = { values: {}, defs: [], pagePrefix: "pages." };
+
+			function settingsField(def, value) {
+				const id = `set-${def.id.replace(/[^\w-]/g, "_")}`;
+				const label = `<label style="min-width:200px;display:inline-block">${escapeHtml(def.label)}<br><span class="muted small">${escapeHtml(def.id)}</span></label>`;
+				const row = (inner) => `<div class="row" style="margin:8px 0;align-items:center">${label}${inner}</div>`;
+				if (def.type === "boolean") {
+					return row(`<input type="checkbox" id="${id}" data-set="${def.id}" ${value ? "checked" : ""} style="width:auto">`);
+				}
+				if (def.type === "enum") {
+					const opts = (def.values || []).map((v) => `<option value="${v}" ${v === value ? "selected" : ""}>${escapeHtml(v)}</option>`).join("");
+					return row(`<select id="${id}" data-set="${def.id}">${opts}</select>`);
+				}
+				if (def.type === "number") {
+					return row(`<input type="number" id="${id}" data-set="${def.id}" data-kind="number" value="${value ?? ""}" ${def.min !== undefined ? `min="${def.min}"` : ""} ${def.max !== undefined ? `max="${def.max}"` : ""}>`);
+				}
+				const text = Array.isArray(value) ? value.join(", ") : (value ?? "");
+				return row(`<input id="${id}" data-set="${def.id}" data-kind="${def.type}" value="${escapeHtml(String(text))}">`);
+			}
+
+			function renderPageToggles() {
+				const { values, pagePrefix } = settingsCache;
+				const keys = Object.keys(values).filter((k) => k.startsWith(pagePrefix));
+				$("pageToggles").innerHTML = keys.length
+					? keys
+							.map((k) => {
+								const name = k.slice(pagePrefix.length);
+								return `<div class="row" style="margin:6px 0;align-items:center"><label style="min-width:200px;display:inline-block">${escapeHtml(name)}</label><input type="checkbox" data-page="${escapeHtml(name)}" ${values[k] ? "checked" : ""} style="width:auto"></div>`;
+							})
+							.join("")
+					: "（没有读到页面开关）";
+			}
+
+			async function loadSettings() {
+				try {
+					const data = await api("/api/settings");
+					settingsCache = {
+						values: data.values || {},
+						defs: data.defs || [],
+						pagePrefix: data.pagePrefix || "pages.",
+					};
+					const main = settingsCache.defs.filter((d) => !d.id.startsWith(settingsCache.pagePrefix));
+					$("settingsForm").innerHTML = main.length
+						? main.map((d) => settingsField(d, settingsCache.values[d.id])).join("")
+						: "（没有可编辑的设置项）";
+					renderPageToggles();
+				} catch (error) {
+					$("settingsForm").textContent = `读取失败：${error.message}`;
+				}
+			}
+
+			async function saveSettings() {
+				const values = {};
+				document.querySelectorAll("[data-set]").forEach((el) => {
+					const id = el.dataset.set;
+					if (el.type === "checkbox") values[id] = el.checked;
+					else if (el.dataset.kind === "number") values[id] = Number(el.value);
+					else values[id] = el.value;
+				});
+				document.querySelectorAll("[data-page]").forEach((el) => {
+					values[`${settingsCache.pagePrefix}${el.dataset.page}`] = el.checked;
+				});
+				if (!confirm(`确定保存 ${Object.keys(values).length} 项设置？\n（原文件会自动备份，可随时恢复）`)) return;
+				try {
+					const result = await api("/api/settings", { method: "POST", body: { values } });
+					toast(result.message || "已保存", "ok");
+					await loadSettings();
+					await loadStatus();
+					scheduleAutoPublish("chore: 更新站点设置");
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			// ── 体检 / 备份 ───────────────────────────────────────────────
+			async function loadDoctor() {
+				$("doctorBox").innerHTML = "体检中…";
+				try {
+					const report = await api("/api/doctor");
+					const icon = { error: "❌", warn: "⚠️", ok: "✅" };
+					const color = { error: "#e5484d", warn: "#f5a524", ok: "#30a46c" };
+					$("doctorBox").innerHTML =
+						`<div style="margin-bottom:10px">检查时间 ${new Date(report.checkedAt).toLocaleString()} ·
+							错误 <b>${report.counts.error}</b> · 警告 <b>${report.counts.warn}</b> · 通过 <b>${report.counts.ok}</b>
+							${report.ok ? " · 可以放心发布 ✅" : " · 发布会被拦住，请先修 ❌"}</div>` +
+						report.checks
+							.map(
+								(c) => `<div style="margin:8px 0;padding:8px 10px;border-left:3px solid ${color[c.level] || "#888"};background:rgba(127,127,127,.08)">
+									<b>${icon[c.level] || ""} ${escapeHtml(c.title)}</b> — ${escapeHtml(c.summary)}
+									${c.details && c.details.length ? `<ul style="margin:6px 0 0 18px">${c.details.slice(0, 12).map((d) => `<li>${escapeHtml(String(d))}</li>`).join("")}</ul>` : ""}
+								</div>`,
+							)
+							.join("");
+				} catch (error) {
+					$("doctorBox").textContent = `体检失败：${error.message}`;
+				}
+			}
+
+			async function loadBackups() {
+				try {
+					const data = await api("/api/backups");
+					const list = data.backups || [];
+					if (!list.length) {
+						$("backupBox").textContent = "还没有备份（保存文章 / 设置 / 公告 / 歌单后会自动生成）";
+						return;
+					}
+					$("backupBox").innerHTML = list
+						.slice(0, 20)
+						.map(
+							(b) => `<div style="margin:8px 0;padding:8px 10px;background:rgba(127,127,127,.08)">
+								<b>${b.time ? new Date(b.time).toLocaleString() : escapeHtml(b.id)}</b>
+								<span class="muted small">· ${escapeHtml(b.reason || "手动快照")}</span>
+								<div class="muted small" style="margin:6px 0">${b.files.map((f) => escapeHtml(f.rel)).join("、")}</div>
+								${b.files
+									.map(
+										(f) =>
+											`<button class="action ghost" data-restore="${escapeHtml(b.id)}" data-rel="${escapeHtml(f.rel)}" style="font-size:12px;padding:4px 8px;margin:2px 6px 2px 0">恢复 ${escapeHtml(f.rel.split("/").pop())}</button>`,
+									)
+									.join("")}
+							</div>`,
+						)
+						.join("");
+					document.querySelectorAll("[data-restore]").forEach((btn) => {
+						btn.addEventListener("click", async () => {
+							const { restore, rel } = btn.dataset;
+							if (!confirm(`确定用这份快照覆盖当前的文件吗？\n${rel}\n\n（当前版本也会先被备份，可再恢复回来）`)) return;
+							try {
+								const result = await api("/api/restore", { method: "POST", body: { id: restore, rel } });
+								toast(result.message || "已恢复", "ok");
+								await loadBackups();
+								await loadDiff();
+								await loadStatus();
+							} catch (error) {
+								toast(error.message, "err");
+							}
+						});
+					});
+				} catch (error) {
+					$("backupBox").textContent = `备份列表读取失败：${error.message}`;
+				}
+			}
+
+			$("btnSaveSettings").addEventListener("click", saveSettings);
+			$("btnReloadSettings").addEventListener("click", loadSettings);
+			$("btnDoctor").addEventListener("click", loadDoctor);
+			$("btnBackups").addEventListener("click", loadBackups);
+
 			// ── 标签切换与事件 ─────────────────────────────────────────────
 			document.querySelectorAll("nav button").forEach((btn) => {
 				btn.addEventListener("click", async () => {
@@ -736,6 +934,8 @@
 					if (btn.dataset.tab === "music") await loadPlaylist();
 					if (btn.dataset.tab === "media") await loadMedia();
 					if (btn.dataset.tab === "config") await loadConfigList();
+					if (btn.dataset.tab === "settings") await loadSettings();
+					if (btn.dataset.tab === "doctor") await loadBackups();
 					if (btn.dataset.tab === "publish") await loadDiff();
 				});
 			});
