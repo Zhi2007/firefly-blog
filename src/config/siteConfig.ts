@@ -55,7 +55,7 @@ export const siteConfig: SiteConfig = {
 		"用 Astro 7 + Firefly 主题搭建的个人博客，托管在 Cloudflare Workers 上：静态生成、自动 HTTPS、零服务器成本。",
 
 	// 站点关键词
-	keywords: ["博客","Astro","Cloudflare","技术笔记","个人站点"],
+	keywords: ["博客", "Astro", "Cloudflare", "技术笔记", "个人站点"],
 
 	// 主题色
 	themeColor: {
