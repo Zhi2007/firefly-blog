@@ -16,6 +16,7 @@
 - [备份与恢复](#备份与恢复)
 - [认证方式（HttpOnly Cookie）](#认证方式httponly-cookie)
 - [导航菜单（隐藏 / 改名 / 排序）](#导航菜单隐藏--改名--排序)
+- [友链管理](#友链管理)
 - [一键压缩（音乐 / 图片）](#一键压缩音乐--图片)
 - [备份导出](#备份导出)
 - [安全说明](#安全说明)
@@ -43,6 +44,7 @@ node admin/server.mjs --port=8899 --no-open
 | **文章** | 列表 / 新建 / 编辑 / 删除；标题、日期、摘要、**标签与分类（带候选下拉，可新增）**、封面、草稿、置顶、**密码（加密文章）**；Markdown 正文 + 实时预览 + **实时字数统计**；封面直接上传 |
 | **公告** | 增删改公告（标题、日期、类型、正文、按钮链接）；勾选「固定为弹窗公告」的那条会作为首访弹窗内容；改动「弹窗版本号」会让所有访客重新看到一次弹窗 |
 | **音乐** | 上传音频/封面/歌词并加入歌单，编辑歌曲信息、调整播放顺序、**本地直接试听**；数据写到 `src/config/music-playlist.json`；**一键压缩**（先试算 / 只压封面 / 音频+封面，后者需确认） |
+| **友链** | 友链列表（图标缩略图 / 站名 / 简介 / 网址 / 权重 / 显示开关），↑↓ 排序、编辑、删除（二次确认）、启用停用；**「从网址抓取」**自动猜标题、简介与图标（结果只填表单、需人工确认后才保存）；数据写到 `src/config/friends.json` |
 | **媒体** | 分类查看文章图片、音乐、封面、歌词、头像目录；上传（可多选）、复制路径、删除；**批量转 WebP**（默认先试算，只新增 `.webp`，绝不删原图） |
 | **配置** | 直接编辑 `src/config/*` 里的常用配置文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
 | **站点设置** | **可视化表单**：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像、壁纸模式与暗度、主页横幅标题、**首页横幅副标题（每行一条）**、显示设置面板各项开关 + **页面开关** + **导航菜单（隐藏/改名/排序）**。写入前自动备份，写完回读校验，不一致立即回滚 |
@@ -200,6 +202,7 @@ src/content/posts/images/<slug>-img2.jpg
 | --- | --- | --- |
 | `src/config/announcements.json` | 公告列表（含固定公告） | `announcementConfig.ts` 导入 → 首访弹窗 / 公告页 / 侧边栏 |
 | `src/config/music-playlist.json` | 歌单 | `musicConfig.ts` 导入 → 悬浮播放器 |
+| `src/config/friends.json` | 友链列表 | `friendsConfig.ts` 导入 → 友链页 |
 
 其它配置（站点信息、导航、个人信息…）仍然在 `src/config/*.ts` 里，用「配置」页的编辑器改。
 
@@ -270,6 +273,77 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 菜单项 id 就是 `navBarConfig.ts` 里每项显式写的 `id`（如 `home`、`friends`、`links-github`）。
 
 > 面板只做**隐藏 / 改名 / 排序**，**不支持新增菜单项** —— 新增要改 TS 里的数组，风险大，请手工编辑 `navBarConfig.ts`。
+
+## 友链管理
+
+友链页的 26 条数据原来硬编码在 `src/config/friendsConfig.ts` 里。现在数据搬到了 **`src/config/friends.json`**，
+`friendsConfig.ts` 只负责 `import` 它（`friendsPageConfig` 与 `getEnabledFriends()` 行为完全不变），
+于是面板可以安全地增删改，而不必去改写 TS 源码 —— 改坏一个引号就会让整站构建失败。
+
+### 接口
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/friends` | GET | 返回 `{ items: [...] }`（就是 `friends.json` 的内容） |
+| `/api/friends` | POST | `{ action: "add" \| "update" \| "delete" \| "move" \| "toggle", ... }`，成功返回 `{ ok, items, backup, message }` |
+| `/api/friends-fetch` | POST | `{ url }` → `{ ok, url, charset, title, desc, iconUrl, iconPath, warnings }` |
+
+```jsonc
+// 新增
+{ "action": "add",    "item": { "title": "…", "imgurl": "/friends/x.png", "desc": "…", "siteurl": "https://…", "tags": ["友链"], "weight": 10, "enabled": true } }
+// 修改（只覆盖传进来的字段）
+{ "action": "update", "index": 3, "item": { "title": "改名" } }
+// 删除 / 上移 / 停用
+{ "action": "delete", "index": 3 }
+{ "action": "move",   "index": 3, "direction": "up" }
+{ "action": "toggle", "index": 3, "enabled": false }
+```
+
+写入流程和其它数据一样：**校验 → 写前快照（`admin-backups/`）→ 写 JSON（tab 缩进、UTF-8、末尾换行）→ 读回校验（条数 + 逐条内容）→ 不一致立即回滚**。
+
+### 校验规则（不满足一律 400 + 中文提示）
+
+| 字段 | 规则 |
+| --- | --- |
+| `title` | 必填，≤ 60 字（按码点算，一个 emoji 算 1 个字） |
+| `desc` | ≤ 120 字 |
+| `siteurl` | 必填，只允许 `http:` / `https:` |
+| `imgurl` | 必填，站内绝对路径（`/friends/x.png`）或 `http(s)` 图片直链 |
+| `tags` | ≤ 4 个、每个 ≤ 12 字的字符串数组（自动去重去空） |
+| `weight` | -999 ~ 999 的整数 |
+| `enabled` | 布尔值 |
+| 总数 | ≤ 200 条 |
+
+### 「从网址抓取」都处理了哪些坑
+
+点「从网址抓取」只是把结果**填进表单**，不会保存 —— 猜错了直接改，不想要就点「取消」。
+
+- **编码**：先读 `<meta charset>` / `<meta http-equiv="Content-Type">` 声明，再退回 HTTP 头，最后才是 UTF-8。
+  声明 `gb2312 / gbk` 的站按 `TextDecoder("gbk")` 解码，否则中文站整页乱码。
+- **HTML 实体**：`&amp;`、数字实体 `&#12345;`、十六进制 `&#x1F600;` 都会解码。
+- **优先级**：标题 `og:title` → `<title>`；简介 `og:description` → `meta[name=description]` → `twitter:description`。
+  `<meta content="…" property="og:title">` 这种**属性顺序颠倒**的写法照样能认出来（按属性名取值，不依赖顺序）。
+- **未渲染的模板变量**：`site.seo.description`、`{{ page.title }}`、`${config.site.desc}` 这类占位符不会被当成标题/简介，
+  而是写进 `warnings` 提示你手填（`astro.build`、`node.js` 这类正常文本不会误判）。
+- **防爬 / 验证页**：标题命中 `Verify Yourself`、`Checking your Browser`、`Just a moment`、`Attention Required` 等特征时同样不采用，改为提示手填。
+- **JS 动态渲染**：正文很短又没有 meta 时，明确提示「页面没有可用的静态介绍，请手动填写」——这类站只能手填。
+- **图标**：候选顺序 `apple-touch-icon` → `link[rel~=icon]` → `og:image`，相对路径按**最终 URL**解析；
+  按**文件头字节**（png / jpeg / gif / webp / ico / svg）判断是不是真图片，大小限制 100 B ~ 400 KB，
+  落盘为 `public/friends/<域名slug>-<N>.<ext>`，**文件已存在就换序号，绝不覆盖**（写入用 `wx` 标志，并发也不会盖）。
+  SVG 允许保存（用 `<img>` 加载不会执行脚本）。
+- **SSRF 防护**：只允许 `http(s)`；拒绝 `localhost`、`127.0.0.1`、`::1`、`10.`、`172.16-31.`、`192.168.`、`169.254.`
+  以及十进制 / 十六进制 / 八进制 / 简写的等价私网写法（`2130706433`、`0x7f.0.0.1`、`127.1` …）；
+  重定向**每一跳都重新检查主机**（公网域名 302 到 `127.0.0.1` 也会被拦），并额外做一次 DNS 解析核对。
+- 其它：15 秒超时、响应体上限 3 MB、用常见浏览器 UA（不少站会拒绝 Node 默认 UA）。
+- 局限：这是「尽力而为」的加固，不是完整的安全边界 —— 判断与请求之间仍存在 DNS 重绑定窗口，
+  也不检查非 HTTP 端口语义；链接预览请只对自己信任的站点使用。
+
+### 面板之外
+
+- 想手工加朋友？直接编辑 `src/config/friends.json` 即可，`friends.json` 也在「配置」页的可编辑白名单里。
+- 图标缩略图通过后端 `/media-file` 只读读取 `public/friends/`（该目录**不在**媒体上传 / 删除白名单内，
+  也就是说面板不会覆盖或删除你已有的图标文件）。
+- 本页**不支持上传自定义图标**：头像字段只填「站内路径 / 图片直链」；要换图标请把文件放进 `public/friends/` 再填路径。
 
 ## 一键压缩（音乐 / 图片）
 
