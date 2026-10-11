@@ -670,7 +670,7 @@ async function latestAction() {
 }
 
 // GitHub check-run 的各种"没通过"结论；只认 success，其余一律不当作绿灯
-const FAILURE_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"]);
+const FAILURE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure", "stale"]);
 
 /** 单个提交的 check-runs：8 秒超时，任何异常都返回空数组（调用方负责降级，不抛错） */
 async function checkRunsFor(owner, repo, sha) {
@@ -730,8 +730,11 @@ async function ciStatus() {
 		});
 	}
 
-	const lastSuccess = runs.find((r) => r.conclusion === "success");
-	const lastFailure = runs.find((r) => FAILURE_CONCLUSIONS.has(r.conclusion));
+	const lastSuccessIndex = runs.findIndex((r) => r.conclusion === "success");
+	const lastFailureIndex = runs.findIndex((r) => FAILURE_CONCLUSIONS.has(r.conclusion));
+	const lastSuccess = lastSuccessIndex >= 0 ? runs[lastSuccessIndex] : null;
+	// 仅当"失败"比任何一次成功都更新时才提示；旧的失败被后续成功覆盖后红条必须消失
+	const lastFailure = lastFailureIndex >= 0 && (lastSuccessIndex < 0 || lastFailureIndex < lastSuccessIndex) ? runs[lastFailureIndex] : null;
 	return {
 		ok: true,
 		runs,
