@@ -204,7 +204,14 @@
 						<h2 style="margin:0">文章列表</h2>
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewPost">新建文章</button>
+						<button class="action ghost" id="btnImportDoc">从 Word / txt 导入</button>
+						<input type="file" id="importDocFile" accept=".docx,.txt,.md,.markdown" style="display:none" />
 					</div>
+					<div class="hint">
+						支持 .docx / .txt / .md：后端会转成 Markdown 并填进下面的编辑器，
+						<b>不会自动保存</b>，请检查后再点「保存」。.doc（旧版二进制）不支持，请先另存为 .docx。
+					</div>
+					<div class="hint" id="importStatus" style="display:none"></div>
 					<table>
 						<thead>
 							<tr><th>标题</th><th>日期</th><th>分类</th><th>标签</th><th>状态</th></tr>
@@ -1574,6 +1581,87 @@
 				fillForm({}, "", "");
 				$("fSlug").value = `post-${new Date().toISOString().slice(0, 10)}`;
 			});
+
+			// ── 从 Word / txt 导入 ─────────────────────────────────────────
+			// 后端只负责"转成 markdown + 图片落盘"，绝不自动保存文章：
+			// 格式转换一定会有误差，必须让人过一眼再点保存。
+			const IMPORT_ACCEPT = /\.(docx|txt|md|markdown)$/i;
+
+			/** 读成 base64（去掉 data:...;base64, 前缀，后端只认纯 base64） */
+			function readFileAsBase64(file) {
+				return new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => {
+						const text = String(reader.result || "");
+						const comma = text.indexOf(",");
+						resolve(comma >= 0 ? text.slice(comma + 1) : text);
+					};
+					reader.onerror = () => reject(new Error("读取文件失败"));
+					reader.readAsDataURL(file);
+				});
+			}
+
+			function showImportStatus(html) {
+				const box = $("importStatus");
+				box.innerHTML = html;
+				box.style.display = html ? "" : "none";
+			}
+
+			$("btnImportDoc").addEventListener("click", () => $("importDocFile").click());
+
+			$("importDocFile").addEventListener("change", async (e) => {
+				const file = (e.target.files || [])[0];
+				// 先清空，这样同一个文件再选一次也会触发 change
+				e.target.value = "";
+				if (!file) return;
+				if (!IMPORT_ACCEPT.test(file.name)) {
+					toast(`暂不支持「${file.name}」的格式，请用 .docx / .txt / .md`, "err");
+					return;
+				}
+				if (file.size > 25 * 1024 * 1024) {
+					toast(`文件太大（${humanSize(file.size)}），最大支持 25 MB`, "err");
+					return;
+				}
+
+				$("btnImportDoc").disabled = true;
+				showImportStatus(`正在解析 <b>${escapeHtml(file.name)}</b>…`);
+				try {
+					const dataBase64 = await readFileAsBase64(file);
+					const result = await api("/api/import-document", {
+						method: "POST",
+						body: { filename: file.name, dataBase64, slug: $("fSlug").value.trim() },
+					});
+					// 只在有内容时覆盖，避免把用户已经写好的字段清空
+					if (result.suggested?.title) $("fTitle").value = result.suggested.title;
+					if (result.suggested?.description) $("fDescription").value = result.suggested.description;
+					$("fBody").value = result.markdown || "";
+					$("mdPreview").innerHTML = renderMarkdown($("fBody").value);
+					updateBodyCount();
+
+					const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+					const images = Array.isArray(result.images) ? result.images : [];
+					showImportStatus(
+						[
+							`✅ 已导入 <b>${escapeHtml(file.name)}</b>，请检查后点「保存」。`,
+							images.length
+								? `已抽出 ${images.length} 张图片：${images
+										.map((image) => escapeHtml(image.repoPath))
+										.join("、")}`
+								: "",
+							...warnings.map((warning) => `⚠️ ${escapeHtml(String(warning))}`),
+						]
+							.filter(Boolean)
+							.join("<br />"),
+					);
+					toast("已导入，请检查后点保存（不会自动保存）", "ok");
+				} catch (error) {
+					showImportStatus("");
+					toast(error.message, "err");
+				} finally {
+					$("btnImportDoc").disabled = false;
+				}
+			});
+
 			$("btnCancelPost").addEventListener("click", () => {
 				$("editorCard").style.display = "none";
 			});

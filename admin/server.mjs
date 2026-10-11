@@ -21,6 +21,7 @@ import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs"
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
 import { runDoctor } from "./doctor.mjs";
 import { COMPRESS_DIRS, compressImages } from "./media-compress.mjs";
+import { MAX_IMPORT_BYTES, convertToMarkdown } from "./import-doc.mjs";
 import { handleNav } from "./nav.mjs";
 import { SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
 import { createZip } from "./zip.mjs";
@@ -1449,6 +1450,50 @@ const server = createServer(async (req, res) => {
 					return;
 				}
 				sendJson(res, 200, await taxonomy());
+				return;
+			}
+
+			case "/api/import-document": {
+				// 从 Word(.docx) / txt / md 导入：只做"转换成 markdown + 图片落盘"，
+				// 不写文章、不建快照（没有旧版本可备份），正文由用户在编辑器里确认后自己保存。
+				if (req.method !== "POST") {
+					sendJson(res, 405, { error: "请用 POST 调用 /api/import-document" });
+					return;
+				}
+				const { filename, dataBase64, slug } = body;
+				if (typeof filename !== "string" || !filename.trim()) {
+					sendJson(res, 400, { error: "缺少文件名" });
+					return;
+				}
+				if (typeof dataBase64 !== "string" || !dataBase64.trim()) {
+					sendJson(res, 400, { error: "缺少文件数据" });
+					return;
+				}
+				// 先按 base64 估算体积，再真正解码，避免解出一个超大 buffer 才报错
+				if (dataBase64.length > Math.ceil((MAX_IMPORT_BYTES * 4) / 3) + 1024) {
+					sendJson(res, 400, { error: "文件太大，最大支持 25 MB" });
+					return;
+				}
+				const buffer = Buffer.from(dataBase64, "base64");
+				// 空文件的提示交给 convertToMarkdown 统一给（"文件是空的，没有可导入的内容"）
+				if (buffer.length > MAX_IMPORT_BYTES) {
+					sendJson(res, 400, {
+						error: `文件太大（${(buffer.length / 1024 / 1024).toFixed(1)} MB），最大支持 25 MB`,
+					});
+					return;
+				}
+				// 图片目录固定落在 post-images 里，并且必须通过仓库根 + 白名单前缀校验
+				const imageDir = resolveInside(MEDIA_DIRS["post-images"], [MEDIA_DIRS["post-images"]]);
+				await fs.mkdir(imageDir, { recursive: true });
+				const result = await convertToMarkdown({
+					filename: path.basename(filename),
+					buffer,
+					repoRoot: REPO_ROOT,
+					imageDir,
+					slug,
+					imageUrlPrefix: MEDIA_URL_PREFIX["post-images"],
+				});
+				sendJson(res, result.ok ? 200 : 400, result);
 				return;
 			}
 
