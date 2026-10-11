@@ -1260,6 +1260,27 @@ async function pushToRemote(steps) {
 	return { ok: pushed.ok, steps, message: pushed.ok ? "" : pushed.stderr || pushed.message };
 }
 
+/**
+ * 把体检里 error 级的详情拼成「改哪个文件 → 哪个字段：怎么改」的多行文本。
+ * 用途：/api/publish 被拦住时的 message。前端还会用 report 里的结构化详情渲染路径徽章，
+ * 这里给的是纯文本版本（命令行/脚本调用也能一眼看到该改哪里）。
+ */
+function formatBlockedDetails(errors, limit = 3) {
+	const lines = [];
+	for (const check of errors) {
+		for (const detail of check.details ?? []) {
+			if (lines.length >= limit) break;
+			if (detail && typeof detail === "object" && detail.file) {
+				lines.push(`· ${detail.file}${detail.field ? ` → ${detail.field}` : ""}：${detail.text ?? ""}`);
+			} else if (typeof detail === "string") {
+				lines.push(`· ${detail}`);
+			}
+		}
+		if (lines.length >= limit) break;
+	}
+	return lines.length ? `\n先去改这些：\n${lines.join("\n")}` : "";
+}
+
 async function publish(message, options = {}) {
 	const steps = [];
 
@@ -1273,7 +1294,7 @@ async function publish(message, options = {}) {
 				blocked: true,
 				steps,
 				report,
-				message: `体检发现 ${errors.length} 个必须先修的问题，已阻止发布：${errors.map((e) => e.title).join("；")}`,
+				message: `体检发现 ${errors.length} 个必须先修的问题，已阻止发布：${errors.map((e) => e.title).join("；")}${formatBlockedDetails(errors)}`,
 			};
 		}
 	}

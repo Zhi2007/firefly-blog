@@ -5,15 +5,25 @@
  *   1. 管理面板「体检」页：把结果列出来给作者看
  *   2. 发布前把关：哪怕只发现 error 级问题，也先拦住 push（可用 force 跳过）
  *
- * 设计原则：任何一项检查抛异常都不会影响其它检查；所有检查都不修改文件。
+ * 设计原则：
+ *   · 任何一项检查抛异常都不会影响其它检查；
+ *   · 检查本身不写仓库内容（唯一例外：`content-schema` 会跑一次真实 `astro build`，
+ *     产物写到 `.astro/doctor-build/`，不碰 `dist/`，见 admin/content-check.mjs 的文件头）；
+ *   · 文章 frontmatter 相关的检查全部委托给 admin/content-check.mjs（两层：YAML 速查 + 真实构建）。
  *
  * 返回结构：
  *   { ok: boolean, checkedAt: string, counts: { error, warn, ok }, checks: [check] }
- *   check = { id, title, level: "error"|"warn"|"ok", summary, details: string[] }
+ *   check = { id, title, level: "error"|"warn"|"ok", summary, details: [detail], truncated? }
+ *   detail = string（老检查项）或 { file, field, text }（前端用路径徽章渲染 file）
+ *
+ * 体检项（内置 9 项）：json / playlist / announcements / content-frontmatter /
+ * content-schema / links / bigfiles / secrets / configs；面板另外传入 gitInfo，
+ * 于是面板页上是 10 项（含「Git 工作区状态」）。
  */
 
 import fs from "node:fs";
 import path from "node:path";
+import { buildContentSchemaCheck, buildFrontmatterCheck } from "./content-check.mjs";
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", ".astro", "admin-backups"]);
 
@@ -47,9 +57,14 @@ function exists(repoRoot, rel) {
 	}
 }
 
-function check(id, title, run) {
+/**
+ * 跑一项检查。
+ * 检查可以返回普通对象，也可以返回 Promise（`content-schema` 要等真实构建），
+ * 所以这里是 async 的：让 run() 结果先 await 再展开，Promise 不会被当成空对象吞掉。
+ */
+async function check(id, title, run) {
 	try {
-		return { id, title, ...run() };
+		return { id, title, ...(await run()) };
 	} catch (error) {
 		return {
 			id,
@@ -67,7 +82,7 @@ export async function runDoctor(repoRoot, options = {}) {
 
 	// ── 1. JSON / JSONC 合法性 ─────────────────────────────────────────────
 	checks.push(
-		check("json", "JSON / JSONC 数据文件合法性", () => {
+		await check("json", "JSON / JSONC 数据文件合法性", () => {
 			const bad = [];
 			let total = 0;
 			for (const rel of files) {
@@ -89,7 +104,7 @@ export async function runDoctor(repoRoot, options = {}) {
 
 	// ── 2. 歌单引用的文件是否都在 ──────────────────────────────────────────
 	checks.push(
-		check("playlist", "歌单引用的音频/封面/歌词文件", () => {
+		await check("playlist", "歌单引用的音频/封面/歌词文件", () => {
 			const rel = "src/config/music-playlist.json";
 			if (!exists(repoRoot, rel)) return { level: "warn", summary: "找不到歌单文件", details: [] };
 			const songs = JSON.parse(readText(repoRoot, rel));
@@ -112,7 +127,7 @@ export async function runDoctor(repoRoot, options = {}) {
 
 	// ── 3. 公告数据 ────────────────────────────────────────────────────────
 	checks.push(
-		check("announcements", "公告数据完整性", () => {
+		await check("announcements", "公告数据完整性", () => {
 			const rel = "src/config/announcements.json";
 			if (!exists(repoRoot, rel)) return { level: "warn", summary: "找不到公告数据文件", details: [] };
 			const items = JSON.parse(readText(repoRoot, rel));
@@ -137,49 +152,33 @@ export async function runDoctor(repoRoot, options = {}) {
 		}),
 	);
 
-	// ── 4. 文章 frontmatter 与配图 ─────────────────────────────────────────
+	// ── 4. 文章 frontmatter（YAML 层速查，秒级） ───────────────────────────
+	// 只查「不依赖 schema 的通用坑」：引号把日期变成字符串、日期不是 ISO / 日历上不存在、
+	// tags 写成字符串、frontmatter 缺失或 YAML 语法坏、缺 title/published、配图与文件名重复。
+	// 为什么这里**不**校验「有哪些字段、字段是什么类型」：那是 schema，手抄一份必然漂移 ——
+	// 字段与类型的唯一权威是下面第 5 项的真实构建（详见 admin/content-check.mjs 文件头）。
 	checks.push(
-		check("posts", "文章 frontmatter 与配图", () => {
-			const postsDir = "src/content/posts";
-			const problems = [];
-			const slugs = new Map();
-			let count = 0;
-			for (const rel of files.filter((f) => f.startsWith(`${postsDir}/`) && /\.mdx?$/.test(f))) {
-				count++;
-				const text = readText(repoRoot, rel);
-				const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
-				if (!fm) {
-					problems.push(`${rel} 缺少 frontmatter（--- 开头的那段）`);
-					continue;
-				}
-				const body = fm[1];
-				if (!/^\s*title\s*:/m.test(body)) problems.push(`${rel} 缺少 title`);
-				if (!/^\s*published\s*:/m.test(body)) problems.push(`${rel} 缺少 published`);
-				const dateMatch = /^\s*published\s*:\s*["']?([^"'\n]+)/m.exec(body);
-				if (dateMatch && !/^\d{4}-\d{2}-\d{2}/.test(dateMatch[1].trim())) {
-					problems.push(`${rel} 的 published 不是 YYYY-MM-DD：${dateMatch[1].trim()}`);
-				}
-				const slug = path.basename(rel).replace(/\.mdx?$/, "");
-				if (slugs.has(slug)) problems.push(`文章 slug 重复：${slug}`);
-				slugs.set(slug, rel);
-				const img = /^\s*image\s*:\s*["']?([^"'\n]+)/m.exec(body);
-				if (img) {
-					const value = img[1].trim();
-					if (!/^https?:/i.test(value)) {
-						const target = path.posix.normalize(path.posix.join(path.posix.dirname(rel), value));
-						if (!exists(repoRoot, target)) problems.push(`${rel} 的封面图不存在：${value}`);
-					}
-				}
-			}
-			return problems.length
-				? { level: "error", summary: `${problems.length} 篇文章有问题`, details: problems }
-				: { level: "ok", summary: `${count} 篇文章 frontmatter 与配图正常`, details: [] };
-		}),
+		await check("content-frontmatter", "文章 frontmatter（YAML 速查）", () =>
+			buildFrontmatterCheck(repoRoot, files),
+		),
 	);
 
-	// ── 5. 站内链接 ────────────────────────────────────────────────────────
+	// ── 5. 文章 schema（真实构建校验） ─────────────────────────────────────
+	// 真实来源 = 仓库里真实的 src/content.config.ts：跑一次 `astro build`，
+	// 把 Astro 的报错（文件 + 字段 + 期望类型 + 实际类型）翻译成中文 + 怎么改。
+	// 跑不起来（没装依赖 / 超时）只给 warning，不阻断发布；跑起来但失败才是 error。
 	checks.push(
-		check("links", "正文里的站内链接", () => {
+		await check("content-schema", "文章 schema（真实构建校验）", () =>
+			buildContentSchemaCheck(repoRoot, {
+				buildTimeoutMs: options.contentBuildTimeoutMs,
+				noBuildCache: options.noContentBuildCache,
+			}),
+		),
+	);
+
+	// ── 6. 站内链接 ────────────────────────────────────────────────────────
+	checks.push(
+		await check("links", "正文里的站内链接", () => {
 			const distDir = path.join(repoRoot, "dist");
 			const hasDist = fs.existsSync(distDir);
 			const dynamic = [
@@ -229,9 +228,9 @@ export async function runDoctor(repoRoot, options = {}) {
 		}),
 	);
 
-	// ── 6. 体积异常的大文件 ────────────────────────────────────────────────
+	// ── 7. 体积异常的大文件 ────────────────────────────────────────────────
 	checks.push(
-		check("bigfiles", "异常大的文件（影响部署与国内加载）", () => {
+		await check("bigfiles", "异常大的文件（影响部署与国内加载）", () => {
 			const big = [];
 			for (const rel of files) {
 				let size = 0;
@@ -250,9 +249,9 @@ export async function runDoctor(repoRoot, options = {}) {
 		}),
 	);
 
-	// ── 7. 疑似密钥泄漏 ────────────────────────────────────────────────────
+	// ── 8. 疑似密钥泄漏 ────────────────────────────────────────────────────
 	checks.push(
-		check("secrets", "疑似密钥 / 令牌泄漏", () => {
+		await check("secrets", "疑似密钥 / 令牌泄漏", () => {
 			const patterns = [
 				[/gh[pousr]_[A-Za-z0-9]{20,}/, "GitHub token"],
 				[/sk-[A-Za-z0-9]{20,}/, "OpenAI 风格密钥"],
@@ -280,9 +279,9 @@ export async function runDoctor(repoRoot, options = {}) {
 		}),
 	);
 
-	// ── 8. 配置之间的自相矛盾 ──────────────────────────────────────────────
+	// ── 9. 配置之间的自相矛盾 ──────────────────────────────────────────────
 	checks.push(
-		check("configs", "配置项之间的一致性", () => {
+		await check("configs", "配置项之间的一致性", () => {
 			const problems = [];
 			const bg = "src/config/backgroundWallpaper.ts";
 			if (exists(repoRoot, bg)) {
@@ -316,7 +315,7 @@ export async function runDoctor(repoRoot, options = {}) {
 		}),
 	);
 
-	// ── 9. 工作区与远端状态 ────────────────────────────────────────────────
+	// ── 10. 工作区与远端状态 ───────────────────────────────────────────────
 	if (typeof options.gitInfo === "function") {
 		const info = await options.gitInfo();
 		checks.push({
