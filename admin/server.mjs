@@ -19,6 +19,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
+// CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
+import {
+	CI_CACHE_TTL_MS,
+	CI_TIMEOUT_MS,
+	FAILURE_CONCLUSIONS,
+	GITHUB_HEADERS,
+	describeFailure,
+	extractRunId,
+	fetchWithCache,
+	pickFailingJobs,
+	pickFailingSteps,
+	summarizeConclusion,
+	tailLines,
+} from "./ci.mjs";
 import { runDoctor } from "./doctor.mjs";
 import { handleFriends, handleFriendsFetch } from "./friends.mjs";
 import { COMPRESS_DIRS, compressImages } from "./media-compress.mjs";
@@ -669,23 +683,71 @@ async function latestAction() {
 	}
 }
 
-// GitHub check-run 的各种"没通过"结论；只认 success，其余一律不当作绿灯
-const FAILURE_CONCLUSIONS = new Set(["failure", "timed_out", "action_required", "startup_failure", "stale"]);
-
-/** 单个提交的 check-runs：8 秒超时，任何异常都返回空数组（调用方负责降级，不抛错） */
+/** 单个提交的 check-runs：8 秒超时 + 60 秒内存缓存，任何异常都返回空数组（调用方负责降级，不抛错） */
 async function checkRunsFor(owner, repo, sha) {
 	const url = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`;
-	try {
-		const res = await fetch(url, {
-			headers: { "User-Agent": "zhi-blog-admin", Accept: "application/vnd.github+json" },
-			signal: AbortSignal.timeout(8000),
+	const res = await fetchWithCache(url, {
+		ttlMs: CI_CACHE_TTL_MS,
+		timeoutMs: CI_TIMEOUT_MS,
+		headers: GITHUB_HEADERS,
+	});
+	if (!res.ok) return { ok: false, runs: [], error: res.error };
+	const data = res.data;
+	return { ok: true, runs: Array.isArray(data?.check_runs) ? data.check_runs : [], error: "" };
+}
+
+/**
+ * 失败详情：details_url → 运行 id → 作业列表 → 失败步骤 → 失败作业日志尾部。
+ *
+ * 每一步都是「尽力而为」：任何一步失败都只往 detailWarning 里写一句中文，
+ * 基本字段（sha / conclusion / checkName / detailsUrl / reason）照常返回，
+ * 所以 /api/ci 永远不会因为详情拿不到而变成 5xx。
+ */
+async function failureDetail(owner, repo, run, checks) {
+	const checkRun = checks.find((c) => FAILURE_CONCLUSIONS.has(c?.conclusion)) ?? checks[0] ?? null;
+	const warnings = [];
+
+	// 1) details_url 里的运行 id（GitHub 的 Actions check-run 形如 .../actions/runs/<id>/job/<jobId>）
+	let jobsJson = null;
+	let jobsWarning = "";
+	const runId = extractRunId(checkRun?.details_url);
+	if (!runId) {
+		jobsWarning = "check-run 的 details_url 里没有 Actions 运行 id，无法定位失败步骤";
+	} else {
+		const jobs = await fetchWithCache(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, {
+			ttlMs: CI_CACHE_TTL_MS,
+			timeoutMs: CI_TIMEOUT_MS,
+			headers: GITHUB_HEADERS,
 		});
-		if (!res.ok) return { ok: false, runs: [], error: `GitHub 返回 ${res.status}` };
-		const data = await res.json();
-		return { ok: true, runs: Array.isArray(data.check_runs) ? data.check_runs : [], error: "" };
-	} catch (error) {
-		return { ok: false, runs: [], error: error?.message ?? String(error) };
+		if (jobs.ok) jobsJson = jobs.data;
+		else jobsWarning = `读取运行 ${runId} 的作业列表失败：${jobs.error}`;
 	}
+
+	// 2) 只有真拿到了失败步骤才去拉日志（省一次请求）；公开仓库的 logs 接口有时可匿名读取
+	let logExcerpt = "";
+	let logWarning = "";
+	if (pickFailingSteps(jobsJson).length > 0) {
+		const job = pickFailingJobs(jobsJson).find((item) => Number.isFinite(Number(item?.id)) && Number(item.id) > 0);
+		if (!job) {
+			logWarning = "作业列表里没有可用的作业 id，未取日志片段";
+		} else {
+			const logs = await fetchWithCache(`https://api.github.com/repos/${owner}/${repo}/actions/jobs/${job.id}/logs`, {
+				ttlMs: CI_CACHE_TTL_MS,
+				timeoutMs: CI_TIMEOUT_MS,
+				headers: GITHUB_HEADERS,
+				asText: true,
+			});
+			if (!logs.ok) {
+				logWarning = `读取作业日志失败（${logs.error}），已省略日志片段`;
+			} else {
+				logExcerpt = tailLines(logs.data, 30);
+				if (!logExcerpt) logWarning = "作业日志为空，已省略日志片段";
+			}
+		}
+	}
+	if (warnings.length === 0 && logWarning) warnings.push(logWarning);
+
+	return describeFailure(run, checkRun, jobsJson, { jobsWarning, logExcerpt, logWarning });
 }
 
 /**
