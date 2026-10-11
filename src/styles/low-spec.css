@@ -1,0 +1,28 @@
+/*
+ * 低配模式（由 src/config/perfConfig.ts 的 lowSpec 控制，Layout.astro 在 <html> 上加 .low-spec 类）
+ *
+ * 为什么需要它：
+ * backdrop-filter（毛玻璃）会让元素强制生成独立的合成层，滚动或动画时每帧重新合成，
+ * 对核显是持续占用。把模糊半径调成 0 并不能去掉这个图层，必须直接移除属性。
+ *
+ * 这里只做两件事：去掉毛玻璃、停掉装饰性的无限循环动画。随时把 lowSpec 改回 false 即恢复原样。
+ */
+
+/* ① 去掉全部毛玻璃（含 -webkit- 前缀） */
+.low-spec *,
+.low-spec *::before,
+.low-spec *::after {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+/* ② 停掉装饰性循环动画（保留打字机光标这类有信息量的除外） */
+.low-spec .animate-spin-slow,
+.low-spec .animate-spin,
+.low-spec .animate-pulse,
+.low-spec .scroll-down-indicator .scroll-down-icon,
+.low-spec .effect-kenburns .slide-item,
+.low-spec .card-github.fetch-waiting .gc-infobar,
+.low-spec .card-github.fetch-waiting .gc-avatar {
+	animation: none !important;
+}

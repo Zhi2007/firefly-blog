@@ -45,7 +45,10 @@ import { getCanonicalUrl, url } from "@/utils/url-utils";
 import "@/styles/main.css";
 import "@/styles/immersive-reading.css";
 import "@/styles/variables.styl";
+import "@/styles/low-spec.css"; // 低配模式：去掉毛玻璃与装饰性循环动画（见 perfConfig.ts）
 import "@rehype-callouts-theme";
+
+import { perfConfig } from "@/config/perfConfig";
 
 interface Props {
 	title?: string;
@@ -159,7 +162,7 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
 ---
 
 <!doctype html>
-<html lang={siteLang} class="bg-(--page-bg) text-[14px] md:text-[16px]" data-wallpaper-mode={backgroundWallpaper.mode} data-fullscreen-layout={fullscreenLayout} data-has-wallpaper={hasWallpaper ? "" : undefined} data-tag-style={siteConfig.tagStyle ?? "pill"} data-category-style={siteConfig.categoryStyle ?? "rectangle"}>
+<html lang={siteLang} class={`bg-(--page-bg) text-[14px] md:text-[16px]${perfConfig.lowSpec ? " low-spec" : ""}`} data-wallpaper-mode={backgroundWallpaper.mode} data-fullscreen-layout={fullscreenLayout} data-has-wallpaper={hasWallpaper ? "" : undefined} data-tag-style={siteConfig.tagStyle ?? "pill"} data-category-style={siteConfig.categoryStyle ?? "rectangle"}>
   <head>
     <meta charset="UTF-8" />
     <style is:inline>
