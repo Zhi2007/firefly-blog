@@ -1046,7 +1046,7 @@ pnpm build
 | 隐蔽点 | `pioConfig` 里 Spine 已关，但 `live2dWidgetConfig.enable` 仍是 `true`，所以 `scripts/prune-pio-assets.ts` 也不会清理 `dist/` 里的 Live2D 资源 |
 | 处理 | `5123b6d`：`live2dWidgetConfig.enable: true → false`（纯配置）。验收：产物首页不再出现 Live2D 脚本标签，首页少下载约 651 KB，并去掉一个持续运行的动画循环 |
 | 现状 | `pioConfig.ts:6` 与 `:88` **都是 `false`** → `prune-pio-assets` 会删掉整个 `dist/pio`（约 15 MiB） |
-| ⚠️ 给 agent 的警告 | 面板里那个「性能 · Live2D 看板娘」开关**实际控制的是 `spineModelConfig.enable`**（见 4.4 节），不要用它来开 Live2D；要开 Live2D 只能改 `pioConfig.ts:88`，并预期 651 KB + 常驻动画回归 |
+| ⚠️ 给 agent 的警告 | 面板里**没有** Live2D 开关：原先误标为「性能 · Live2D 看板娘」的那一项已改名为 **`perf.spine`**，它**实际控制的是 `spineModelConfig.enable`**（见 4.4 节）（名实已相符，可放心使用）。要开/关 Live2D 只能改 `pioConfig.ts:88`，并预期 651 KB + 常驻动画回归 |
 
 ### 12.6 CSP 漏放 `esm.sh` 导致评论区整体打不开
 
