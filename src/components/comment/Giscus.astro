@@ -31,39 +31,61 @@ const darkTheme = "dark";
 />
 
 <script is:inline define:vars={{ lightTheme, darkTheme }}>
-  const requestedPath = new URLSearchParams(window.location.search).get("path");
-  const widget = document.querySelector("giscus-widget");
-  if (requestedPath && widget) {
-    widget.setAttribute("mapping", "specific");
-    widget.setAttribute("term", requestedPath);
+  // Giscus 用官方 Web Component（<giscus-widget>），本脚本负责三件事：
+  //   1) 支持 ?path=xxx 指定评论映射
+  //   2) 跟随站点深浅色切换主题
+  //   3) ★ Swup 页面切换后重新初始化
+  // 注意（曾经的 bug）：
+  //   a. 原实现只在脚本执行时 querySelector 一次并长期持有引用 —— 换页后那个节点已被替换，
+  //      引用失效会让评论区不再加载、主题也不再跟随。这里改成每次都重新查询。
+  //   b. 自定义元素靠 import 注册，换页后要再 import 一次（浏览器会命中模块缓存，幂等）。
+  //   c. 该 import 的域名必须出现在 CSP 的 script-src 里，否则整个评论区都加载不出来。
+
+  function currentWidget() {
+    return document.querySelector("giscus-widget");
   }
 
-  import("https://esm.sh/giscus");
-
-  function updateGiscusTheme() {
-    const isDark = document.documentElement.classList.contains('dark');
-    const theme = isDark ? darkTheme : lightTheme;
-    if (widget) {
-      widget.setAttribute('theme', theme);
+  function applyRequestedPath() {
+    const requestedPath = new URLSearchParams(window.location.search).get("path");
+    const widget = currentWidget();
+    if (requestedPath && widget) {
+      widget.setAttribute("mapping", "specific");
+      widget.setAttribute("term", requestedPath);
     }
   }
 
-  // Initial update
-  updateGiscusTheme();
-
-  // Clean up previous observer if exists
-  if (window.giscusThemeObserver) {
-    window.giscusThemeObserver.disconnect();
+  function updateGiscusTheme() {
+    const widget = currentWidget();
+    if (!widget) return;
+    const theme = document.documentElement.classList.contains("dark") ? darkTheme : lightTheme;
+    widget.setAttribute("theme", theme);
   }
 
-  // Create new observer
-  window.giscusThemeObserver = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        updateGiscusTheme();
+  function initGiscus() {
+    applyRequestedPath();
+    updateGiscusTheme();
+    import("https://esm.sh/giscus").catch((error) => {
+      console.warn("[giscus] 脚本加载失败（检查 CSP 的 script-src 是否放行了 esm.sh）:", error);
+    });
+  }
+
+  // 深浅色观察器只建一次；回调里每次重新查询 widget，避免持有失效引用
+  if (!window.giscusThemeObserver) {
+    window.giscusThemeObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes" && mutation.attributeName === "class") {
+          updateGiscusTheme();
+        }
       }
     });
-  });
+    window.giscusThemeObserver.observe(document.documentElement, { attributes: true });
+  }
 
-  window.giscusThemeObserver.observe(document.documentElement, { attributes: true });
+  initGiscus();
+  // 主题在页面切换后会派发这个事件；同时兼容 Swup 钩子与脚本被重新执行的情况
+  document.addEventListener("firefly:page:loaded", initGiscus);
+  document.addEventListener("swup:enable", () => {
+    if (window.swup && window.swup.hooks) window.swup.hooks.on("content:replace", initGiscus);
+  });
+  if (window.swup && window.swup.hooks) window.swup.hooks.on("content:replace", initGiscus);
 </script>
