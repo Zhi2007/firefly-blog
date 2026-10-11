@@ -13,6 +13,7 @@
 - [数据放在哪](#数据放在哪)
 - [站点设置：改 TS 配置也不会改坏](#站点设置改-ts-配置也不会改坏)
 - [体检（发布前的安全闸）](#体检发布前的安全闸)
+- [CI 失败详情（错在哪一步）](#ci-失败详情错在哪一步)
 - [备份与恢复](#备份与恢复)
 - [认证方式（HttpOnly Cookie）](#认证方式httponly-cookie)
 - [导航菜单（隐藏 / 改名 / 排序）](#导航菜单隐藏--改名--排序)
@@ -48,7 +49,7 @@ node admin/server.mjs --port=8899 --no-open
 | **媒体** | 分类查看文章图片、音乐、封面、歌词、头像目录；上传（可多选）、复制路径、删除；**批量转 WebP**（默认先试算，只新增 `.webp`，绝不删原图） |
 | **配置** | 直接编辑 `src/config/*` 里的常用配置文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
 | **站点设置** | **可视化表单**：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像、壁纸模式与暗度、主页横幅标题、**首页横幅副标题（每行一条）**、显示设置面板各项开关 + **页面开关** + **导航菜单（隐藏/改名/排序）**。写入前自动备份，写完回读校验，不一致立即回滚 |
-| **体检 / 备份** | 一键体检（JSON 合法性、引用是否丢失、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + **导出 ZIP**；**CI 部署状态**（失败时全页红色横幅 + 一键回滚该提交） |
+| **体检 / 备份** | 一键体检（JSON 合法性、引用是否丢失、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + **导出 ZIP**；**CI 部署状态**（失败时全页红色横幅，直接显示**是哪个 job 的哪个步骤挂了** + 日志片段 + 一键回滚该提交） |
 | **发布** | 同步状态（待推送提交数 / 远端新提交数 / 最后提交时间 / 最近一次部署结果）、**自动同步开关**、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住** |
 
 ## 从 Word / txt 导入文章
@@ -235,6 +236,94 @@ src/content/posts/images/<slug>-img2.jpg
 | Git 状态 | 未提交 / 待推送 / 落后远端 |
 
 **发布时会自动跑一遍**：只要出现 error 级问题就拦住 push（`/api/publish` 可用 `force: true` 跳过），避免把坏数据推上去。
+
+## CI 失败详情（错在哪一步）
+
+以前失败了只给一个短 sha，还得自己点进 GitHub Actions 翻日志。现在 `/api/ci` 会把失败的 check-run 一路追到「哪个 job 的哪个 step 挂了」，红色横幅直接显示：
+
+```
+❌ CI 部署失败：abc1234（❌ 失败）
+检查 build · 失败步骤：Build site
+原因：步骤 `Build site` 失败：Process completed with exit code 1
+▸ 查看日志片段（最后 30 行）
+[Actions 日志 →] [这次的 job →]                    [回滚这次提交（abc1234）]
+```
+
+### 它是怎么查出来的
+
+| 步骤 | 请求 | 拿到什么 |
+| --- | --- | --- |
+| 1 | `GET /repos/{o}/{r}/commits/{sha}/check-runs` | 每个提交的 check-run（结论 + `details_url`） |
+| 2 | 从 `details_url` 正则取运行 id（形态 `…/actions/runs/<id>/job/<jobId>`） | `1234567890` |
+| 3 | `GET /repos/{o}/{r}/actions/runs/{id}/jobs` | 该次运行的 job 列表 → 失败 job 里结论为失败的步骤名 |
+| 4 | `GET /repos/{o}/{r}/actions/jobs/{job_id}/logs` | 失败作业的日志尾部（最后 30 行；**仅当第 3 步拿到了失败步骤才请求**） |
+
+### `/api/ci` 的 `lastFailure` 字段（失败时非空）
+
+```json
+{
+	"ok": true,
+	"runs": [ "…8 个提交的结论，字段不变…" ],
+	"lastSuccess": { "sha": "05b5c94…", "url": "https://github.com/…/actions/runs/…" },
+	"lastFailure": {
+		"sha": "05b5c9412345678901234567890123456789abcd",
+		"shortSha": "05b5c94",
+		"conclusion": "failure",
+		"status": "completed",
+		"url": "https://github.com/zhihai-blog/firefly/actions/runs/1234567890/job/3456789012",
+		"createdAt": "2026-10-11T07:30:00Z",
+		"message": "feat: 示例提交",
+		"checkName": "build",
+		"detailsUrl": "https://github.com/zhihai-blog/firefly/actions/runs/1234567890/job/3456789012",
+		"runUrl": "https://github.com/zhihai-blog/firefly/actions/runs/1234567890",
+		"jobName": "build",
+		"failingSteps": ["Build site"],
+		"reason": "步骤 `Build site` 失败：Process completed with exit code 1",
+		"logExcerpt": "log line 32\n…\nProcess completed with exit code 1",
+		"detailWarning": ""
+	}
+}
+```
+
+| 字段 | 含义 |
+| --- | --- |
+| `sha` / `shortSha` / `status` / `createdAt` / `message` | 提交本身的信息（和 `runs[]` 里那条一致） |
+| `conclusion` | 汇总后的结论（`failure`；`timed_out` / `startup_failure` 等也归到这里） |
+| `checkName` | 失败的 check-run 名称（一般就是 job 名） |
+| `detailsUrl` | check-run 的 `details_url`（通常精确到 `…/job/<jobId>`） |
+| `runUrl` | 化简出的**那次 Actions 运行**地址 `…/actions/runs/<id>`；解析不出来是 `""` |
+| `jobName` | 失败作业名；没拿到是 `""` |
+| `failingSteps` | 失败步骤名数组（可能为空） |
+| `reason` | 一句话中文摘要（有步骤时形如「步骤 \`X\` 失败：<output.summary>」，否则退化成 `output.title` / `output.summary`） |
+| `logExcerpt` | 失败作业日志的最后 30 行（**拿不到就没有这个键**） |
+| `detailWarning` | 详情获取过程中的降级说明（正常情况下是空串） |
+
+前端横幅以 `lastFailure` 为准（找不到就退回 `runs[]` 里同 sha 的那条补齐结论/时间）：所以旧的失败被之后某次成功覆盖后，红条会自动消失，不会一直挂着。
+
+### 限流与降级
+
+- **60 秒内存缓存**：所有 GitHub 请求都走 `admin/ci.mjs` 的 `fetchWithCache()`，同一 URL 在 `CI_CACHE_TTL_MS`（60 秒）内只请求一次 —— 匿名 API 每小时只有 60 次，反复刷新面板不会把它刷爆；`ttlMs: 0` 可强制绕过缓存。缓存最多留 200 条（超出淘汰最旧的）。
+- **只缓存成功响应**：超时、断网、403（限流）、404、非法 JSON 都不进缓存，避免一次偶发失败在 60 秒内被"钉死"。
+- **8 秒超时**（`CI_TIMEOUT_MS`）+ 任何异常都降级成 `{ ok: false, error }`，不抛错；日志响应超长时只保留尾部 2 MB 再切 30 行。
+- **详情失败不影响主流程**：`lastFailure` 的基本字段（sha / conclusion / checkName / detailsUrl / reason）照常返回，失败原因写进 `detailWarning`，`/api/ci` 永远是 200（路由里还保留了一层 try/catch 兜底）。
+- 失败详情只在「这个失败真的要展示时」才去拉（最多多 2 个请求：jobs + logs）。
+
+### 代码位置
+
+| 文件 | 职责 |
+| --- | --- |
+| `admin/ci.mjs`（零依赖、可单测） | `extractRunId` / `runPageUrl` / `pickFailingJobs` / `pickFailingSteps` / `summarizeFailure` / `describeFailure` / `fetchWithCache` / `tailLines` / `firstLine` / `summarizeConclusion`（含 `FAILURE_CONCLUSIONS`） |
+| `admin/server.mjs` | 只接线：`failureDetail()` 发请求并逐步降级，`ciStatus()` 决定是否返回 `lastFailure` |
+| `admin/index.html` | 横幅渲染：`checkName` / `reason` / 步骤名 / 日志片段等**外部文本一律 `escapeHtml`**，日志用 `<details>` 折叠 |
+
+### 已知取舍
+
+| 取舍 | 说明 |
+| --- | --- |
+| 日志是"尽力而为" | `actions/jobs/{id}/logs` 对匿名请求并不稳定（可能 403/404，也可能 302 到签名地址）。取不到就不显示日志片段，只在 `detailWarning` 里说明；步骤与原因仍然照常显示 |
+| `reason` 只点名第一个失败步骤 | 多个失败步骤会在「失败步骤」一行里全部列出，摘要在句子里只用第一个 |
+| `cancelled` 不算失败 | 手动取消不触发红条（`FAILURE_CONCLUSIONS` 故意不含它）；`failure` / `timed_out` / `action_required` / `startup_failure` / `stale` 才算 |
+| 只看最近 8 个提交 | 和改造前一致；更早的老失败不显示 |
 
 ## 备份与恢复
 

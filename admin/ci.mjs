@@ -111,7 +111,10 @@ export function firstLine(text, maxLength = 200) {
 			.find((part) => part.length > 0) ?? "";
 	const flat = line.replace(/\s+/g, " ");
 	const limit = Number.isFinite(maxLength) && maxLength > 0 ? Math.floor(maxLength) : 200;
-	return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
+	if (flat.length > limit) return `${flat.slice(0, limit)}…`;
+	// GitHub 的 output.summary 常以英文句号收尾（"Process completed with exit code 1."），
+	// 拼进中文摘要里这个句号是多余的；只去掉单个结尾句号，不动其它内容
+	return flat.length > 1 && flat.endsWith(".") && !flat.endsWith("..") ? flat.slice(0, -1) : flat;
 }
 
 /** 日志尾部：只留最后 maxLines 行（去掉行尾空行与整体首尾空白），拿不到内容返回 "" */
@@ -153,7 +156,8 @@ export function summarizeFailure(checkRun, jobsJson, options = {}) {
 	// 一句话说清「错在哪一步」：有失败步骤就点名步骤，否则退化成 check-run 的标题/摘要
 	let reason;
 	if (failingSteps.length > 0) {
-		const detail = summary || title;
+		// 标题常常就是步骤名（"Build site"），此时只有 summary 才是有信息量的补充
+		const detail = summary || (title && title !== failingSteps[0] ? title : "");
 		reason = detail ? `步骤 \`${failingSteps[0]}\` 失败：${detail}` : `步骤 \`${failingSteps[0]}\` 失败`;
 	} else if (title && summary) {
 		reason = `检查「${title}」失败：${summary}`;
@@ -241,7 +245,7 @@ export async function fetchWithCache(url, options = {}) {
 	const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : CI_TIMEOUT_MS;
 	const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
-	const hit = CACHE.get(key);
+	const hit = ttlMs > 0 ? CACHE.get(key) : undefined;
 	if (hit && hit.expiresAt > Date.now()) return { ...hit.value, cached: true };
 	if (typeof fetchImpl !== "function") {
 		return { ok: false, status: 0, data: null, error: "当前 Node 没有可用的 fetch", cached: false };

@@ -141,6 +141,17 @@
 			.ci-ico { font-size: 15px; }
 			.ci-fail { color: var(--err); font-weight: 700; }
 			.ci-ok { color: var(--ok); font-weight: 700; }
+			/* CI 失败详情（横幅里的步骤 / 原因 / 日志片段） */
+			.ci-detail { margin-top: 6px; line-height: 1.6; }
+			.ci-detail .ci-reason { color: var(--err); }
+			.ci-log { margin-top: 8px; }
+			.ci-log summary { cursor: pointer; font-size: 12px; color: var(--primary); }
+			.ci-log pre {
+				max-height: 280px; overflow: auto; margin: 6px 0 0; padding: 8px 10px;
+				border: 1px solid var(--border); border-radius: 8px;
+				background: rgba(127, 127, 127, .08);
+				font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+			}
 			.nav-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 			.nav-row .nav-label { flex: 1; min-width: 160px; }
 			.friend-icon {
@@ -1200,8 +1211,9 @@
 			};
 			const CI_ICON = { success: "✅", failure: "❌", cancelled: "⏳", pending: "⏳" };
 
+			/** CI 链接优先用后端解析出的「那次 Actions 运行」地址（runUrl），退回 check-run 的 html_url */
 			function actionsRunUrl(run) {
-				return safeUrl(run && run.url);
+				return safeUrl(run && (run.runUrl || run.url));
 			}
 
 			function shortShaOf(run) {
@@ -1220,17 +1232,55 @@
 				return CI_ICON[conclusion] || "⏳";
 			}
 
-			/** 有失败时在体检页顶部显示醒目红色横幅 */
+			/** 当前该展示的失败：以 /api/ci 的 lastFailure 为准（后端保证"失败比任何一次成功都新"才返回） */
+			function currentCiFailure() {
+				const failure = ciCache && typeof ciCache.lastFailure === "object" ? ciCache.lastFailure : null;
+				if (!failure || !failure.sha) return null;
+				// 兼容旧后端（只返回 sha/url）：用 runs 里同一个提交补齐结论、时间、提交说明
+				const run = (Array.isArray(ciCache.runs) ? ciCache.runs : []).find((r) => r && r.sha === failure.sha);
+				return run ? { ...run, ...failure } : failure;
+			}
+
+			/** 失败详情（检查名 / 失败步骤 / 原因 / 日志片段）：内容全部来自外部 API，一律 escapeHtml */
+			function ciFailureDetailHtml(failed) {
+				const rows = [];
+				const checkName = String(failed.checkName || "").trim();
+				if (checkName) rows.push(`检查 <b>${escapeHtml(checkName)}</b>`);
+				const steps = Array.isArray(failed.failingSteps)
+					? failed.failingSteps.map((s) => String(s || "").trim()).filter(Boolean)
+					: [];
+				if (steps.length) rows.push(`失败步骤：${steps.map((s) => `<b>${escapeHtml(s)}</b>`).join("、")}`);
+				const head = rows.length ? `<div class="ci-detail small">${rows.join(" · ")}</div>` : "";
+				const reason = failed.reason
+					? `<div class="ci-detail small">原因：<span class="ci-reason">${escapeHtml(String(failed.reason))}</span></div>`
+					: "";
+				const warning = failed.detailWarning
+					? `<div class="ci-detail small muted">⚠️ ${escapeHtml(String(failed.detailWarning))}</div>`
+					: "";
+				const logText = typeof failed.logExcerpt === "string" ? failed.logExcerpt.trim() : "";
+				const log = logText
+					? `<details class="ci-log"><summary>查看日志片段（最后 ${logText.split("\n").length} 行）</summary><pre>${escapeHtml(logText)}</pre></details>`
+					: "";
+				return head + reason + warning + log;
+			}
+
+			/** 有失败时在体检页顶部显示醒目红色横幅（能看到"错在哪一步"） */
 			function ciBannerBlock(failed) {
 				const link = actionsRunUrl(failed);
-				const linkHtml = link
-					? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener">在 GitHub 查看这次运行 →</a>`
-					: '<span class="muted small">（这次运行没有返回链接）</span>';
-				return `<div class="banner-title">❌ CI 部署失败：${shortShaOf(failed)}</div>
-					<div>结论：<b>${ciText(failed.conclusion)}</b>
+				const detailLink = safeUrl(failed.detailsUrl);
+				const links = [];
+				if (link) links.push(`<a href="${escapeHtml(link)}" target="_blank" rel="noopener">Actions 日志 →</a>`);
+				if (detailLink && detailLink !== link) {
+					links.push(`<a href="${escapeHtml(detailLink)}" target="_blank" rel="noopener">这次的 job →</a>`);
+				}
+				const linkHtml = links.length ? links.join(" ") : '<span class="muted small">（这次运行没有返回链接）</span>';
+				return `<div class="banner-title">❌ CI 部署失败：<code>${shortShaOf(failed)}</code>（${ciText(failed.conclusion)}）</div>
+					${ciFailureDetailHtml(failed)}
+					<div class="small" style="margin-top:4px">
+						${failed.createdAt ? escapeHtml(new Date(failed.createdAt).toLocaleString()) : ""}
 						${failed.status ? ` · 状态：${escapeHtml(String(failed.status))}` : ""}
-						${failed.createdAt ? ` · ${escapeHtml(new Date(failed.createdAt).toLocaleString())}` : ""}</div>
-					${failed.message ? `<div class="small" style="margin-top:4px">${escapeHtml(String(failed.message))}</div>` : ""}
+						${failed.message ? ` · ${escapeHtml(String(failed.message))}` : ""}
+					</div>
 					<div class="row" style="margin-top:8px">
 						${linkHtml}
 						<span style="flex:1"></span>
@@ -1242,8 +1292,7 @@
 			function renderCiBanner() {
 				const bannerEl = $("ciBanner");
 				const topEl = $("topBanner");
-				const runs = (ciCache && Array.isArray(ciCache.runs)) ? ciCache.runs : [];
-				const failed = runs.find((r) => r && r.conclusion === "failure");
+				const failed = currentCiFailure();
 				// 失败信号变化时重新展示（用户手动关掉后不再反复弹）
 				if (failed && failed.sha !== ciKnownFailureSha) {
 					ciKnownFailureSha = failed.sha;
@@ -1257,9 +1306,10 @@
 				if (hidden) {
 					topEl.innerHTML = "";
 				} else {
+					const link = actionsRunUrl(failed);
 					topEl.innerHTML = `<div class="row">
-						<span class="banner-title">❌ CI 部署失败：${shortShaOf(failed)}（${ciText(failed.conclusion)}）</span>
-						${actionsRunUrl(failed) ? `<a href="${escapeHtml(actionsRunUrl(failed))}" target="_blank" rel="noopener" style="color:#fff">Actions 日志 →</a>` : ""}
+						<span class="banner-title">❌ CI 部署失败：<code>${shortShaOf(failed)}</code>（${ciText(failed.conclusion)}）${failed.checkName ? ` · 检查 ${escapeHtml(String(failed.checkName))}` : ""}</span>
+						${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" style="color:#fff">Actions 日志 →</a>` : ""}
 						<span style="flex:1"></span>
 						<button class="action ghost" data-ci-goto>去体检页回滚</button>
 					</div>`;
