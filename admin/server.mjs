@@ -57,6 +57,8 @@ import { handleFriends, handleFriendsFetch } from "./friends.mjs";
 import { COMPRESS_DIRS, compressImages } from "./media-compress.mjs";
 import { MAX_IMPORT_BYTES, convertToMarkdown } from "./import-doc.mjs";
 import { handleNav } from "./nav.mjs";
+// 文章 frontmatter 的读写共用模型：保存时**外科式改写**（日期不带引号、没编辑的行逐字节保留）
+import { composePostFile, readFrontmatterValues } from "./post-frontmatter.mjs";
 import { PAGE_BLOCK, PAGE_FILE, PAGE_PREFIX, SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
 import { createZip } from "./zip.mjs";
 
@@ -759,7 +761,14 @@ async function readYamlModule() {
 	}
 }
 
-/** 解析 Markdown 的 frontmatter（优先用项目里的 yaml 包，失败则退回简易解析） */
+/**
+ * 解析 Markdown 的 frontmatter（优先用项目里的 yaml 包，失败则用与**写入路径共用**的兜底解析）。
+ *
+ * 实测：本仓库 `import("yaml")` 一律 `ERR_MODULE_NOT_FOUND`（`yaml` 不在 package.json 依赖里，
+ * node_modules 根下也没有），所以真正跑的是兜底分支。旧兜底只认 `key: value` 一行，
+ * 于是块列表 `tags:`（`- 测试`）会被读成空字符串，表单显示为空、保存时就把标签写没了。
+ * 现在兜底交给 `post-frontmatter.mjs` 的 `readFrontmatterValues()`：与保存时的行模型完全一致。
+ */
 async function parseFrontmatter(raw) {
 	const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
 	if (!match) return { frontmatter: {}, body: raw };
@@ -770,65 +779,46 @@ async function parseFrontmatter(raw) {
 		try {
 			return { frontmatter: yaml.parse(yamlText) || {}, body };
 		} catch {
-			// 落到下面的简易解析
+			// 落到下面的兜底解析
 		}
 	}
-	const frontmatter = {};
-	for (const line of yamlText.split(/\r?\n/)) {
-		const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-		if (!m) continue;
-		const key = m[1];
-		let value = m[2].trim();
-		if (
-			(value.startsWith('"') && value.endsWith('"')) ||
-			(value.startsWith("'") && value.endsWith("'"))
-		) {
-			value = value.slice(1, -1);
-		} else if (value.startsWith("[") && value.endsWith("]")) {
-			value = value
-				.slice(1, -1)
-				.split(",")
-				.map((v) => v.trim().replace(/^["']|["']$/g, ""))
-				.filter(Boolean);
-		} else if (value === "true" || value === "false") {
-			value = value === "true";
-		}
-		frontmatter[key] = value;
-	}
-	return { frontmatter, body };
+	const { values } = readFrontmatterValues(raw);
+	return { frontmatter: values, body };
 }
 
-/** 组装 Markdown 文件内容（frontmatter 用 yaml 包序列化，保持可读） */
-async function stringifyPost(frontmatter, body) {
-	const yaml = await readYamlModule();
-	const ordered = {
-		title: frontmatter.title ?? "",
-		published: frontmatter.published ?? new Date().toISOString().slice(0, 10),
-		description: frontmatter.description ?? undefined,
-		tags: frontmatter.tags?.length ? frontmatter.tags : undefined,
-		category: frontmatter.category || undefined,
-		image: frontmatter.image || undefined,
-		pinned: frontmatter.pinned ? true : undefined,
-		draft: frontmatter.draft ? true : undefined,
+/**
+ * 保存前后对比 frontmatter 里的日期写法，返回给用户看的提示。
+ *
+ * 为什么要提示：历史坏数据（`published: "2026-10-11"`）在保存时会被顺手规整成不带引号的写法，
+ * 变好了也得说一声 —— 否则用户会以为「我没动日期，它怎么变了」。只读一行文本、只做提示，
+ * 不做任何别的动作（真正改写的是 post-frontmatter.mjs）。
+ */
+function dateNormalizeNotes(before, after) {
+	if (!before) return [];
+	// 只看 frontmatter 区块（第一个 `---` 到下一个 `---`）：正文里恰好有一行 `published: x`
+	// 不该被当成「日期被规整了」，否则会给用户弹一条莫名其妙的提示
+	const frontmatterOnly = (text) => {
+		const lines = String(text).split(/\r?\n/);
+		if (lines[0]?.trim() !== "---") return "";
+		const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+		return lines.slice(1, end < 0 ? lines.length : end).join("\n");
 	};
-	for (const [k, v] of Object.entries(frontmatter)) {
-		if (!(k in ordered) && v !== undefined && v !== null && v !== "") {
-			ordered[k] = v;
+	const readDateLines = (text) => {
+		const out = {};
+		for (const line of frontmatterOnly(text).split("\n")) {
+			const m = /^(published|updated):\s*(.*)$/.exec(line);
+			if (m) out[m[1]] = m[2].trim();
 		}
+		return out;
+	};
+	const oldLines = readDateLines(before);
+	const newLines = readDateLines(after);
+	const notes = [];
+	for (const [key, value] of Object.entries(newLines)) {
+		if (oldLines[key] === undefined || oldLines[key] === value) continue;
+		notes.push(`${key} 已从 ${oldLines[key]} 规整为 ${value}（日期不能带引号）`);
 	}
-	const clean = Object.fromEntries(
-		Object.entries(ordered).filter(([, v]) => v !== undefined && v !== null),
-	);
-	const yamlText = yaml
-		? yaml.stringify(clean).trimEnd()
-		: Object.entries(clean)
-				.map(([k, v]) =>
-					Array.isArray(v)
-						? `${k}: [${v.join(", ")}]`
-						: `${k}: ${typeof v === "string" ? `"${v}"` : v}`,
-				)
-				.join("\n");
-	return `---\n${yamlText}\n---\n\n${body.replace(/^\s*\n/, "")}`;
+	return notes;
 }
 
 /**
@@ -1764,7 +1754,13 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "originalSlug 只能包含字母、数字、点、下划线和连字符" });
 					return;
 				}
-				const content = await stringifyPost(frontmatter || {}, md || "");
+				// 外科式改写：读目标文件**当前**的原文当基准，只替换「值真的变了」的字段行，
+				// 其余行（注释 / 字段顺序 / 引号风格 / 块列表 / 面板不认识的字段）逐字节保留。
+				// 日期字段由 composePostFile 规范化成不带引号的 YYYY-MM-DD（非法日期抛 400，不落盘）。
+				const baseRel = `${POSTS_DIR}/${originalSlug && originalSlug !== "" ? String(originalSlug) : slug}.md`;
+				const baseAbs = safeResolve(baseRel);
+				const baseRaw = (await exists(baseAbs)) ? await fs.readFile(baseAbs, "utf-8") : null;
+				const content = composePostFile({ baseRaw, frontmatter, body: md || "" });
 				const target = safeResolve(`${POSTS_DIR}/${slug}.md`);
 				await fs.mkdir(path.dirname(target), { recursive: true });
 				await snapshotBefore(
@@ -1776,7 +1772,10 @@ const server = createServer(async (req, res) => {
 					const oldFile = safeResolve(`${POSTS_DIR}/${originalSlug}.md`);
 					if (await exists(oldFile)) await fs.rm(oldFile, { force: true });
 				}
-				sendJson(res, 200, { ok: true, file: `${POSTS_DIR}/${slug}.md` });
+				// 把「这次顺手规整掉的坏写法」告诉用户（例如历史遗留的 published: "2026-10-11"）——
+				// 面板只在 toast 里提示，不做任何静默改写之外的额外动作
+				const notes = dateNormalizeNotes(baseRaw, content);
+				sendJson(res, 200, { ok: true, file: `${POSTS_DIR}/${slug}.md`, notes });
 				return;
 			}
 
