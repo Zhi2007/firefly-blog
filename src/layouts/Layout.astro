@@ -490,6 +490,8 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       define:vars={{
         configHue,
         "page-width": `${siteConfig.pageWidth ?? PAGE_WIDTH}rem`,
+        // 主内容区宽度自适应：取「最大宽度」与「占屏比」中较小者（见 siteConfig.contentWidth）
+        "container-lg": `min(${siteConfig.contentWidth ?? 1600}px, ${siteConfig.contentWidthVw ?? 94}vw)`,
         "navbar-panel-blur": `${navbarPanelBlur}px`,
         "banner-height-home": `${BANNER_HEIGHT_HOME}vh`,
         "banner-height-non-home": `max(${BANNER_HEIGHT_NON_HOME}vh, ${BANNER_HEIGHT_NON_HOME_MIN}px)`,

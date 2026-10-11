@@ -30,6 +30,8 @@ export const SETTINGS_DEFS = [
 	{ id: "site.site_url", file: "src/config/siteConfig.ts", key: "site_url", type: "string", label: "站点 URL（主域）" },
 	{ id: "site.startDate", file: "src/config/siteConfig.ts", key: "siteStartDate", type: "string", label: "建站日期（时间进度用）" },
 	{ id: "site.pageWidth", file: "src/config/siteConfig.ts", key: "pageWidth", type: "number", min: 50, max: 200, label: "页面宽度（rem，50-200）" },
+	{ id: "site.contentWidth", file: "src/config/siteConfig.ts", key: "contentWidth", type: "number", min: 600, max: 2400, label: "主内容区最大宽度（px，≥1280px 屏幕生效）" },
+	{ id: "site.contentWidthVw", file: "src/config/siteConfig.ts", key: "contentWidthVw", type: "number", min: 60, max: 100, label: "主内容区占屏比例（%，自适应屏宽）" },
 	{ id: "navbar.title", file: "src/config/siteConfig.ts", key: "title", within: "navbar", type: "string", label: "导航栏标题" },
 	{ id: "theme.hue", file: "src/config/siteConfig.ts", key: "hue", within: "themeColor", type: "number", min: 0, max: 360, label: "主题色相（0-360）" },
 	{ id: "theme.defaultMode", file: "src/config/siteConfig.ts", key: "defaultMode", within: "themeColor", type: "enum", values: ["light", "dark", "system"], label: "默认明暗模式" },
