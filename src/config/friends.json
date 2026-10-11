@@ -4,9 +4,7 @@
 		"imgurl": "/friends/bdgroup-lab-com.ico",
 		"desc": "为多彩的明天献上祝福！",
 		"siteurl": "https://www.bdgroup-lab.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 24,
 		"enabled": true
 	},
@@ -15,9 +13,7 @@
 		"imgurl": "/friends/h-juij-fun.ico",
 		"desc": "By. Juij —— 工具与资源整理",
 		"siteurl": "https://h.juij.fun/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 23,
 		"enabled": true
 	},
@@ -26,9 +22,7 @@
 		"imgurl": "/friends/91biu.work.svg",
 		"desc": "差生工具多",
 		"siteurl": "https://www.91biu.work/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -37,9 +31,7 @@
 		"imgurl": "/friends/mefcl-com.png",
 		"desc": "绿色便携软件与资源分享",
 		"siteurl": "https://www.mefcl.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 21,
 		"enabled": true
 	},
@@ -48,9 +40,7 @@
 		"imgurl": "/friends/fuun-fun.ico",
 		"desc": "奇趣网站收藏家",
 		"siteurl": "https://fuun.fun/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -59,9 +49,7 @@
 		"imgurl": "/friends/osu-ppy-sh.png",
 		"desc": "免费的音乐节奏游戏，上手简单、容易上瘾",
 		"siteurl": "https://osu.ppy.sh/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -70,9 +58,7 @@
 		"imgurl": "/friends/pandadatech.webp",
 		"desc": "PanDaTech's Blog - 愿此行，终抵群星。分享个人技术经验，培养个人爱好，创造新的人生。",
 		"siteurl": "https://www.pandadatech.cn/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -81,9 +67,7 @@
 		"imgurl": "/friends/blog-upx8-com.ico",
 		"desc": "AI 机器人硬件、网络安全攻防、区块链等技术文档",
 		"siteurl": "https://blog.upx8.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 17,
 		"enabled": true
 	},
@@ -92,9 +76,7 @@
 		"imgurl": "/friends/hmcl-huangyuhui-net.ico",
 		"desc": "开源的 Minecraft 启动器，跨平台、好上手",
 		"siteurl": "https://hmcl.huangyuhui.net/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 16,
 		"enabled": true
 	},
@@ -103,9 +85,7 @@
 		"imgurl": "/friends/wepe-com-cn.ico",
 		"desc": "超好用的装机维护工具",
 		"siteurl": "https://www.wepe.com.cn/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 15,
 		"enabled": true
 	},
@@ -114,9 +94,7 @@
 		"imgurl": "/friends/firpe-cn.png",
 		"desc": "免费纯净的 PE 维护系统",
 		"siteurl": "https://firpe.cn/page-247",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 14,
 		"enabled": true
 	},
@@ -125,9 +103,7 @@
 		"imgurl": "/friends/officetool-plus.ico",
 		"desc": "Office 部署与激活管理工具",
 		"siteurl": "https://www.officetool.plus/zh-cn/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 13,
 		"enabled": true
 	},
@@ -136,9 +112,7 @@
 		"imgurl": "/friends/wiki-uotan-cn.ico",
 		"desc": "刷机百科（柚坛社区）",
 		"siteurl": "https://wiki.uotan.cn/index.php?title=%E9%A6%96%E9%A1%B5",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 12,
 		"enabled": true
 	},
@@ -147,9 +121,7 @@
 		"imgurl": "/friends/flingtrainer-com.png",
 		"desc": "PC 游戏修改器与作弊表",
 		"siteurl": "https://flingtrainer.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 11,
 		"enabled": true
 	},
@@ -158,9 +130,7 @@
 		"imgurl": "/friends/yhcres-top.png",
 		"desc": "萤火虫资源站，原酷米基地，提供多达22TB+的安卓玩机资源，包括各品牌手机的官方固件、第三方ROM、内核、TWRP、救砖包等。分类明确，免登录不限速下载。",
 		"siteurl": "https://www.yhcres.top/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -169,9 +139,7 @@
 		"imgurl": "/friends/next-itellyou-cn.ico",
 		"desc": "MSDN 原版系统与软件镜像",
 		"siteurl": "https://next.itellyou.cn/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 9,
 		"enabled": true
 	},
@@ -180,9 +148,7 @@
 		"imgurl": "/friends/ghxi-com.ico",
 		"desc": "互联网的净土 —— 软件分享",
 		"siteurl": "https://www.ghxi.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 8,
 		"enabled": true
 	},
@@ -191,9 +157,7 @@
 		"imgurl": "/friends/jamcz-com.png",
 		"desc": "专注开发小众实用软件",
 		"siteurl": "https://jamcz.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 7,
 		"enabled": true
 	},
@@ -202,9 +166,7 @@
 		"imgurl": "/friends/xydh-fun.png",
 		"desc": "实用网址导航（Dieheart）",
 		"siteurl": "https://xydh.fun/dieheart",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 6,
 		"enabled": true
 	},
@@ -213,9 +175,7 @@
 		"imgurl": "/friends/firepx-com.png",
 		"desc": "谷歌版、定制版应用分享",
 		"siteurl": "https://www.firepx.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 5,
 		"enabled": true
 	},
@@ -224,9 +184,7 @@
 		"imgurl": "/friends/ippure-com.ico",
 		"desc": "IP 地址信息与纯净度检测",
 		"siteurl": "https://ippure.com/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 4,
 		"enabled": true
 	},
@@ -235,9 +193,7 @@
 		"imgurl": "/friends/moliranran.com.jpeg",
 		"desc": "欢迎来到 莫离然然的下载站",
 		"siteurl": "https://moliranran.com:5245/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 20,
 		"enabled": true
 	},
@@ -246,9 +202,7 @@
 		"imgurl": "/friends/abracadabra-js-org.png",
 		"desc": "JS 代码保护 / 混淆工具",
 		"siteurl": "https://abracadabra.js.org/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 2,
 		"enabled": true
 	},
@@ -257,9 +211,7 @@
 		"imgurl": "/friends/virustotal-com.png",
 		"desc": "在线多引擎病毒扫描（Google 旗下）",
 		"siteurl": "https://www.virustotal.com/gui/",
-		"tags": [
-			"友链"
-		],
+		"tags": ["友链"],
 		"weight": 1,
 		"enabled": true
 	},
@@ -268,9 +220,7 @@
 		"imgurl": "https://docs-firefly.cuteleaf.cn/logo.png",
 		"desc": "本站所用主题的官方文档（中文）",
 		"siteurl": "https://docs-firefly.cuteleaf.cn",
-		"tags": [
-			"文档"
-		],
+		"tags": ["文档"],
 		"weight": 2,
 		"enabled": true
 	},
@@ -279,9 +229,7 @@
 		"imgurl": "https://avatars.githubusercontent.com/u/44914786?v=4&s=640",
 		"desc": "本站使用的静态站点框架",
 		"siteurl": "https://github.com/withastro/astro",
-		"tags": [
-			"框架"
-		],
+		"tags": ["框架"],
 		"weight": 1,
 		"enabled": true
 	}
