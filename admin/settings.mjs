@@ -49,10 +49,20 @@ export const SETTINGS_DEFS = [
 		type: "stringlist",
 		label: "首页横幅副标题（每行一条）",
 	},
-	{ id: "display.enable", file: "src/config/displaySettingsConfig.ts", key: "enable", type: "boolean", label: "显示设置面板（🎨 按钮）" },
-	{ id: "display.wallpaperModeSwitchable", file: "src/config/displaySettingsConfig.ts", key: "wallpaperModeSwitchable", type: "boolean", label: "允许访客切换壁纸模式" },
+	{ id: "display.enable", file: "src/config/displaySettingsConfig.ts", key: "enable", type: "boolean", label: "显示设置面板（🎨 按钮；整个关掉最省资源）" },
+	{ id: "display.wallpaperModeSwitchable", file: "src/config/displaySettingsConfig.ts", key: "wallpaperModeSwitchable", type: "boolean", label: "允许访客切换壁纸模式（开启会让每页多约 33KB JS）" },
 	{ id: "display.themeColorSwitchable", file: "src/config/displaySettingsConfig.ts", key: "themeColorSwitchable", type: "boolean", label: "允许访客切换主题色" },
 	{ id: "display.sakuraSwitchable", file: "src/config/displaySettingsConfig.ts", key: "sakuraSwitchable", type: "boolean", label: "允许访客切换樱花特效" },
+
+	// ── 性能相关：关掉最耗 GPU 的特效（作者实测核显占用高时优先调这些） ──────────
+	{ id: "perf.live2d", file: "src/config/pioConfig.ts", key: "enable", within: "pioConfig", type: "boolean", label: "性能 · Live2D 看板娘（关掉省 651KB 且去掉常驻动画）" },
+	{ id: "perf.wavesDesktop", file: "src/config/backgroundWallpaper.ts", key: "desktop", within: ["waves", "enable"], type: "boolean", label: "性能 · 水波纹动画（桌面端，主题注明会影响性能）" },
+	{ id: "perf.wavesMobile", file: "src/config/backgroundWallpaper.ts", key: "mobile", within: ["waves", "enable"], type: "boolean", label: "性能 · 水波纹动画（移动端）" },
+	{ id: "perf.gradientDesktop", file: "src/config/backgroundWallpaper.ts", key: "desktop", within: ["gradient", "enable"], type: "boolean", label: "性能 · 底部渐变过渡（桌面端，纯 CSS 开销小）" },
+	{ id: "perf.gradientMobile", file: "src/config/backgroundWallpaper.ts", key: "mobile", within: ["gradient", "enable"], type: "boolean", label: "性能 · 底部渐变过渡（移动端）" },
+	{ id: "perf.blurRampDesktop", file: "src/config/backgroundWallpaper.ts", key: "desktop", within: "blurRamp", type: "boolean", label: "性能 · 全屏模糊渐变（桌面端，整屏模糊很耗 GPU）" },
+	{ id: "perf.blurRampMobile", file: "src/config/backgroundWallpaper.ts", key: "mobile", within: "blurRamp", type: "boolean", label: "性能 · 全屏模糊渐变（移动端）" },
+	{ id: "perf.carousel", file: "src/config/backgroundWallpaper.ts", key: "enable", within: "carousel", type: "boolean", label: "性能 · 壁纸轮播（会周期性切换整屏大图）" },
 ];
 
 /** 页面开关（siteConfig 顶部 resolvePageToggles({...})），键从文件里动态读出，保持与主题同步 */
@@ -128,22 +138,40 @@ function literalFor(def, value) {
 	}
 }
 
-/** 找到 `blockName: {` 或 `blockName({` 对应的整个块，返回 [start, end]（含首尾花括号） */
-function findBlock(text, blockName) {
-	const startRe = new RegExp(`\\b${blockName}\\s*(?::\\s*|\\()\\s*\\{`, "m");
-	const match = startRe.exec(text);
-	if (!match) return null;
-	let depth = 0;
-	let i = match.index + match[0].length - 1; // 指向 "{"
-	for (; i < text.length; i++) {
-		const ch = text[i];
-		if (ch === "{") depth++;
-		else if (ch === "}") {
-			depth--;
-			if (depth === 0) return [match.index, i + 1];
+/**
+ * 找到配置块，返回 [start, end]（含首尾花括号）。
+ * blockPath 可以是单个块名，也可以是**路径数组**（如 ["fullscreen","blurRamp","enable"]），
+ * 逐层深入后返回最内层块的坐标（相对最初传入的文本），这样 within 就能定位深层嵌套字段。
+ */
+function findBlock(text, blockPath) {
+	const names = Array.isArray(blockPath) ? blockPath : [blockPath];
+	let scope = text;
+	let base = 0;
+	let span = null;
+	for (const name of names) {
+		const startRe = new RegExp(`\\b${name}\\b[^{}]*?\\{`, "m");
+		const match = startRe.exec(scope);
+		if (!match) return null;
+		const braceIdx = match.index + match[0].length - 1; // 指向 "{"
+		let depth = 0;
+		let end = -1;
+		for (let i = braceIdx; i < scope.length; i++) {
+			const ch = scope[i];
+			if (ch === "{") depth++;
+			else if (ch === "}") {
+				depth--;
+				if (depth === 0) {
+					end = i;
+					break;
+				}
+			}
 		}
+		if (end < 0) return null;
+		span = [base + braceIdx, base + end + 1];
+		scope = scope.slice(braceIdx, end + 1); // 进入这一层继续找
+		base += braceIdx;
 	}
-	return null;
+	return span;
 }
 
 /**
