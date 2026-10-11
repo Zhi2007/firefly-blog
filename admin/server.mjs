@@ -810,19 +810,6 @@ async function ciStatus() {
 	};
 }
 
-/** 把若干 check-run 的结论归并成一个：任一失败即失败，全绿才算成功 */
-function summarizeConclusion(checks) {
-	if (!Array.isArray(checks) || checks.length === 0) return "unknown";
-	const conclusions = checks.map((c) => c.conclusion).filter(Boolean);
-	if (conclusions.length === 0) return "pending";
-	if (conclusions.some((c) => FAILURE_CONCLUSIONS.has(c))) return "failure";
-	if (conclusions.some((c) => c === "skipped" || c === "neutral")) {
-		return conclusions.every((c) => c === "success" || c === "skipped" || c === "neutral") ? "success" : "pending";
-	}
-	if (conclusions.every((c) => c === "success")) return "success";
-	return "pending";
-}
-
 /** 找 pnpm：直接命令 → corepack → npx（找不到返回 null） */
 async function findPnpm() {
 	const direct = await run("pnpm", ["--version"], { shell: process.platform === "win32" });
