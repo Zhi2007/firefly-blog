@@ -17,6 +17,7 @@ export const PUBLISH_SCOPE = [
 	"public/assets", // 媒体库上传与压缩产物（图片、音乐、封面）
 	"public/friends", // 友链图标
 	"public/vendor", // 自托管第三方脚本（如 giscus）
+	"src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，必须随文章一起发布，否则线上少了封面占位数据
 ];
 
 /** 把 git 输出的路径归一化成 / 分隔、去掉可能的引号 */
