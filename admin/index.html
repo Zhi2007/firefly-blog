@@ -560,6 +560,32 @@
 			<!-- 站点设置（可视化表单） -->
 			<section class="panel" id="panel-settings">
 				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">站点头像</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnAvatarReload">刷新</button>
+					</div>
+					<div class="hint">
+						对应 <code>src/config/profileConfig.ts</code> 的 <code>avatar</code> 字段（也可以在下面的表单里直接改「头像路径」）。
+						上传会另存为 <code>public/assets/images/avatar-&lt;内容哈希&gt;.&lt;格式&gt;</code>：<b>不覆盖原头像</b>，改配置前自动备份、写完回读校验，失败即回滚。
+					</div>
+					<div class="row" style="margin-top:10px;align-items:flex-start;gap:16px">
+						<img id="avatarPreview" alt="当前头像" width="96" height="96"
+							style="width:96px;height:96px;border-radius:50%;object-fit:cover;background:rgba(127,127,127,.25)"
+							onerror="this.style.visibility='hidden'" />
+						<div style="flex:1;min-width:240px">
+							<div class="small">当前：<code id="avatarPath">读取中…</code></div>
+							<div class="small muted" id="avatarMeta"></div>
+							<div class="row" style="margin-top:8px;align-items:center">
+								<label for="avatarUpload" class="action" style="cursor:pointer;margin:0">上传新头像…</label>
+								<input type="file" id="avatarUpload" accept=".png,.jpg,.jpeg,.webp,.avif,.gif" style="display:none" />
+								<button class="action ghost" id="btnAvatarDefault">恢复默认</button>
+							</div>
+							<div class="small muted" id="avatarNote"></div>
+						</div>
+					</div>
+				</div>
+				<div class="card">
 					<h2>站点设置</h2>
 					<div class="hint">
 						这些字段来自 <code>src/config</code> 的白名单。<b>保存前会自动备份原文件</b>，写入后会回读校验，校验不过立即回滚 —— 不会留下改坏的文件。
@@ -1133,6 +1159,103 @@
 				}
 			}
 
+			// ── 站点头像 ───────────────────────────────────────────────────
+			// 头像不是「媒体库里的一个文件」那么简单：换图 = 写新文件 + 改写 profileConfig.ts 的 avatar 字段。
+			// 所以入口放在「站点设置」页（配置的归属地），而不是只做文件管理的「媒体」页。
+			let avatarState = null;
+
+			/** 只有 http(s) 或站内绝对路径能在面板里直接预览（src 相对路径浏览器取不到） */
+			function avatarPreviewSrc(url) {
+				const text = String(url || "");
+				return /^https?:\/\//i.test(text) || text.startsWith("/") ? text : "";
+			}
+
+			async function loadAvatar() {
+				try {
+					const data = await api("/api/avatar");
+					avatarState = data;
+					const url = String(data.url || "");
+					const img = $("avatarPreview");
+					const src = avatarPreviewSrc(url);
+					if (src) {
+						img.src = src;
+						img.style.visibility = "visible";
+					} else {
+						img.removeAttribute("src");
+						img.style.visibility = "hidden";
+					}
+					$("avatarPath").textContent = url || "（配置里没有头像路径）";
+					const bits = [];
+					if (data.remote) bits.push("远程 URL（面板改不了它的文件）");
+					if (data.repoPath) bits.push(data.repoPath);
+					if (data.fileExists) bits.push(humanSize(data.size));
+					else if (data.repoPath) bits.push("⚠️ 文件不存在");
+					if (data.isDefault) bits.push("默认头像");
+					$("avatarMeta").textContent = bits.join(" · ");
+					if (data.limits && data.limits.accept) $("avatarUpload").accept = data.limits.accept;
+					$("avatarNote").textContent = `单张上限 ${(data.limits && data.limits.maxBytesText) || "25.0MB"}；静态图最长边超过 ${(data.limits && data.limits.maxDimension) || 512}px 会自动等比缩小（动图 / GIF 不缩，避免丢帧）`;
+				} catch (error) {
+					$("avatarNote").textContent = `头像状态读取失败：${error.message}`;
+				}
+			}
+
+			async function uploadAvatarFile(file) {
+				if (!file) return;
+				const limits = (avatarState && avatarState.limits) || {};
+				const maxBytes = Number(limits.maxBytes) > 0 ? Number(limits.maxBytes) : 25 * 1024 * 1024;
+				if (!/\.(png|jpe?g|webp|avif|gif)$/i.test(file.name)) {
+					toast("头像只支持 png / jpg / jpeg / webp / avif / gif", "err");
+					return;
+				}
+				if (file.size > maxBytes) {
+					toast(`头像太大（${humanSize(file.size)}），上限 ${limits.maxBytesText || "25.0MB"}`, "err");
+					return;
+				}
+				if (!confirm(`确定把站点头像换成 ${file.name}（${humanSize(file.size)}）？\n会写入一个新文件，并把 profileConfig.ts 的 avatar 指向它；原头像文件不会被覆盖。`)) return;
+				const dataBase64 = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(String(reader.result).split(",")[1]);
+					reader.onerror = reject;
+					reader.readAsDataURL(file);
+				});
+				try {
+					$("avatarNote").textContent = "上传处理中…";
+					const result = await api("/api/avatar", {
+						method: "POST",
+						body: { filename: file.name, dataBase64 },
+					});
+					toast(result.message || "头像已更新", "ok");
+					await loadAvatar();
+					// 关键：同步刷新设置表单，否则里面那份「头像路径」还是旧值，
+					// 之后点「保存设置」就会把刚换好的头像写回旧路径
+					await loadSettings();
+					await loadDiff();
+					scheduleAutoPublish("chore: 更换站点头像");
+				} catch (error) {
+					toast(error.message, "err");
+					await loadAvatar();
+				}
+			}
+
+			async function restoreDefaultAvatar() {
+				const def = (avatarState && avatarState.default) || "/assets/images/avatar-zhi.webp";
+				if (avatarState && avatarState.isDefault) {
+					toast("当前用的已经是默认头像", "ok");
+					return;
+				}
+				if (!confirm(`确定把头像改回默认（${def}）？\n上传过的图片文件不会被删除，随时能再切回去。`)) return;
+				try {
+					const result = await api("/api/avatar", { method: "POST", body: { restore: true } });
+					toast(result.message || "已恢复默认头像", "ok");
+					await loadAvatar();
+					await loadSettings();
+					await loadDiff();
+					scheduleAutoPublish("chore: 恢复默认头像");
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
 			// ── 体检 / 备份 ───────────────────────────────────────────────
 			async function loadDoctor() {
 				$("doctorBox").innerHTML = "体检中…";
@@ -1661,6 +1784,17 @@
 
 			$("btnSaveSettings").addEventListener("click", saveSettings);
 			$("btnReloadSettings").addEventListener("click", loadSettings);
+			$("btnAvatarReload").addEventListener("click", () => {
+				void loadAvatar();
+			});
+			$("btnAvatarDefault").addEventListener("click", () => {
+				void restoreDefaultAvatar();
+			});
+			$("avatarUpload").addEventListener("change", (e) => {
+				const file = e.target.files && e.target.files[0];
+				e.target.value = ""; // 清空，方便连续两次选同一个文件
+				void uploadAvatarFile(file);
+			});
 			$("btnDoctor").addEventListener("click", loadDoctor);
 			$("btnBackups").addEventListener("click", loadBackups);
 			$("btnCiReload").addEventListener("click", () => {
@@ -1708,6 +1842,7 @@
 					if (btn.dataset.tab === "config") await loadConfigList();
 					if (btn.dataset.tab === "settings") {
 						await loadSettings();
+						await loadAvatar();
 						await loadNav();
 					}
 					if (btn.dataset.tab === "doctor") {
@@ -2796,6 +2931,7 @@
 
 			bindEditor();
 			void loadTaxonomy();
+			void loadAvatar();
 			loadStatus();
 			loadDiff();
 			// 进页面就查一次 CI，失败会立刻在顶部显示红色横幅
