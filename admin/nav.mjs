@@ -142,7 +142,22 @@ async function saveNav({ repoRoot, body, snapshotBefore }) {
 export async function handleNav({ repoRoot, method = "GET", body, snapshotBefore }) {
 	try {
 		if (method === "GET") {
-			return { status: 200, payload: { items: await listNav(repoRoot) } };
+			// 路径说明：改动只写 OVERRIDES_FILE；菜单项本身是从 NAV_FILE **只读**解析出来的。
+			// 覆盖文件可能还不存在（从没改过导航 = 空覆盖），所以如实带上 fileExists，
+			// 前端据此显示「（尚未创建）」而不是谎称它存在。
+			const fileExists = await fs
+				.access(path.join(repoRoot, OVERRIDES_FILE))
+				.then(() => true)
+				.catch(() => false);
+			return {
+				status: 200,
+				payload: {
+					items: await listNav(repoRoot),
+					file: OVERRIDES_FILE,
+					sourceFile: NAV_FILE,
+					fileExists,
+				},
+			};
 		}
 		if (method === "POST") {
 			return await saveNav({ repoRoot, body, snapshotBefore });

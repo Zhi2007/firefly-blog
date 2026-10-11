@@ -164,6 +164,8 @@ export async function listSnapshots(repoRoot) {
 		const meta = await readMeta(dir);
 		out.push({
 			id: name,
+			// 面板要显示「这份快照在仓库里的哪里」：目录是我们刚刚 stat 过的，真实存在
+			dir: `${BACKUP_DIR}/${name}`,
 			time: meta?.time ?? null,
 			reason: meta?.reason ?? "",
 			files: (meta?.files ?? []).map((f) => ({ rel: f.rel, size: f.size })),

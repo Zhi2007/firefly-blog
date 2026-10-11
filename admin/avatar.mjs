@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { applySettings, readSettings } from "./settings.mjs";
+import { SETTINGS_DEFS, applySettings, readSettings } from "./settings.mjs";
 
 /** 头像落盘目录（相对仓库根，正斜杠）——就是 MEDIA_DIRS.avatar */
 export const AVATAR_DIR = "public/assets/images";
@@ -226,6 +226,7 @@ function encodeAs(pipeline, ext) {
 /**
  * 当前头像状态（面板缩略图 / 路径 / 体积）。
  * 读的是 `settings.mjs` 的 `readSettings`，所以显示的一定是**配置里的真实值**，不是猜测。
+ * `config` 字段（file + key）直接取自 SETTINGS_DEFS，面板用它显示「这个值存在哪个文件的哪个字段」。
  */
 export async function describeAvatar(repoRoot) {
 	let url = null;
@@ -236,8 +237,11 @@ export async function describeAvatar(repoRoot) {
 		url = null;
 	}
 
+	const def = SETTINGS_DEFS.find((item) => item.id === AVATAR_SETTING_ID) ?? null;
 	const base = {
 		settingId: AVATAR_SETTING_ID,
+		// 头像路径被写进哪个文件的哪个字段（缺 def 时为 null，前端就不显示这个徽章）
+		config: def ? { file: def.file, key: def.key, within: def.within ?? null } : null,
 		url,
 		dir: AVATAR_DIR,
 		default: AVATAR_DEFAULT,

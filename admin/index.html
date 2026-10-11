@@ -80,6 +80,34 @@
 			.tag { display: inline-block; padding: 1px 7px; border-radius: 999px; background: rgba(127,127,127,.14); font-size: 12px; margin-right: 4px; }
 			.muted { color: var(--muted); }
 			.small { font-size: 12px; }
+			/*
+			 * ── 路径徽章 ──────────────────────────────────────────────────────
+			 * 面板里「这个内容存在哪个文件」的唯一显示方式（见 filePathBadge()）。
+			 * 刻意做得比标题次要：等宽小号字 + 次要色 + 可换行，不抢标题的视觉重心，
+			 * 也不会把已有的表单 / 表格撑破（长路径 overflow-wrap 断行，hover 看完整值）。
+			 */
+			.path-badge {
+				display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
+				max-width: 100%; min-width: 0; vertical-align: middle;
+			}
+			.path-badge code {
+				font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+				color: var(--muted); background: rgba(127,127,127,.12);
+				border-radius: 6px; padding: 1px 6px;
+				overflow-wrap: anywhere; word-break: break-all;
+			}
+			.path-badge .path-btn {
+				border: 1px solid var(--border); background: transparent; color: var(--muted);
+				cursor: pointer; font: inherit; font-size: 11px; line-height: 1.5;
+				padding: 0 6px; border-radius: 6px; width: auto; flex: none;
+			}
+			.path-badge .path-btn:hover { color: var(--text); border-color: var(--primary); }
+			.path-badge .path-btn:disabled { opacity: .45; cursor: not-allowed; }
+			.path-badge .path-btn.copied { color: var(--ok); border-color: var(--ok); }
+			.path-note { font-size: 11px; color: var(--muted); }
+			.path-warn { font-size: 11px; color: var(--warn); }
+			.path-block { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 6px; }
+			.path-block .path-label { font-size: 12px; color: var(--muted); flex: none; }
 			pre.log {
 				background: #0f1115; color: #d8dee9; padding: 12px; border-radius: 10px;
 				overflow: auto; max-height: 320px; font-size: 12px; white-space: pre-wrap;
@@ -233,6 +261,7 @@
 						支持 .docx / .txt / .md：后端会转成 Markdown 并填进下面的编辑器，
 						<b>不会自动保存</b>，请检查后再点「保存」。.doc（旧版二进制）不支持，请先另存为 .docx。
 					</div>
+					<div class="hint" id="postsDirHint"></div>
 					<div class="hint" id="importStatus" style="display:none"></div>
 					<table>
 						<thead>
@@ -250,6 +279,7 @@
 						<button class="action danger" id="btnDeletePost">删除</button>
 						<button class="action" id="btnSavePost">保存</button>
 					</div>
+					<div class="path-block" id="editorPaths"></div>
 					<div class="grid" style="margin-top:12px">
 						<div><label>文件名（slug，不含 .md）</label><input id="fSlug" /></div>
 						<div><label>标题</label><input id="fTitle" /></div>
@@ -327,6 +357,7 @@
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewAnnounce">新增公告</button>
 					</div>
+					<div class="path-block" id="announceFile"></div>
 					<table>
 						<thead><tr><th>标题</th><th>日期</th><th>类型</th><th>首访弹窗</th></tr></thead>
 						<tbody id="announceBody"></tbody>
@@ -341,6 +372,7 @@
 						<button class="action danger" id="btnDeleteAnnounce">删除</button>
 						<button class="action" id="btnSaveAnnounce">保存</button>
 					</div>
+					<div class="path-block" id="announceEditorPath"></div>
 					<div class="grid" style="margin-top:12px">
 						<div><label>标识 id（唯一，只能用字母数字 . _ -）</label><input id="aId" /></div>
 						<div><label>标题</label><input id="aTitle" /></div>
@@ -382,6 +414,7 @@
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewSong">新增歌曲</button>
 					</div>
+					<div class="path-block" id="playlistFile"></div>
 					<table>
 						<thead><tr><th>歌曲</th><th>歌手</th><th>音频</th><th>封面/歌词</th><th>试听 / 操作</th></tr></thead>
 						<tbody id="musicBody"></tbody>
@@ -469,6 +502,7 @@
 						<span style="flex:1"></span>
 						<button class="action" id="btnNewFriend">新增友链</button>
 					</div>
+					<div class="path-block" id="friendsFile"></div>
 					<table>
 						<thead>
 							<tr><th style="width:44px">#</th><th style="width:52px">图标</th><th>站名 / 简介</th><th>网址</th><th style="width:70px">权重</th><th style="width:70px">显示</th><th style="width:240px">操作</th></tr>
@@ -528,6 +562,7 @@
 						<input type="file" id="mediaUpload" multiple style="display:none" />
 					</div>
 					<div class="hint">上传后记得点「发布」才会出现在线上；路径可点“复制”直接粘到文章或配置里。也可以把文件直接拖到页面上传到当前选中的目录。</div>
+					<div class="path-block" id="mediaDirPath"></div>
 					<table style="margin-top:12px">
 						<thead><tr><th>文件</th><th>大小</th><th>修改时间</th><th>操作</th></tr></thead>
 						<tbody id="mediaBody"></tbody>
@@ -611,6 +646,7 @@
 					<div class="row" style="margin:10px 0 4px;align-items:center">
 						<label style="min-width:200px;display:inline-block">首页横幅副标题<br><span class="muted small">banner.subtitles（每行一条）</span></label>
 						<textarea id="bannerSubtitles" rows="4" placeholder="每行一条副标题"></textarea>
+						<span id="bannerSubtitlesPath" class="path-block"></span>
 					</div>
 					<div id="settingsForm" class="small">加载中…</div>
 					<div class="row" style="margin-top:12px">
@@ -634,6 +670,7 @@
 					<div class="hint">
 						顺序即导航栏显示顺序（点 ↑ ↓ 调整）；取消勾选「显示」即可隐藏某一项，改文本框可自定义显示名。保存后到「发布」页推送才生效。
 					</div>
+					<div class="path-block" id="navPath"></div>
 					<div id="navForm" class="small">加载中…</div>
 				</div>
 			</section>
@@ -706,6 +743,7 @@
 				</div>
 				<div class="card">
 					<h2>发布日志</h2>
+					<div class="path-block" id="publishFiles"></div>
 					<pre class="log" id="publishOutput">（还没有发布过）</pre>
 				</div>
 			</section>
@@ -767,6 +805,127 @@
 					/[&<>"]/g,
 					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
 				);
+			}
+
+			// ── 路径徽章：面板里唯一「这东西存在哪个文件」的显示组件 ──────────
+			//
+			// 约定（新增面板展示项时必须遵守，详见 admin/README.md「路径徽章」一节）：
+			//   1. 任何要向用户展示「文件在哪」的地方，都必须调用 filePathBadge()，
+			//      不要各自拼 HTML —— 复制 / 反馈 / 打开文件夹三件事只维护一份；
+			//   2. 传进来的 relPath 必须是**仓库内相对路径**，且只能来自后端返回的字段
+			//      （fs.readdir / git / 实际写入路径）。前端**不许**自己拼路径：
+			//      拼错就等于让作者去文件管理器里白找一趟。
+			//
+			// 渲染出来的结构（data-copy / data-reveal 由文档级事件委托统一处理）：
+			//   <span class="path-badge" title="src/content/posts/x.md">
+			//     <code>src/content/posts/x.md</code>
+			//     <button class="path-btn" data-copy="src/content/posts/x.md">复制</button>
+			//     <button class="path-btn" data-reveal="src/content/posts/x.md">📂</button>
+			//   </span>
+			//
+			// opts：
+			//   label   路径前面的小字说明（如「当前文件：」）
+			//   note    路径后面的小字补充（如「3.2 MB」「文件不存在」）
+			//   warn    true 时加一个 ⚠️（配合 note 说明原因）
+			//   title   hover 显示的完整值（默认就是路径本身）
+			//   display 显示文本（默认 = 路径；设置项用它显示「文件 → 块.字段」）
+			//   copy    复制出来的文本（默认 = 路径）
+			//   reveal  false 时不渲染「打开所在文件夹」按钮（文件已删除 / 远程 URL / 尚未创建）
+			function filePathBadge(relPath, opts = {}) {
+				const rel = String(relPath ?? "").trim();
+				if (!rel) return "";
+				const display = opts.display === undefined ? rel : String(opts.display);
+				const copyValue = opts.copy === undefined ? rel : String(opts.copy);
+				const title = opts.title === undefined ? rel : String(opts.title);
+				const label = opts.label ? `<span class="path-note">${escapeHtml(opts.label)}</span>` : "";
+				const note = opts.note ? `<span class="path-note">${escapeHtml(opts.note)}</span>` : "";
+				const warn = opts.warn
+					? '<span class="path-warn" title="文件当前不存在">⚠️</span>'
+					: "";
+				const reveal =
+					opts.reveal === false || !rel
+						? ""
+						: `<button type="button" class="path-btn" data-reveal="${escapeHtml(rel)}" title="在资源管理器中定位（仅 Windows；其它系统请手动打开）">📂</button>`;
+				return (
+					`<span class="path-badge" title="${escapeHtml(title)}">${label}` +
+					`<code>${escapeHtml(display)}</code>${note}${warn}` +
+					`<button type="button" class="path-btn" data-copy="${escapeHtml(copyValue)}" title="复制：${escapeHtml(copyValue)}">复制</button>` +
+					`${reveal}</span>`
+				);
+			}
+
+			/**
+			 * 复制文本：优先 navigator.clipboard，失败退回 document.execCommand("copy")，
+			 * 再失败就把文本选中（让用户自己按 Ctrl+C）—— 三种都不做才是真的失败。
+			 * @param text     要复制的文本
+			 * @param sourceEl 兜底时用来「选中」的元素（通常是徽章里的 <code>）
+			 */
+			async function copyText(text, sourceEl) {
+				const value = String(text ?? "");
+				if (!value) return false;
+				try {
+					if (navigator.clipboard && window.isSecureContext) {
+						await navigator.clipboard.writeText(value);
+						return true;
+					}
+				} catch {
+					// 落到下面的兜底
+				}
+				try {
+					const area = document.createElement("textarea");
+					area.value = value;
+					area.setAttribute("readonly", "");
+					area.style.position = "fixed";
+					area.style.top = "-1000px";
+					area.style.opacity = "0";
+					document.body.appendChild(area);
+					area.select();
+					const ok = document.execCommand("copy");
+					area.remove();
+					if (ok) return true;
+				} catch {
+					// 落到下面的兜底
+				}
+				try {
+					if (sourceEl) {
+						const range = document.createRange();
+						range.selectNodeContents(sourceEl);
+						const selection = window.getSelection();
+						selection.removeAllRanges();
+						selection.addRange(range);
+					}
+				} catch {
+					// 选不中也只能算了（已经提示过用户）
+				}
+				return false;
+			}
+
+			/** 复制成功后按钮上显示 2 秒「已复制」，然后恢复原文案 */
+			function flashCopied(button) {
+				if (!button) return;
+				if (button.dataset.copyOriginal === undefined) {
+					button.dataset.copyOriginal = button.textContent;
+				}
+				button.textContent = "已复制";
+				button.classList.add("copied");
+				if (button._copyTimer) clearTimeout(button._copyTimer);
+				button._copyTimer = setTimeout(() => {
+					button.textContent = button.dataset.copyOriginal;
+					button.classList.remove("copied");
+					button._copyTimer = null;
+				}, 2000);
+			}
+
+			/**
+			 * 设置项的「写进哪个文件的哪个块/字段」文案。
+			 * 右侧一律是 `within.key`（块.字段，within 是数组时用 . 连接）或裸 `key`（文件顶层字段），
+			 * file / within / key 全部来自后端 SETTINGS_DEFS，前端只做格式化。
+			 */
+			function settingTarget(def) {
+				if (!def?.file) return "";
+				const within = Array.isArray(def.within) ? def.within.join(".") : def.within;
+				const field = within ? `${within}.${def.key}` : String(def.key ?? "");
+				return `${def.file} → ${field}`;
 			}
 
 			/** 数值兜底：拿不到数字就返回 fallback */
@@ -892,23 +1051,70 @@
 				}
 			}
 
+			/** porcelain 状态码 → 中文（认不出的码原样显示，不猜） */
+			function gitCodeLabel(code) {
+				const text = String(code || "").trim();
+				if (text === "??") return "新增";
+				if (text.includes("D")) return "删除";
+				if (text.includes("R")) return "重命名";
+				if (text.includes("C")) return "复制";
+				if (text.includes("A")) return "新增";
+				if (text.includes("M")) return "修改";
+				return text || "改动";
+			}
+
+			/** 磁盘上已经没有的条目（删除 / 重命名前的旧路径）：不给「打开所在文件夹」 */
+			function pathGone(entry) {
+				return entry.origin === "old" || String(entry.code || "").includes("D");
+			}
+
 			async function loadDiff() {
 				try {
-					const { stat } = await api("/api/diff");
-					$("diffBox").innerHTML = stat
-						? `<pre class="log" style="background:transparent;color:inherit;padding:0">${escapeHtml(stat)}</pre>`
-						: '<span class="muted">工作区没有未提交的改动</span>';
+					const data = await api("/api/diff");
+					const stat = data.stat || "";
+					const files = Array.isArray(data.files) ? data.files : [];
+					const list = files.length
+						? `<div class="path-block"><span class="path-label">待提交文件（${files.length}）：</span>${files
+								.map((entry) =>
+									filePathBadge(entry.path, {
+										label: `${gitCodeLabel(entry.code)}：`,
+										note: entry.origin === "old" ? "（重命名前的旧路径）" : "",
+										warn: pathGone(entry),
+										reveal: !pathGone(entry),
+									}),
+								)
+								.join("")}</div>`
+						: "";
+					$("diffBox").innerHTML =
+						list +
+						(stat
+							? `<pre class="log" style="background:transparent;color:inherit;padding:0">${escapeHtml(stat)}</pre>`
+							: list
+								? ""
+								: '<span class="muted">工作区没有未提交的改动</span>');
 				} catch (error) {
 					$("diffBox").textContent = error.message;
 				}
 			}
 
 			// ── 文章 ───────────────────────────────────────────────────────
+			// post.file 由后端 /api/posts 给出（fs.readdir 的**真实**文件名），
+			// 面板只显示它，不自己拼 `slug + ".md"`；文章目录 / 图片目录同理由后端给出。
+			let postsMeta = { dir: "", imagesDir: "", imagesUrlPrefix: "" };
+
+			/** URL slug 完全由**文件名**决定（`src/pages/posts/[...slug].astro` 用 removeFileExtension(entry.id)） */
+			function postUrlOf(slug) {
+				return `/posts/${String(slug ?? "")}/`;
+			}
+
 			function postRow(post) {
 				const tags = (post.tags || []).map((t) => `<span class="tag">${escapeHtml(String(t))}</span>`).join("");
 				const state = [post.draft ? "草稿" : "已发布", post.pinned ? "置顶" : ""].filter(Boolean).join(" · ");
 				return `<tr class="clickable" data-slug="${post.slug}">
-					<td>${escapeHtml(post.title)}<div class="muted small">${escapeHtml(post.slug)}.md</div></td>
+					<td>${escapeHtml(post.title)}
+						${filePathBadge(post.file, { label: "文件：" })}
+						<div class="muted small">URL：<code>${escapeHtml(postUrlOf(post.slug))}</code>（由文件名决定）</div>
+					</td>
 					<td>${escapeHtml(post.published)}</td>
 					<td>${escapeHtml(post.category || "-")}</td>
 					<td>${tags || "-"}</td>
@@ -917,13 +1123,30 @@
 			}
 
 			async function loadPosts() {
-				const { posts } = await api("/api/posts");
-				postsCache = posts;
+				const data = await api("/api/posts");
+				postsCache = Array.isArray(data.posts) ? data.posts : [];
+				postsMeta = {
+					dir: data.dir || "",
+					imagesDir: data.imagesDir || "",
+					imagesUrlPrefix: data.imagesUrlPrefix || "",
+				};
+				// 目录徽章：让「文章都存在哪、图片放哪」一眼可见（+ 文件名决定 URL 的说明）
+				$("postsDirHint").innerHTML = postsMeta.dir
+					? filePathBadge(postsMeta.dir, {
+							label: "文章目录：",
+							note: postsMeta.imagesUrlPrefix ? `（正文引用图片写 ${postsMeta.imagesUrlPrefix}）` : "",
+						})
+					: "";
+				const posts = postsCache;
 				$("postsBody").innerHTML = posts.length
 					? posts.map(postRow).join("")
 					: '<tr><td colspan="5" class="muted">还没有文章，点右上角「新建文章」</td></tr>';
 				$("postsBody").querySelectorAll("tr[data-slug]").forEach((tr) => {
-					tr.addEventListener("click", () => openPost(tr.dataset.slug));
+					// 行内徽章也有按钮：点按钮不要顺手把文章也打开
+					tr.addEventListener("click", (event) => {
+						if (event.target instanceof Element && event.target.closest("button")) return;
+						openPost(tr.dataset.slug);
+					});
 				});
 			}
 
@@ -959,8 +1182,96 @@
 				}
 			}
 
-			function fillForm(frontmatter, body, slug) {
+			// 编辑器里「当前文件 / 图片目录 / 引用到的图片」的真实路径。
+			// editorData 就是最近一次 /api/post 的返回（file / dir / imagesDir / images 全部来自后端）；
+			// importedImages 是「从 Word/txt 导入」时后端刚刚落盘的图片（也是后端返回的真实路径）。
+			let editorData = null;
+			let importedImages = [];
+
+			function renderEditorPaths() {
+				const box = $("editorPaths");
+				if (!box) return;
+				const bits = [];
+				const slug = $("fSlug").value.trim();
+				const imagesDir = editorData ? editorData.imagesDir : postsMeta.imagesDir;
+				if (imagesDir) {
+					const prefix = editorData?.imagesUrlPrefix || postsMeta.imagesUrlPrefix || "";
+					bits.push(
+						filePathBadge(imagesDir, {
+							label: "文章图片目录：",
+							title: prefix ? `${imagesDir}（正文里用 ${prefix} 引用）` : imagesDir,
+						}),
+					);
+				}
+				if (editorData?.file) {
+					// 已存在的文章：显示它的真实文件
+					bits.unshift(filePathBadge(editorData.file, { label: "当前文件：" }));
+					const dir =
+						editorData.dir ||
+						(editorData.file.includes("/")
+							? editorData.file.slice(0, editorData.file.lastIndexOf("/"))
+							: "");
+					if (slug && slug !== currentSlug && /^[A-Za-z0-9._-]+$/.test(slug) && dir) {
+						bits.push(
+							filePathBadge(`${dir}/${slug}.md`, {
+								label: "保存后将改为：",
+								note: `（旧文件 ${editorData.file.split("/").pop()} 会被删除）`,
+								reveal: false,
+							}),
+						);
+					} else if (slug) {
+						bits.push(`<span class="path-note">URL：<code>${escapeHtml(postUrlOf(slug))}</code></span>`);
+					}
+				} else if (slug) {
+					// 新建文章：目标文件还没写盘，如实标「尚未创建」，也不给「打开所在文件夹」
+					if (!/^[A-Za-z0-9._-]+$/.test(slug)) {
+						bits.unshift(
+							'<span class="path-warn">文件名只能用字母、数字、点、下划线、连字符（后端会拒绝其它写法）</span>',
+						);
+					} else if (postsMeta.dir) {
+						bits.unshift(
+							filePathBadge(`${postsMeta.dir}/${slug}.md`, {
+								label: "保存后将写入：",
+								note: "（尚未创建）",
+								reveal: false,
+							}),
+						);
+						bits.push(`<span class="path-note">URL：<code>${escapeHtml(postUrlOf(slug))}</code></span>`);
+					} else {
+						bits.unshift('<span class="path-warn">没读到文章目录，重新打开「文章」页可恢复</span>');
+					}
+				}
+				// 正文引用到的本地图片（已存在的文章）＋ 刚导入落盘的图片（后端刚写过，一定存在）。
+				// 两类都是后端返回的真实路径，按 repoPath 去重后逐个显示。
+				const images = [...(editorData?.images ?? []), ...importedImages];
+				const seen = new Set();
+				for (const image of images) {
+					const repoPath = String(image.repoPath || "");
+					if (!repoPath || seen.has(repoPath)) continue;
+					seen.add(repoPath);
+					const kind = image.role === "cover" ? "封面" : "正文引用";
+					const sizeText = !image.exists
+						? "文件不存在"
+						: image.size === null || image.size === undefined
+							? "刚导入"
+							: humanSize(toNum(image.size));
+					bits.push(
+						filePathBadge(repoPath, {
+							label: "文章图片：",
+							note: `${kind} · ${sizeText}`,
+							warn: image.exists !== true,
+							reveal: image.exists === true,
+						}),
+					);
+				}
+				box.innerHTML = bits.join("");
+				box.style.display = bits.length ? "" : "none";
+			}
+
+			function fillForm(frontmatter, body, slug, data) {
 				currentSlug = slug;
+				editorData = data?.file ? data : null;
+				importedImages = [];
 				$("fSlug").value = slug || "";
 				$("fTitle").value = frontmatter.title || "";
 				$("fPublished").value = frontmatter.published ? String(frontmatter.published).slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -977,13 +1288,15 @@
 				$("editorCard").style.display = "";
 				$("editorTitle").textContent = slug ? `编辑：${slug}.md` : "新建文章";
 				$("btnDeletePost").style.display = slug ? "" : "none";
+				renderEditorPaths();
 				$("editorCard").scrollIntoView({ behavior: "smooth", block: "start" });
 			}
 
 			async function openPost(slug) {
 				try {
 					const data = await api(`/api/post?slug=${encodeURIComponent(slug)}`);
-					fillForm(data.frontmatter, data.body, slug);
+					// 把整个返回交给 fillForm：file / imagesDir / images 都由它渲染成路径徽章
+					fillForm(data.frontmatter, data.body, slug, data);
 				} catch (error) {
 					toast(error.message, "err");
 				}
@@ -1009,6 +1322,9 @@
 			}
 
 			// ── 媒体 ───────────────────────────────────────────────────────
+			/** 目录 key → 仓库相对目录（后端 /api/media 的 dirs，就是 server.mjs 的 MEDIA_DIRS） */
+			let mediaDirs = {};
+
 			function humanSize(bytes) {
 				if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 				if (bytes > 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -1018,16 +1334,25 @@
 			async function loadMedia() {
 				const data = await api("/api/media");
 				const dir = $("mediaDir").value;
-				const files = data.files[dir] || [];
+				mediaDirs = data.dirs || {};
+				const files = data.files?.[dir] ?? [];
+				// 当前目录在仓库里的真实位置（来自后端 mediaDirs 白名单），让「文件到底存在哪」一眼可见
+				const dirPath = mediaDirs[dir] || "";
+				$("mediaDirPath").innerHTML = dirPath
+					? filePathBadge(dirPath, { label: "当前目录：" })
+					: "";
 				$("mediaBody").innerHTML = files.length
 					? files
 							.map(
 								(f) => `<tr>
-									<td>${escapeHtml(f.name)}</td>
+									<td>${escapeHtml(f.name)}
+										${filePathBadge(f.repoPath)}
+										<div class="muted small">引用：<code>${escapeHtml(f.path)}</code></div>
+									</td>
 									<td>${humanSize(f.size)}</td>
 									<td class="small muted">${new Date(f.updatedAt).toLocaleString()}</td>
 									<td>
-										<button class="action ghost small" data-copy="${escapeHtml(f.path)}">复制路径</button>
+										<button class="action ghost small" data-copy="${escapeHtml(f.path)}" title="复制正文 / 配置里引用的站内路径（${escapeHtml(f.path)}）">复制引用路径</button>
 										<button class="action danger small" data-del="${escapeHtml(f.repoPath)}">删除</button>
 									</td>
 								</tr>`,
@@ -1035,12 +1360,7 @@
 							.join("")
 					: '<tr><td colspan="4" class="muted">这个目录还是空的</td></tr>';
 
-				$("mediaBody").querySelectorAll("[data-copy]").forEach((btn) =>
-					btn.addEventListener("click", async () => {
-						await navigator.clipboard.writeText(btn.dataset.copy);
-						toast(`已复制：${btn.dataset.copy}`, "ok");
-					}),
-				);
+				// 复制 / 已复制反馈由文档级委托统一处理（见 filePathBadge 附近的注释），这里只绑删除
 				$("mediaBody").querySelectorAll("[data-del]").forEach((btn) =>
 					btn.addEventListener("click", async () => {
 						if (!confirm(`确定删除 ${btn.dataset.del} ？删除后需要发布才会生效。`)) return;
@@ -1095,12 +1415,30 @@
 			}
 
 			// ── 站点设置（可视化表单） ─────────────────────────────────────
-			let settingsCache = { values: {}, defs: [], pagePrefix: "pages." };
+			let settingsCache = { values: {}, defs: [], pagePrefix: "pages.", pageToggle: null };
+
+			/**
+			 * 单个设置项的路径徽章：`文件 → 块.字段`（file / within / key 全部来自后端 SETTINGS_DEFS）。
+			 * 这是「这一项会被写进哪个文件的哪个块」的唯一依据 —— 校验脚本会逐个断言
+			 * 那个文件存在、且文件里真的能找到那个块。
+			 */
+			function settingPathBadge(def) {
+				const target = settingTarget(def);
+				if (!target) return "";
+				return filePathBadge(def.file, {
+					label: "写进：",
+					display: target,
+					copy: target,
+					title: target,
+					reveal: true,
+				});
+			}
 
 			function settingsField(def, value) {
 				const id = `set-${def.id.replace(/[^\w-]/g, "_")}`;
 				const label = `<label style="min-width:200px;display:inline-block">${escapeHtml(def.label)}<br><span class="muted small">${escapeHtml(def.id)}</span></label>`;
-				const row = (inner) => `<div class="row" style="margin:8px 0;align-items:center">${label}${inner}</div>`;
+				const badge = settingPathBadge(def);
+				const row = (inner) => `<div class="row" style="margin:8px 0;align-items:center">${label}${inner}${badge}</div>`;
 				if (def.type === "boolean") {
 					return row(`<input type="checkbox" id="${id}" data-set="${def.id}" ${value ? "checked" : ""} style="width:auto">`);
 				}
@@ -1116,13 +1454,24 @@
 			}
 
 			function renderPageToggles() {
-				const { values, pagePrefix } = settingsCache;
+				const { values, pagePrefix, pageToggle } = settingsCache;
 				const keys = Object.keys(values).filter((k) => k.startsWith(pagePrefix));
+				const file = pageToggle?.file ?? "";
+				const block = pageToggle?.block ?? "";
 				$("pageToggles").innerHTML = keys.length
 					? keys
 							.map((k) => {
 								const name = k.slice(pagePrefix.length);
-								return `<div class="row" style="margin:6px 0;align-items:center"><label style="min-width:200px;display:inline-block">${escapeHtml(name)}</label><input type="checkbox" data-page="${escapeHtml(name)}" ${values[k] ? "checked" : ""} style="width:auto"></div>`;
+								const target = file && block ? `${file} → ${block}.${name}` : file;
+								const badge = file
+									? filePathBadge(file, {
+											label: "写进：",
+											display: target,
+											copy: target,
+											title: target,
+										})
+									: "";
+								return `<div class="row" style="margin:6px 0;align-items:center"><label style="min-width:200px;display:inline-block">${escapeHtml(name)}</label><input type="checkbox" data-page="${escapeHtml(name)}" ${values[k] ? "checked" : ""} style="width:auto">${badge}</div>`;
 							})
 							.join("")
 					: "（没有读到页面开关）";
@@ -1135,6 +1484,7 @@
 						values: data.values || {},
 						defs: data.defs || [],
 						pagePrefix: data.pagePrefix || "pages.",
+						pageToggle: data.pageToggle || null,
 					};
 					const main = settingsCache.defs.filter(
 						(d) => !d.id.startsWith(settingsCache.pagePrefix) && d.id !== "banner.subtitles",
@@ -1142,6 +1492,12 @@
 					$("settingsForm").innerHTML = main.length
 						? main.map((d) => settingsField(d, settingsCache.values[d.id])).join("")
 						: "（没有可编辑的设置项）";
+					// 首页横幅副标题的多行文本框是手写的，它的路径徽章也要显示（同样取自 SETTINGS_DEFS）
+					const bannerDef = settingsCache.defs.find((d) => d.id === "banner.subtitles");
+					$("bannerSubtitlesPath").innerHTML = bannerDef
+						? settingPathBadge(bannerDef) +
+							`<span class="path-note">（文本域里的每一行 = 数组里的一项）</span>`
+						: "";
 					applyBannerSubtitles();
 					renderPageToggles();
 				} catch (error) {
@@ -1203,13 +1559,32 @@
 						img.style.visibility = "hidden";
 					}
 					$("avatarPath").textContent = url || "（配置里没有头像路径）";
+					// 头像的「配置写在哪」+「文件落在哪」都用同一套路径徽章显示（都来自后端）
 					const bits = [];
-					if (data.remote) bits.push("远程 URL（面板改不了它的文件）");
-					if (data.repoPath) bits.push(data.repoPath);
-					if (data.fileExists) bits.push(humanSize(data.size));
-					else if (data.repoPath) bits.push("⚠️ 文件不存在");
-					if (data.isDefault) bits.push("默认头像");
-					$("avatarMeta").textContent = bits.join(" · ");
+					if (data.config?.file) {
+						const target = `${data.config.file} → ${data.config.key}`;
+						bits.push(
+							filePathBadge(data.config.file, {
+								label: "配置项：",
+								display: target,
+								copy: target,
+								title: target,
+							}),
+						);
+					}
+					if (data.remote) bits.push('<span class="path-note">远程 URL（面板改不了它的文件）</span>');
+					if (data.repoPath) {
+						bits.push(
+							filePathBadge(data.repoPath, {
+								label: "文件：",
+								note: data.fileExists ? humanSize(toNum(data.size)) : "文件不存在",
+								warn: !data.fileExists,
+								reveal: data.fileExists === true,
+							}),
+						);
+					}
+					if (data.isDefault) bits.push('<span class="path-note">默认头像</span>');
+					$("avatarMeta").innerHTML = bits.join("");
 					if (data.limits && data.limits.accept) $("avatarUpload").accept = data.limits.accept;
 					$("avatarNote").textContent = `单张上限 ${(data.limits && data.limits.maxBytesText) || "25.0MB"}；静态图最长边超过 ${(data.limits && data.limits.maxDimension) || 512}px 会自动等比缩小（动图 / GIF 不缩，避免丢帧）`;
 				} catch (error) {
@@ -1312,19 +1687,27 @@
 							(b) => `<div style="margin:8px 0;padding:8px 10px;background:rgba(127,127,127,.08)">
 								<b>${b.time ? new Date(b.time).toLocaleString() : escapeHtml(b.id)}</b>
 								<span class="muted small">· ${escapeHtml(b.reason || "手动快照")}</span>
-								<div class="muted small" style="margin:6px 0">${b.files.map((f) => escapeHtml(f.rel)).join("、")}</div>
+								${
+									toNum(b.skipped) > 0
+										? `<span class="path-warn">· 有 ${toNum(b.skipped)} 个文件因体积超限未纳入</span>`
+										: ""
+								}
+								<div class="path-block">
+									${b.dir ? filePathBadge(b.dir, { label: "快照目录：" }) : ""}
+									${b.files
+										.map((f) =>
+											`<span class="path-badge">${filePathBadge(f.rel, {
+												note: humanSize(toNum(f.size)),
+											})}<button class="action ghost" data-restore="${escapeHtml(b.id)}" data-rel="${escapeHtml(f.rel)}" style="font-size:12px;padding:4px 8px">恢复</button></span>`,
+										)
+										.join("")}
+								</div>
 								<div class="row" style="margin:2px 0 6px">
 									<a class="action ghost" data-export="${escapeHtml(String(b.id))}"
 										href="/api/backup-export?id=${encodeURIComponent(String(b.id))}"
 										download style="font-size:12px;padding:4px 10px;text-decoration:none">导出 ZIP</a>
 									<span class="muted small">把这份快照里 ${b.files.length} 个文件打包下载（靠 Cookie 认证）</span>
 								</div>
-								${b.files
-									.map(
-										(f) =>
-											`<button class="action ghost" data-restore="${escapeHtml(b.id)}" data-rel="${escapeHtml(f.rel)}" style="font-size:12px;padding:4px 8px;margin:2px 6px 2px 0">恢复 ${escapeHtml(f.rel.split("/").pop())}</button>`,
-									)
-									.join("")}
 							</div>`,
 						)
 						.join("");
@@ -1771,6 +2154,28 @@
 						hidden: item.hidden === true,
 						order: item.order,
 					}));
+					// 改动写进 overridesFile；菜单项本身是从 sourceFile 只读解析出来的。
+					// overrides 文件可能还不存在（从没改过导航 = 空覆盖），如实标出来。
+					const bits = [];
+					if (data.file) {
+						bits.push(
+							filePathBadge(data.file, {
+								label: "改动写进：",
+								note: data.fileExists === false ? "（尚未创建，保存后生成）" : "",
+								warn: data.fileExists === false,
+								reveal: data.fileExists !== false,
+							}),
+						);
+					}
+					if (data.sourceFile) {
+						bits.push(
+							filePathBadge(data.sourceFile, {
+								label: "菜单项来自（只读）：",
+								note: "（面板只隐藏/改名/排序，不新增）",
+							}),
+						);
+					}
+					$("navPath").innerHTML = bits.join("");
 					renderNav();
 				} catch (error) {
 					$("navForm").innerHTML = `<span class="muted">导航菜单读取失败：${escapeHtml(error.message)}（可以点「重新载入」再试）</span>`;
@@ -1834,6 +2239,42 @@
 					document.querySelector('nav button[data-tab="doctor"]')?.click();
 				}
 			});
+
+			// ── 路径徽章的统一交互（复制 / 打开所在文件夹）────────────────────
+			// 用文档级事件委托：徽章会被各页反复重渲染，逐个绑定必然漏（而且会随重渲染失效）。
+			document.addEventListener("click", async (e) => {
+				if (!(e.target instanceof Element)) return;
+				const copyBtn = e.target.closest("[data-copy]");
+				if (copyBtn) {
+					e.preventDefault();
+					const badge = copyBtn.closest(".path-badge");
+					const sourceEl = badge ? badge.querySelector("code") : null;
+					const ok = await copyText(copyBtn.dataset.copy, sourceEl);
+					if (ok) flashCopied(copyBtn);
+					else toast("复制失败：路径已选中，请按 Ctrl+C", "err");
+					return;
+				}
+				const revealBtn = e.target.closest("[data-reveal]");
+				if (revealBtn) {
+					e.preventDefault();
+					const path = revealBtn.dataset.reveal;
+					if (!path) return;
+					revealBtn.disabled = true;
+					try {
+						const result = await api("/api/reveal", { method: "POST", body: { path } });
+						toast(
+							result.ok
+								? `已在资源管理器中定位：${result.path}`
+								: String(result.message || "没能打开所在文件夹"),
+							result.ok ? "ok" : "",
+						);
+					} catch (error) {
+						toast(error.message, "err");
+					} finally {
+						revealBtn.disabled = false;
+					}
+				}
+			});
 			$("navForm").addEventListener("click", (e) => {
 				const btn = e.target instanceof Element ? e.target.closest("[data-nav-move]") : null;
 				if (btn) moveNav(Number(btn.dataset.navIndex), btn.dataset.navMove);
@@ -1894,6 +2335,12 @@
 				currentSlug = null;
 				fillForm({}, "", "");
 				$("fSlug").value = `post-${new Date().toISOString().slice(0, 10)}`;
+				// 新建文章：显示「保存后将写入」的目标路径（后端给的文章目录 + slug，如实标注尚未创建）
+				renderEditorPaths();
+			});
+			// 改文件名时同步刷新路径徽章：已存在的文章会显示「保存后将改为 …」
+			$("fSlug").addEventListener("input", () => {
+				if ($("editorCard").style.display !== "none") renderEditorPaths();
 			});
 
 			// ── 从 Word / txt 导入 ─────────────────────────────────────────
@@ -1954,6 +2401,11 @@
 
 					const warnings = Array.isArray(result.warnings) ? result.warnings : [];
 					const images = Array.isArray(result.images) ? result.images : [];
+					// 记下后端刚落盘的图片（repoPath 是真实路径），让编辑器里的路径徽章立刻可见
+					importedImages = images
+						.filter((image) => image?.repoPath)
+						.map((image) => ({ repoPath: image.repoPath, exists: true, size: null }));
+					renderEditorPaths();
 					showImportStatus(
 						[
 							`✅ 已导入 <b>${escapeHtml(file.name)}</b>，请检查后点「保存」。`,
@@ -1988,6 +2440,8 @@
 					toast(`已保存 ${result.file}`, "ok");
 					currentSlug = payload.slug;
 					await loadPosts();
+					// 保存后重新读一次文章：文件名可能改了，路径徽章要跟着变成真实的那个文件
+					await openPost(payload.slug);
 					await loadDiff();
 					scheduleAutoPublish(`feat: 更新文章「${payload.frontmatter.title}」`);
 				} catch (error) {
@@ -2049,6 +2503,8 @@
 			// ── 公告 ───────────────────────────────────────────────────────
 			let announceCache = [];
 			let announceIndex = -1;
+			/** 公告数据文件（后端返回的真实路径），编辑器的路径徽章也用它 */
+			let announceFile = "";
 
 			function linkRow(link = {}) {
 				const div = document.createElement("div");
@@ -2078,8 +2534,14 @@
 
 			async function loadAnnouncements() {
 				try {
-					const { items } = await api("/api/announcements");
+					const data = await api("/api/announcements");
+					const items = Array.isArray(data.items) ? data.items : [];
 					announceCache = items;
+					announceFile = data.file || "";
+					// 公告的数据文件位置（后端 DATA_FILES.announcements）
+					$("announceFile").innerHTML = announceFile
+						? filePathBadge(announceFile, { label: "数据文件：" })
+						: "";
 					$("announceBody").innerHTML = items.length
 						? items
 								.map(
@@ -2118,6 +2580,12 @@
 				$("announceEditor").style.display = "";
 				$("announceEditorTitle").textContent =
 					index >= 0 ? `编辑公告：${item.title || ""}` : "新增公告";
+				$("announceEditorPath").innerHTML = announceFile
+					? filePathBadge(announceFile, { label: "保存进：" }) +
+						`<span class="path-note">这一条是数组里 ${
+							index >= 0 ? `第 ${index + 1} 项` : "新增的一项"
+						}</span>`
+					: "";
 				$("btnDeleteAnnounce").style.display = index >= 0 ? "" : "none";
 				$("announceEditor").scrollIntoView({ behavior: "smooth", block: "start" });
 			}
@@ -2208,6 +2676,10 @@
 			// ── 音乐 ───────────────────────────────────────────────────────
 			let songCache = [];
 			let songIndex = -1;
+			/** 歌单数据文件（后端 DATA_FILES.playlist） */
+			let playlistFile = "";
+			/** 每首歌的音频 / 封面 / 歌词对应的真实文件（后端 stat 核对过），与 songCache 同序 */
+			let songPaths = [];
 
 			/** 把站内公开路径转成仓库路径，用于本地试听 */
 			function publicToRepo(p) {
@@ -2218,18 +2690,58 @@
 				return `/media-file?token=${TOKEN}&path=${encodeURIComponent(publicToRepo(url))}`;
 			}
 
+			/**
+			 * 一首歌的某个文件（音频 / 封面 / 歌词）的路径徽章。
+			 * local 为 null 表示「不是站内路径」（远程 URL）：只显示引用值，不显示仓库路径 —— 不猜。
+			 */
+			function songFileBadge(url, local, label) {
+				if (local?.repoPath && local.exists) {
+					return filePathBadge(local.repoPath, {
+						label,
+						note: humanSize(toNum(local.size)),
+					});
+				}
+				if (local?.repoPath) {
+					return filePathBadge(local.repoPath, {
+						label,
+						note: "文件不存在",
+						warn: true,
+						reveal: false,
+					});
+				}
+				return url ? `<span class="path-note">${escapeHtml(label)}远程 / 站外：${escapeHtml(String(url))}</span>` : "";
+			}
+
 			async function loadPlaylist() {
 				try {
-					const { songs } = await api("/api/playlist");
+					const data = await api("/api/playlist");
+					const songs = Array.isArray(data.songs) ? data.songs : [];
 					songCache = songs;
+					songPaths = Array.isArray(data.paths) ? data.paths : [];
+					playlistFile = data.file || "";
+					$("playlistFile").innerHTML = playlistFile
+						? filePathBadge(playlistFile, {
+								label: "歌单数据文件：",
+								note: "（音频 / 封面 / 歌词文件本身的路径见下表）",
+							})
+						: "";
 					$("musicBody").innerHTML = songs.length
 						? songs
 								.map(
 									(song, i) => `<tr>
 										<td>${escapeHtml(song.name)}</td>
 										<td class="muted small">${escapeHtml(song.artist || "-")}</td>
-										<td class="small">${escapeHtml(song.url)}</td>
-										<td class="small muted">${[song.cover ? "封面" : "", song.lrc ? "歌词" : ""].filter(Boolean).join(" / ") || "-"}</td>
+										<td class="small">
+											<code>${escapeHtml(song.url)}</code>
+											${songFileBadge(song.url, songPaths[i]?.url, "文件：")}
+										</td>
+										<td class="small muted">
+											${
+												song.cover || song.lrc
+													? `${songFileBadge(song.cover, songPaths[i]?.cover, "封面：")}${songFileBadge(song.lrc, songPaths[i]?.lrc, "歌词：")}`
+													: "-"
+											}
+										</td>
 										<td>
 											<audio controls preload="none" src="${audioSrc(song.url)}" style="height:32px;max-width:180px"></audio>
 											<button class="action ghost" data-edit="${i}">编辑</button>
@@ -2682,7 +3194,31 @@
 			// （站名、简介都可能带引号和尖括号）。
 			let friendCache = [];
 			let friendIndex = -1;
+			/** 友链数据文件与图标目录（都是后端返回的真实相对路径） */
+			let friendFile = "";
+			let friendDir = "";
 			const FRIEND_SAVED_HINT = "已保存，去「发布」页推送即可上线";
+
+			/**
+			 * 友链图标落在哪个文件。local 为 null 表示 imgurl 不是 `/friends/<文件名>`
+			 * （远程直链 / 其它站内路径）：只如实说一句「不在 public/friends/ 下」，不猜路径。
+			 */
+			function friendIconPathBadge(imgurl, local) {
+				if (local?.repoPath) {
+					return filePathBadge(local.repoPath, {
+						label: "图标：",
+						note: local.exists
+							? local.size === null || local.size === undefined
+								? ""
+								: humanSize(toNum(local.size))
+							: "文件不存在",
+						warn: local.exists !== true,
+						reveal: local.exists === true,
+					});
+				}
+				if (!imgurl) return "";
+				return `<span class="path-note">图标不在 ${escapeHtml(friendDir || "public/friends")}/ 下：${escapeHtml(String(imgurl))}</span>`;
+			}
 
 			/** 头像地址 → <img src>：站内路径走后端只读预览，外链直连 */
 			function friendIconSrc(url) {
@@ -2703,8 +3239,17 @@
 
 			async function loadFriends() {
 				try {
-					const { items } = await api("/api/friends");
+					const data = await api("/api/friends");
+					const items = Array.isArray(data.items) ? data.items : [];
 					friendCache = items;
+					friendFile = data.file || "";
+					friendDir = data.dir || "";
+					// 图标路径与 items 同序（后端 stat 核对过；远程直链是 null，不猜）
+					const icons = Array.isArray(data.icons) ? data.icons : [];
+					$("friendsFile").innerHTML = friendFile
+						? filePathBadge(friendFile, { label: "友链数据文件：" }) +
+							(friendDir ? filePathBadge(friendDir, { label: "图标目录：" }) : "")
+						: "";
 					$("friendsBody").innerHTML = items.length
 						? items
 								.map(
@@ -2715,7 +3260,7 @@
 											(item.tags || []).length
 												? `<div>${item.tags.map((t) => `<span class="tag">${escapeHtml(String(t))}</span>`).join("")}</div>`
 												: ""
-										}</td>
+										}${friendIconPathBadge(item.imgurl, icons[i])}</td>
 										<td class="small">${escapeHtml(item.siteurl)}</td>
 										<td class="small">${escapeHtml(String(item.weight))}</td>
 										<td>${item.enabled ? "✅" : '<span class="muted">停用</span>'}</td>
@@ -2941,6 +3486,26 @@
 					.join("\n\n");
 			}
 
+			/** 发布结果里涉及的文件（本次提交 / 被跳过的范围外改动）也统一显示成路径徽章 */
+			function renderPublishFiles(result) {
+				const bits = [];
+				const files = Array.isArray(result?.files) ? result.files : [];
+				const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
+				if (files.length) {
+					bits.push(
+						`<span class="path-label">本次提交（${files.length}）：</span>` +
+							files.map((f) => filePathBadge(f, { reveal: false })).join(""),
+					);
+				}
+				if (skipped.length) {
+					bits.push(
+						`<span class="path-label">已跳过（不在面板提交范围）：</span>` +
+							skipped.map((f) => filePathBadge(f)).join(""),
+					);
+				}
+				$("publishFiles").innerHTML = bits.join("");
+			}
+
 			async function doPublish(message) {
 				$("publishOutput").textContent = "正在提交并推送…";
 				try {
@@ -2949,6 +3514,7 @@
 						body: { message: (message || $("commitMessage").value).trim() },
 					});
 					$("publishOutput").textContent = formatSteps(result.steps) || result.message;
+					renderPublishFiles(result);
 					toast(result.message, result.ok ? "ok" : "err");
 					await loadStatus();
 					if (result.ok && !result.dryRun) watchActions();

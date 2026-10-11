@@ -72,7 +72,9 @@ export const SETTINGS_DEFS = [
 
 /** 页面开关（siteConfig 顶部 resolvePageToggles({...})），键从文件里动态读出，保持与主题同步 */
 export const PAGE_PREFIX = "pages.";
-const PAGE_BLOCK = "resolvePageToggles";
+/** 页面开关写在哪个文件的哪个块里（面板要靠它显示「这一项会被写进哪里」） */
+export const PAGE_FILE = "src/config/siteConfig.ts";
+export const PAGE_BLOCK = "resolvePageToggles";
 
 const STRING_RE = /^"(?:[^"\\]|\\.)*"$/;
 
