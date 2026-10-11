@@ -60,7 +60,7 @@
 
 | # | 坑 | 后果 | 正确做法 |
 | --- | --- | --- | --- |
-| 1 | 用 `git add -A` 或 `git add .` 提交 | 会把「改到一半的在制品」一起推上去，GitHub Actions 构建失败 → 线上部署挂掉。历史上真发生过：`09b0634` 的 4 个 `chore:` 提交里混进了半成品 `admin/ci.mjs`（284 行）和约 20 个 webp | 只用面板「发布」按钮（内部按 `PUBLISH_SCOPE` 白名单暂存，`admin/publish-scope.mjs:14-20`）；手工提交时**逐个列出路径** |
+| 1 | 用 `git add -A` 或 `git add .` 提交 | 会把「改到一半的在制品」一起推上去，GitHub Actions 构建失败 → 线上部署挂掉。历史上真发生过：`09b0634` 的 4 个 `chore:` 提交里混进了半成品 `admin/ci.mjs`（284 行）和约 20 个 webp | 只用面板「发布」按钮（内部按 `PUBLISH_SCOPE` 白名单暂存，`admin/publish-scope.mjs:14-21`）；手工提交时**逐个列出路径** |
 | 2 | 手工改 `src/config/*.ts` 里的 JSON 数据，或直接编辑面板管辖的 JSON | TS 源码改坏一个引号 = 整站构建失败；JSON 结构改坏 = 面板读取报错 | 数据类改 `src/config/{announcements,friends,music-playlist}.json`（面板会校验+快照）；站点设置走面板「站点设置」页（白名单 + 回读校验 + 回滚） |
 | 3 | 手改 `src/constants/lqips.json`、`src/constants/icons-data.json`、`dist/`、`public/vndb-covers/` | 前两个是生成物（`lqips.json` 由 `pnpm lqips` 生成，`icons-data.json` 被 Biome 显式忽略），`dist/` 与 `public/vndb-covers/`、`admin-backups/`、`logs/` 都在 `.gitignore` 里 | 跑 `pnpm lqips` 重新生成；产物一律不手改 |
 | 4 | 改 `public/vendor/giscus-*.mjs`、或改 `Giscus.astro` 里的 import 路径但不换文件名 | 该文件名带版本号并配了 1 年 `immutable` 缓存，改内容不换名 = 老访客永远拿旧文件 | 升级流程：下载新版本 → 存成 `giscus-<新版本>.mjs` → 同步改 `src/components/comment/Giscus.astro:68` 的 import 路径（`public/_headers:38-40`、`worker/index.mjs:124-126` 的缓存规则不用改） |
@@ -978,6 +978,7 @@ export const PUBLISH_SCOPE = [
   "public/assets", // 媒体库上传与压缩产物（图片、音乐、封面）
   "public/friends",// 友链图标
   "public/vendor", // 自托管第三方脚本（如 giscus）
+  "src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，须随文章一起发布
 ];
 ```
 
@@ -1535,6 +1536,9 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 > ② 带 `#锚点` 时目标 HTML 里真的含该 `id`/`name`；③ 该页面没有被 `siteConfig.pages` 关掉
 > （关掉的页面产物是 `/404/` 跳转 stub，跳过去等于跳 404）。**宁可不给 `href`，也不要编一个不存在的链接**，
 > 演示不了的能力保持普通文本即可。`pnpm check-docs` **不检查**这项，属于人工核对范围。
+
+> 补充（2026-10-11）：面板显示的路径统一为**正斜杠**（`src/content/posts/x.md`），Windows 反斜杠在 UI 入口已归一化；
+> `PUBLISH_SCOPE` 已包含 `src/constants`（LQIP 等构建产物数据须随文章一起发布）。
 
 ### E.3 为什么光靠「记得更新」不行（三个真实历史事故）
 

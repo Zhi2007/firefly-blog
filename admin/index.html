@@ -831,7 +831,9 @@
 			//   display 显示文本（默认 = 路径；设置项用它显示「文件 → 块.字段」）
 			//   copy    复制出来的文本（默认 = 路径）
 			//   reveal  false 时不渲染「打开所在文件夹」按钮（文件已删除 / 远程 URL / 尚未创建）
-			function filePathBadge(relPath, opts = {}) {
+			function filePathBadge(rawPath, opts = {}) {
+			// 统一显示为正斜杠：Windows 上后端返回 src\content\posts\x.md，与文档和跨平台习惯不一致
+			const relPath = String(rawPath ?? "").split("\\").join("/");
 				const rel = String(relPath ?? "").trim();
 				if (!rel) return "";
 				const display = opts.display === undefined ? rel : String(opts.display);
