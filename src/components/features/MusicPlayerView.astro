@@ -385,7 +385,13 @@ const viewConfigStr = JSON.stringify({
         }
 
         function vsSetContainerHeight() {
-            ui.playlistContainer.style.height = (local.vs.playlist.length * ITEM_H) + 'px';
+            // 用伪元素撑开真实内容高度，容器本身保持 max-height（否则 max-height 会吞掉 height，
+            // scrollHeight 只按已渲染的绝对定位项增长，滚动条 thumb 会越滚越短）。
+            ui.playlistContainer.style.setProperty(
+                "--playlist-height",
+                (local.vs.playlist.length * ITEM_H) + "px"
+            );
+            ui.playlistContainer.style.height = "";
         }
 
         function renderPlaylist(playlist, currentIndex) {

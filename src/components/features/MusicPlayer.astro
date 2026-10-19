@@ -154,4 +154,13 @@ const widgetId = id || "music-widget-navbar";
     .animate-spin-slow {
         animation: spin-slow 10s linear infinite;
     }
+    /* 虚拟列表的总高度由这个伪元素撑开：容器自身有 max-height，
+       直接设置容器 height 会被 max-height 截断，滚动高度只能随已渲染的绝对定位项增长，
+       导致越往下滚、scrollHeight 越大、滚动条 thumb 越短。 */
+    .playlist-container::before {
+        content: "";
+        display: block;
+        height: var(--playlist-height, 0px);
+        pointer-events: none;
+    }
 </style>
