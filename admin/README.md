@@ -78,7 +78,7 @@ node admin/server.mjs --port=8899 --no-open
 | 在线重启 | 面板发 `POST /api/status {"action":"restart"}` → 服务端退出 → 启动器用**同端口 + 同 token** 重新拉起 → 页面轮询恢复后自动刷新；Cookie 不失效 |
 | 刷新 | 顶栏「刷新界面」直接 `location.reload()`；静态页认会话 Cookie，不会再 403 |
 | 浏览器 profile | `logs/admin-browser-profile-<chrome\|msedge>`，两种浏览器格式不同，**必须分开**（共用会出现 Chrome 秒退 / Edge 白屏） |
-| 受限环境 | 先带 Chromium 沙箱启动；若在嵌套沙箱 / Job Object 里以 `STATUS_BREAKPOINT` 秒退，自动降级 `--no-sandbox` 重试一次（普通桌面不会降级） |
+| 受限环境 | 先带 Chromium 沙箱启动；若以 `STATUS_BREAKPOINT` 秒退，自动降级 `--no-sandbox --test-type` 重试一次（`--test-type` 用于隐藏 Chromium 的警告条；只影响本机回环面板） |
 | 自检 | `firefly-admin.exe --selftest` 不打开窗口：启动 → 校验托管 → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1 |
 
 **重新编译**（需要 Windows 自带 .NET Framework 4.x，无需安装 SDK）：

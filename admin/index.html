@@ -213,6 +213,13 @@
 			#ciBanner h2 { color: var(--err); }
 			.banner-title { font-weight: 700; color: var(--err); margin-bottom: 6px; }
 			#topBanner .banner-title { color: #fff; margin: 0; }
+			/* 限流不是部署失败：用琥珀色提示，避免和真正的红色失败横幅混淆 */
+			#topBanner.rate-limit { background: var(--warn); }
+			#ciBanner.rate-limit {
+				border-color: var(--warn); border-left-color: var(--warn);
+				background: rgba(217, 119, 6, .08);
+			}
+			#ciBanner.rate-limit .banner-title { color: var(--warn); }
 			.ci-row { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 			.ci-row:last-child { border-bottom: 0; }
 			.ci-ico { font-size: 15px; }
@@ -2488,11 +2495,15 @@
 				if (ciCache && ciCache.rateLimited === true) {
 					const block = ciRateLimitBlock(ciCache.warning);
 					bannerEl.innerHTML = block;
+					bannerEl.classList.add("rate-limit");
 					bannerEl.classList.toggle("show", true);
 					topEl.innerHTML = block;
+					topEl.classList.add("rate-limit");
 					topEl.classList.toggle("show", true);
 					return;
 				}
+				bannerEl.classList.remove("rate-limit");
+				topEl.classList.remove("rate-limit");
 				const failed = currentCiFailure();
 				// 失败信号变化时重新展示（用户手动关掉后不再反复弹）
 				if (failed && failed.sha !== ciKnownFailureSha) {
