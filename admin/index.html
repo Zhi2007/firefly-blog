@@ -390,6 +390,8 @@
 			.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 			.topbar-actions .action { padding: 7px 12px; border-radius: 9px; font-size: 13px; }
 			.icon-btn { width: 36px; justify-content: center; padding: 7px 0 !important; }
+			/* 顶部横幅在整页最上方，左侧会被固定侧栏盖住；留出侧栏宽度 + 内容区间距，避免文字贴黑框 */
+			#topBanner { padding: 10px 24px 10px 256px; }
 			main { padding: 20px 24px 56px; max-width: 1440px; width: 100%; margin: 0 auto; }
 			.card {
 				background: var(--card);
@@ -438,6 +440,7 @@
 				.sidebar-foot { display: none; }
 				.workspace { margin-left: 0; }
 				.topbar { padding: 10px 14px; }
+				#topBanner { padding-left: 14px; }
 				main { padding: 14px 14px 48px; }
 			}
 		</style>
