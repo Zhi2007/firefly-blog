@@ -711,6 +711,14 @@
 					<div class="hint">
 						保存文章 / 设置 / 公告 / 歌单 / 配置文件之前，面板都会把原文件另存到 <code>admin-backups/</code>（已 gitignore，不会提交也不会发布）。点下面的按钮即可恢复。
 					</div>
+					<div class="row" style="margin:10px 0 4px;gap:8px;align-items:center">
+						<label style="margin:0;white-space:nowrap">保留最新
+							<input id="backupKeep" type="number" min="1" step="1" style="width:96px" />
+							份
+						</label>
+						<button class="action ghost" id="btnSaveBackupKeep">保存保留份数</button>
+						<span class="muted small" id="backupKeepHint">默认 40；保存后立即删除超出部分的旧快照</span>
+					</div>
 					<div id="backupBox" class="small">加载中…</div>
 				</div>
 			</section>
@@ -1711,6 +1719,13 @@
 				try {
 					const data = await api("/api/backups");
 					const list = data.backups || [];
+					// 保留份数由后端返回；保存后重新载入时同步到输入框
+					if (document.activeElement !== $("backupKeep")) {
+						$("backupKeep").value = String(toNum(data.keep) || 40);
+					}
+					$("backupKeepHint").textContent = list.length
+						? `当前共 ${list.length} 份快照；保存后只保留最新 N 份，超出的旧快照会立即删除`
+						: "默认 40；保存后立即删除超出部分的旧快照";
 					if (!list.length) {
 						$("backupBox").textContent = "还没有备份（保存文章 / 设置 / 公告 / 歌单后会自动生成）";
 						return;
@@ -2254,6 +2269,28 @@
 			});
 			$("btnDoctor").addEventListener("click", loadDoctor);
 			$("btnBackups").addEventListener("click", loadBackups);
+			$("btnSaveBackupKeep").addEventListener("click", async () => {
+				const raw = $("backupKeep").value.trim();
+				const keep = Number(raw);
+				if (!Number.isSafeInteger(keep) || keep < 1) {
+					toast("保留份数必须是正整数（例如 1、10、40）", "err");
+					return;
+				}
+				if (
+					!confirm(
+						`只保留最新 ${keep} 份本地快照？\n超出的旧快照会立即删除（不可恢复）。`,
+					)
+				) {
+					return;
+				}
+				try {
+					const result = await api("/api/backups", { method: "POST", body: { keep } });
+					toast(result.message || `已改为保留最新 ${keep} 份`, "ok");
+					await loadBackups();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
 			$("btnCiReload").addEventListener("click", () => {
 				void loadCi();
 			});

@@ -782,7 +782,7 @@ export const tabTitleConfig: TabTitleConfig = {
 | **媒体** | 按目录查看文章图片、音乐、封面、歌词、头像；上传（可多选）、复制路径、删除；批量转 WebP（默认先试算，只新增 `.webp`，不删原图）。每条显示 `public/assets/...` 下的真实仓库路径 + 体积。**换站点头像请去「站点设置 → 站点头像」**：这里只放文件，不会改配置 |
 | **配置** | 直接编辑 `src/config/*` 的白名单文件（含 `FooterConfig.html`、`announcements.json`、`music-playlist.json`） |
 | **站点设置** | 可视化表单：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像、壁纸模式与暗度、主页横幅标题与副标题（每行一条）、显示设置面板各项开关、页面开关、导航菜单（隐藏/改名/排序）。顶部还有**站点头像**卡片：缩略图 + 「上传新头像…」+「恢复默认」（另存新文件、不覆盖原图、可回滚；见 8.4 示例 D）。**每一项都显示它写进哪个文件的哪个块/字段**（如 `src/config/siteConfig.ts → navbar.title`）。所有写入前自动备份，写完回读校验，不一致立即回滚 |
-| **体检 / 备份** | 一键体检（10 项：JSON 合法性、歌单引用、公告完整性、**文章 frontmatter**、**文章 schema（跑真实 `astro build`）**、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + 导出 ZIP；CI 部署状态（失败时全页红色横幅 + 一键回滚该提交） |
+| **体检 / 备份** | 一键体检（10 项：JSON 合法性、歌单引用、公告完整性、**文章 frontmatter**、**文章 schema（跑真实 `astro build`）**、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + 导出 ZIP + **保留份数可调（任意正整数）**；CI 部署状态（失败时全页红色横幅 + 一键回滚该提交） |
 | **发布** | 同步状态（待推送/落后远端/最后提交时间/最近部署结果）、自动同步开关、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住** —— 文章 frontmatter 写错（例如日期被引号包住 `published: "2026-10-11"`，会让 CI 报 `Expected type "date", received "string"`）现在会在发布前被拦下，并直接告诉你「改哪个文件、哪个字段、怎么改」 |
 
 拖拽上传的落点按当前页签判断（音乐页 → `public/assets/music/`；媒体页 → 下拉框选中的目录；其它页 → `src/content/posts/images/`）。
@@ -1040,7 +1040,7 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 | 路径白名单 | `safeResolve()`（先 `path.resolve` 再带 `path.sep` 前缀比较，挡住 `../` 与同名前缀目录）+ `resolveInside(relative, allowedPrefixes)`；可写的只有 `src/config/*` 白名单文件、`src/content/posts/` 与几个媒体目录 |
 | 上传类型白名单 | `UPLOAD_EXT`：文章图片/封面/头像只收 `png/jpe?g/webp/avif/gif`，音乐只收 `mp3/m4a/aac/flac/wav/ogg/opus`，歌词只收 `.lrc`（注释原话：避免把 `.html`/`.svg` 这类可带脚本的文件传进站点目录）。**站点头像再额外做一层文件头「魔数」校验**（`admin/avatar.mjs`）：把 txt / PHP 改名成 `.png` 也传不进去，落盘扩展名以真实格式为准 |
 | 请求体上限 | `readBody()` 超过 **64 MB** 直接拒绝；导入文档另有 25 MB 上限；换头像另有 25 MB 上限 |
-| 写前快照 | 任何写入前把原文件复制到 `admin-backups/`（已 gitignore，最多保留 40 份）；恢复前还会再给"当前版本"打一份快照 |
+| 写前快照 | 任何写入前把原文件复制到 `admin-backups/`（已 gitignore，默认保留最新 40 份，保留份数可在面板「体检 / 备份」页改为任意正整数）；恢复前还会再给"当前版本"打一份快照 |
 | 设置写入校验 | 只允许 `admin/settings.mjs` 的 `SETTINGS_DEFS` 白名单字段 + 类型/范围/枚举校验 + 括号结构体检 + 回读校验，不一致立即回滚 |
 | 不支持危险改写 | `nav.mjs` 只读写 `nav-overrides.json`，明确**不改写 TS 源码**（注释：改坏一个字符整个构建就挂） |
 | 命令参数白名单 | 压缩音乐只允许 `--dry-run` / `--covers` / `--all` 三种，由服务端拼接；`/api/run` 只允许 `build` / `dev` / `check` |

@@ -4,7 +4,7 @@
  * 特点：
  * - 存在仓库里的 `admin-backups/`（已写进 .gitignore，不会被提交、不会发布）
  * - 每次写操作生成一个带时间戳的快照目录，里面保留相对路径结构 + meta.json
- * - 最多保留 KEEP 份，超出自动删最旧的
+ * - 默认保留最新 40 份，超出自动删最旧的；保留份数可在面板「体检 / 备份」页改（任意正整数）
  * - 路径必须先经过调用方的 safeResolve 检查，避免越界写
  */
 
@@ -12,7 +12,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const BACKUP_DIR = "admin-backups";
-const KEEP = 40;
+/** 保留份数设置文件（放在备份目录里，随 admin-backups/ 一起被 gitignore） */
+const KEEP_FILE = "keep.json";
+/** 默认保留最新 40 份 */
+export const DEFAULT_KEEP = 40;
 
 // 单文件与单次快照的默认上限。
 // 为什么要限制：媒体目录里可能躺着几百 MB 的音乐/原图，全量复制会把磁盘吃光、也拖慢保存。
@@ -41,14 +44,57 @@ async function readMeta(dir) {
 	}
 }
 
-/** 超出 KEEP 份时删除最旧的快照 */
-async function prune(root, keep = KEEP) {
+/** 校验「保留份数」：任意正整数（字符串只接受纯十进制数字） */
+export function parseKeepValue(value) {
+	const n =
+		typeof value === "number"
+			? value
+			: typeof value === "string" && /^\d+$/.test(value.trim())
+				? Number(value.trim())
+				: Number.NaN;
+	if (!Number.isSafeInteger(n) || n < 1) {
+		throw new Error(`保留份数必须是正整数（例如 1、10、40），收到：${JSON.stringify(value)}`);
+	}
+	return n;
+}
+
+/** 读取「保留最新 N 份」设置；文件不存在 / 内容不合法时回退默认 40 */
+export async function readKeep(repoRoot) {
+	try {
+		const raw = JSON.parse(await fs.readFile(path.join(repoRoot, BACKUP_DIR, KEEP_FILE), "utf8"));
+		return parseKeepValue(raw?.keep);
+	} catch {
+		return DEFAULT_KEEP;
+	}
+}
+
+/**
+ * 保存「保留最新 N 份」设置，并立即按新值清理更旧的快照。
+ * @returns { keep, removed } removed = 本次实际删掉的快照数
+ */
+export async function writeKeep(repoRoot, value) {
+	const keep = parseKeepValue(value);
+	const base = path.join(repoRoot, BACKUP_DIR);
+	await fs.mkdir(base, { recursive: true });
+	await fs.writeFile(path.join(base, KEEP_FILE), `${JSON.stringify({ keep }, null, "\t")}\n`, "utf8");
+	// 回读校验：写进去的不是用户要的值就报错，避免磁盘 / 权限问题被静默吞掉
+	const readBack = await readKeep(repoRoot);
+	if (readBack !== keep) throw new Error(`保留份数写入失败（写入 ${keep}，读回 ${readBack}）`);
+	const removed = await prune(repoRoot, keep);
+	return { keep, removed };
+}
+
+/**
+ * 超出保留份数时删除最旧的快照。
+ * @returns 实际删掉的快照数
+ */
+async function prune(root, keep = DEFAULT_KEEP) {
 	const base = path.join(root, BACKUP_DIR);
 	let entries;
 	try {
 		entries = await fs.readdir(base);
 	} catch {
-		return;
+		return 0;
 	}
 	const dirs = [];
 	for (const name of entries) {
@@ -60,9 +106,16 @@ async function prune(root, keep = KEEP) {
 		}
 	}
 	dirs.sort();
+	let removed = 0;
 	for (const name of dirs.slice(0, Math.max(0, dirs.length - keep))) {
-		await fs.rm(path.join(base, name), { recursive: true, force: true }).catch(() => {});
+		try {
+			await fs.rm(path.join(base, name), { recursive: true, force: true });
+			removed += 1;
+		} catch {
+			// 删不掉就保留，下次再试
+		}
 	}
+	return removed;
 }
 
 /**
@@ -140,7 +193,7 @@ export async function createSnapshot(repoRoot, rels, options = {}) {
 		)}\n`,
 		"utf8",
 	);
-	await prune(repoRoot);
+	await prune(repoRoot, await readKeep(repoRoot));
 	return { id, files: copied, skipped };
 }
 
