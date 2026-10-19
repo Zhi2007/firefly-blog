@@ -114,7 +114,7 @@ firefly/
 │   ├── doctor.mjs              #    体检 10 项（只读；其中 2 项查文章 frontmatter，见 9.11）
 │   ├── content-check.mjs       #    文章 frontmatter 两层校验：YAML 速查（秒级）+ 真实 astro build（权威）
 │   ├── post-frontmatter.mjs    #    保存文章时的 frontmatter 读写共用模型（外科式改写，见 9.12）★ 日期引号事故的根修
-│   ├── backups.mjs             #    写前快照 admin-backups/（保留 40 份）
+│   ├── backups.mjs             #    写前快照 admin-backups/（默认保留最新 40 份，面板可调）
 │   ├── ci.mjs                  #    GitHub Actions 状态（60s 缓存 / 8s 超时 / 限流识别）
 │   ├── zip.mjs                 #    快照导出 ZIP（store 模式）
 │   ├── media-compress.mjs      #    批量转 WebP（只新增，不删原图）
@@ -758,7 +758,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 19 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检（**10 项**，含文章 frontmatter 的 YAML 速查 + 真实 `astro build`），有 error 拦住（`force: true` 跳过）；被拦住时 `blocked: true`，`message` 直接列出「文件 → 字段 → 怎么改」（见 9.11）；只暂存 `PUBLISH_SCOPE`；返回 `files` / `skipped`（都是真实相对路径） | `:2085-2095` |
 | 20 | `/api/doctor` | GET/POST | 否（唯一的写盘是 `astro build` 的产物 `.astro/doctor-build/`，不碰 `dist/` 与仓库内容） | 否 | **10 项**体检；其中 `content-frontmatter`（YAML 速查）与 `content-schema`（真实构建）专查文章 frontmatter，见 9.11；Git 那一项用 `info.changed` 列出待提交文件 | `:2096-2101` |
 | 21 | `/api/settings` | 非 POST 读 / POST 写 | **是** | 是（每个涉及文件） | `SETTINGS_DEFS` 白名单 + 类型/范围/枚举 + 结构体检 + 回读校验 + 失败回滚；GET 返回 `defs`（含 `file`/`within`/`key`）与 `pageToggle:{file,block}` | `:2081-2107` |
-| 22 | `/api/backups` | GET | 否 | 否 | 列出 `admin-backups/`；每份含快照目录 `dir` | `:2108-2112` |
+| 22 | `/api/backups` | GET 读列表 / POST 设置保留份数 | **是**（仅 `admin-backups/keep.json` 保留份数设置） | 否（设置文件本身就在备份目录，无需再备份） | GET 返回 `backups[]` + `keep`；POST `{ keep: N }`，N 必须是**正整数**，保存后立即清理超出份数的旧快照并返回 `removed` | `:2156-2185` |
 | 23 | `/api/restore` | POST | **是** | **是**（恢复前再给「当前版本」留一份） | `id` 格式校验；`rel` 双重校验（`1940c1c`） | `:2113-2122` |
 | 24 | `/api/backup-export` | **仅 GET** | 否（读快照打包） | 否 | `id` 必须 `^[A-Za-z0-9-]+$` | `:2123-2156` |
 | 25 | `/api/ci` | **仅 GET** | 否 | 否 | 内部与路由双层兜底，**永远 200**；限流时 `rateLimited: true` | `:2157-2176` |
@@ -788,7 +788,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
 | 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
 | 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
-| 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；CI 失败横幅与「回滚该提交」 |
+| 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**保留份数可改为任意正整数**（`keep.json`，保存后立即清理旧快照）；CI 失败横幅与「回滚该提交」 |
 | 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
 
 > 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），现已改成 **10 个**（`README.md:771`、`README.md:172`）；`admin/README.md:45-56` 的功能表也是 10 行。这个是附录 E.3 事故 2 的现场，留作教材。
@@ -805,7 +805,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
    ↓
 ④ safeResolve + resolveInside（先 resolve 再按绝对路径比较目录前缀）  server.mjs:559-582
    ↓
-⑤ 写前快照 → admin-backups/<时间戳>-<随机>/（保留 40 份）    backups.mjs:15,79
+⑤ 写前快照 → admin-backups/<时间戳>-<随机>/（默认保留最新 40 份，可调）    backups.mjs:18,48-112
    ↓
 ⑥ 写入（原子性：单文件覆盖 / 同目录临时文件 rename）
    ↓

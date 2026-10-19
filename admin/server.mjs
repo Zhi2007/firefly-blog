@@ -32,7 +32,14 @@ import {
 } from "./announcement-draft.mjs";
 import { extractAudioMeta, mimeToExt, plainLyricsToLrc } from "./audio-meta.mjs";
 import { AVATAR_DEFAULT, applyAvatar, describeAvatar, restoreDefaultAvatar } from "./avatar.mjs";
-import { createSnapshot, listSnapshots, restoreSnapshot } from "./backups.mjs";
+import {
+	createSnapshot,
+	listSnapshots,
+	parseKeepValue,
+	readKeep,
+	restoreSnapshot,
+	writeKeep,
+} from "./backups.mjs";
 import { PUBLISH_SCOPE, parsePorcelainEntriesZ, stageForPublish } from "./publish-scope.mjs";
 // CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
 import {
@@ -1582,7 +1589,7 @@ const POST_BODY_FIELDS = {
 	"/api/publish": ["message", "force"],
 	"/api/doctor": [],
 	"/api/settings": ["values"],
-	"/api/backups": [],
+	"/api/backups": ["keep"],
 	"/api/restore": ["id", "rel"],
 	"/api/revert": ["sha"],
 	"/api/import-document": ["filename", "dataBase64", "slug"],
@@ -2147,7 +2154,33 @@ const server = createServer(async (req, res) => {
 			}
 
 			case "/api/backups": {
-				sendJson(res, 200, { backups: await listSnapshots(REPO_ROOT) });
+				if (req.method === "GET") {
+					sendJson(res, 200, {
+						backups: await listSnapshots(REPO_ROOT),
+						keep: await readKeep(REPO_ROOT),
+					});
+					return;
+				}
+				if (req.method !== "POST") {
+					sendJson(res, 405, { error: "GET 读快照列表；POST { keep: N } 设置保留份数" });
+					return;
+				}
+				// 保留份数必须是正整数；解析失败按 400 返回，而不是让 500 吞掉
+				let keep;
+				try {
+					keep = parseKeepValue(body.keep);
+				} catch (error) {
+					sendJson(res, 400, { error: error.message });
+					return;
+				}
+				const result = await writeKeep(REPO_ROOT, keep);
+				sendJson(res, 200, {
+					ok: true,
+					keep: result.keep,
+					removed: result.removed,
+					backups: await listSnapshots(REPO_ROOT),
+					message: `已改为保留最新 ${result.keep} 份${result.removed > 0 ? `，删除了 ${result.removed} 份更旧的快照` : ""}`,
+				});
 				return;
 			}
 
