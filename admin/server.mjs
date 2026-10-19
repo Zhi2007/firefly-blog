@@ -81,7 +81,14 @@ const argValue = (name, fallback) => {
 const PORT = Number(argValue("port", process.env.ADMIN_PORT || 8799));
 const AUTO_OPEN = !args.includes("--no-open");
 const DRY_RUN_PUBLISH = process.env.ADMIN_PUBLISH_DRY_RUN === "1";
-const TOKEN = randomBytes(16).toString("hex");
+// 启动器可以注入固定 TOKEN：后台重启后旧 Cookie 仍然有效，浏览器刷新/重连不会掉登录。
+// 没注入时仍按原来的随机令牌（每次启动都不同）。
+const TOKEN = String(process.env.ADMIN_TOKEN || "").trim() || randomBytes(16).toString("hex");
+const SUPERVISED = process.env.ADMIN_SUPERVISED === "1";
+const STARTED_AT = Date.now();
+// 启动器把服务端 stdout/stderr 重定向到这里；面板「后台」页直接读它显示日志
+const LOG_FILE = path.join(REPO_ROOT, "logs", "admin-server.log");
+const LOG_TAIL_BYTES = 128 * 1024;
 
 // ── 会话 Cookie ─────────────────────────────────────────────────────────────
 // 把访问令牌换成 HttpOnly Cookie：地址栏里的 ?token= 只用于「首次进页面」，
@@ -1545,6 +1552,30 @@ function sendJson(res, status, payload, extraHeaders) {
 }
 
 /**
+ * 读启动器写下的服务端日志尾部（最多 128KB），供面板「后台」页展示。
+ * 没日志文件（例如手动 `node admin/server.mjs` 启动）时返回 missing，不报错。
+ */
+async function readLogTail() {
+	try {
+		const stat = await fs.stat(LOG_FILE);
+		const start = Math.max(0, stat.size - LOG_TAIL_BYTES);
+		const length = stat.size - start;
+		const handle = await fs.open(LOG_FILE, "r");
+		try {
+			const buffer = Buffer.alloc(length);
+			await handle.read(buffer, 0, length, start);
+			// 去掉 ANSI 颜色控制符，避免在 <pre> 里显示成乱码
+			const text = buffer.toString("utf8").replace(/\x1b\[[0-9;]*m/g, "");
+			return { text, size: stat.size, truncated: start > 0, missing: false };
+		} finally {
+			await handle.close().catch(() => {});
+		}
+	} catch {
+		return { text: "", size: 0, truncated: false, missing: true };
+	}
+}
+
+/**
  * 带 HTTP 状态码的错误。抛出它的地方都是「客户端请求有问题」，最外层 catch 会照 status 返回。
  * 为什么不直接把 Error 当 400：只有我们自己明确标记过的错误才配当 4xx，
  * 其它意外异常一律 500，且不回显 JS 内部消息。
@@ -1610,7 +1641,7 @@ const POST_BODY_FIELDS = {
 	"/api/diff": [],
 	// 只读 + 拉起资源管理器（不写盘）；path 必须落在仓库内且真实存在
 	"/api/reveal": ["path"],
-	"/api/status": [],
+	"/api/status": ["action"],
 	"/api/media": [],
 	"/api/posts": [],
 	"/api/taxonomy": [],
@@ -1659,12 +1690,12 @@ const server = createServer(async (req, res) => {
 	const route = url.pathname;
 
 	try {
-		// 静态页面：允许带 token 访问，页面内所有请求都会带上它
+		// 静态页面：允许带 token 访问，页面内所有请求都会带上它；
+		// 页面加载后 token 会换成 HttpOnly Cookie，所以刷新时也认 Cookie —— 否则
+		// 地址栏里的 ?token= 被 replaceState 抹掉后，按 F5 会直接 403。
 		if (route === "/" || route === "/index.html") {
-			// 只认 URL / 请求头里的令牌，不认 Cookie：带着 ?token= 打开才算"登录"，
-			// 否则任何人直接访问 / 都能白拿页面（本机其它程序也一样）
 			const provided = url.searchParams.get("token") || req.headers["x-admin-token"];
-			if (!tokenValid(provided)) {
+			if (!(sessionValid(req) || tokenValid(provided))) {
 				res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
 				res.end(
 					`访问令牌不正确。请使用启动时打开的地址（含 ?token=…），或重新启动：node admin/server.mjs`,
@@ -1704,17 +1735,46 @@ const server = createServer(async (req, res) => {
 
 		switch (route) {
 			case "/api/status": {
+				if (req.method === "POST") {
+					// 由启动器托管时，响应后退出，启动器会用同样的端口/令牌把服务重新拉起来。
+					// 没托管时直接拒绝，避免进程退出后再也没有人把它拉起来。
+					if (body.action !== "restart") {
+						sendJson(res, 400, { error: "只支持 { action: \"restart\" }" });
+						return;
+					}
+					if (!SUPERVISED) {
+						sendJson(res, 409, {
+							error: "当前服务不是由启动器托管的，不能在线重启；请用桌面启动器打开面板。",
+						});
+						return;
+					}
+					sendJson(res, 200, { ok: true, restarting: true, message: "后台重启中…" });
+					setTimeout(() => process.exit(0), 300);
+					return;
+				}
 				const [info, action, pnpm] = await Promise.all([
 					repoInfo(),
 					latestAction(),
 					findPnpm(),
 				]);
-				sendJson(res, 200, {
+				const payload = {
 					...info,
 					action,
 					hasPnpm: Boolean(pnpm),
 					repoRoot: REPO_ROOT,
-				});
+					server: {
+						pid: process.pid,
+						port: PORT,
+						supervised: SUPERVISED,
+						startedAt: STARTED_AT,
+						uptimeMs: Date.now() - STARTED_AT,
+						logFile: path.relative(REPO_ROOT, LOG_FILE).split(path.sep).join("/"),
+					},
+				};
+				if (url.searchParams.get("log") === "1") {
+					payload.log = await readLogTail();
+				}
+				sendJson(res, 200, payload);
 				return;
 			}
 			case "/api/posts":
