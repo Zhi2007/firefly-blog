@@ -18,5 +18,10 @@ updates:
     pull-request-branch-name:
       separator: "-"
     ignore:
+      # @mermanjs/web 0.9.0 重打包并改了 API（去掉了
+      # `@mermanjs/web/pkg/merman_wasm_bg.wasm` 子路径导出，`assertSafeSvgForDom`
+      # 改名为 assertSelfContainedSvgForDom），src/plugins/rehype-mermaid.mjs 依赖
+      # 0.8.0-alpha.3 的旧 API，升上去会直接让 astro build 失败，先锁住。
+      - dependency-name: "@mermanjs/web"
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
