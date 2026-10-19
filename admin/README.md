@@ -29,9 +29,15 @@
 
 ## 启动
 
-**方式一（Windows 双击）**：双击项目根目录的 `启动管理面板.cmd`
+**方式一（Windows 双击，推荐）**：双击项目根目录的 `firefly-admin.exe`
 
-**方式二（命令行）**：
+- 只出现**一个**无标签栏的 Chrome / Edge 窗口；node 在后台隐藏运行，**关窗口 = 停止服务**。
+- 面板顶栏有「刷新界面」「重启后台」；「后台」页可以看 node 的实时日志、复制日志、打开日志文件。
+- exe 是构建产物（`.gitignore`）；换机器或重装后跑 `admin-launcher/build.cmd` 重新生成即可。
+
+**方式二（传统方式，调试用）**：双击项目根目录的 `启动管理面板.cmd`
+
+**方式三（命令行）**：
 
 ```sh
 node admin/server.mjs
@@ -40,6 +46,8 @@ node admin/server.mjs --port=8899 --no-open
 ```
 
 启动后会自动打开浏览器（地址里带一次性访问令牌），黑窗口关掉服务就停了。
+
+> 「方式二 / 三」没有启动器托管：后台页的「重启后台」会禁用；如需在线重启与日志收集，请用 `firefly-admin.exe`。
 
 ## 能做什么
 
@@ -55,6 +63,31 @@ node admin/server.mjs --port=8899 --no-open
 | **站点设置** | **可视化表单**：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像（**头像可在这里直接上传更换 / 恢复默认**，见下文「站点头像」）、壁纸模式与暗度、主页横幅标题、**首页横幅副标题（每行一条）**、显示设置面板各项开关 + **页面开关** + **导航菜单（隐藏/改名/排序）**。表单按用途分组、每项一张卡片（标题 + 说明 + 控件），写入位置收在每项的「写进 …」折叠里（如 `src/config/siteConfig.ts → navbar.title`，见「路径徽章」）；页面开关用中文名 + 原 key 的网格展示。写入前自动备份，写完回读校验，不一致立即回滚 |
 | **体检 / 备份** | 一键体检（10 项：JSON 合法性、内容引用是否丢失、公告完整性、**文章 frontmatter（YAML 速查）**、**文章 schema（跑真实 `astro build`）**、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + **导出 ZIP**（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**CI 部署状态**（失败时全页红色横幅，直接显示**是哪个 job 的哪个步骤挂了** + 日志片段 + 一键回滚该提交） |
 | **发布** | 同步状态（待推送提交数 / 远端新提交数 / 最后提交时间 / 最近一次部署结果）、**自动同步开关**、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住**（文章 frontmatter 写错也一样拦，见「体检」一节的「文章 frontmatter：为什么有两条检查」）；「待提交的改动」逐条显示真实路径与状态码，发布后列出本次提交的文件 |
+| **后台** | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；**后台日志**（读 `logs/admin-server.log` 尾部，2 秒自动刷新、复制、📂 打开日志文件）；**重启后台**（仅 `firefly-admin.exe` 托管时可用，重启后页面自动重连）；**刷新界面**；见「桌面启动器」一节 |
+
+## 桌面启动器（单窗口：node + 浏览器 + 后台日志）
+
+`admin-launcher/FireflyAdminLauncher.cs` 是一个零依赖的 .NET Framework WinForms 启动器，编译产物是仓库根目录的 `firefly-admin.exe`：
+
+| 能力 | 说明 |
+| --- | --- |
+| 单窗口 | 用 Chrome / Edge 的 `--app` 模式打开面板（没有标签栏、地址栏）；后台 node 不弹黑窗 |
+| 启动流程 | 单实例 Mutex → 找 Node → 从 8799 起找空闲端口 → 生成固定 `ADMIN_TOKEN` → 设置 `ADMIN_SUPERVISED=1` → 隐藏启动 `node admin/server.mjs --no-open --port=<port>` → 轮询 `/api/status` 就绪 → 开浏览器 |
+| 关闭 | 关闭浏览器窗口 = 浏览器进程退出 = 启动器结束 node；不会留下后台孤儿进程 |
+| 日志 | node 的 stdout/stderr 实时写入 `logs/admin-server.log`；「后台」页通过 `GET /api/status?log=1` 读最后 128KB |
+| 在线重启 | 面板发 `POST /api/status {"action":"restart"}` → 服务端退出 → 启动器用**同端口 + 同 token** 重新拉起 → 页面轮询恢复后自动刷新；Cookie 不失效 |
+| 刷新 | 顶栏「刷新界面」直接 `location.reload()`；静态页认会话 Cookie，不会再 403 |
+| 浏览器 profile | `logs/admin-browser-profile-<chrome\|msedge>`，两种浏览器格式不同，**必须分开**（共用会出现 Chrome 秒退 / Edge 白屏） |
+| 受限环境 | 先带 Chromium 沙箱启动；若在嵌套沙箱 / Job Object 里以 `STATUS_BREAKPOINT` 秒退，自动降级 `--no-sandbox` 重试一次（普通桌面不会降级） |
+| 自检 | `firefly-admin.exe --selftest` 不打开窗口：启动 → 校验托管 → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1 |
+
+**重新编译**（需要 Windows 自带 .NET Framework 4.x，无需安装 SDK）：
+
+```bat
+admin-launcher\build.cmd
+```
+
+**与手动 `node admin/server.mjs` 的差异**：手动方式没有 `ADMIN_SUPERVISED`，后台页显示「手动运行」，「重启后台」禁用；日志可能为空（stdout 在终端里）。
 
 ## 从 Word / txt 导入文章
 
@@ -566,9 +599,11 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 
 - 页面脚本读不到这个 Cookie（`HttpOnly`），也不会随页面内链泄漏到 Referer
 - 页面加载后立刻把地址栏里的 `?token=` 抹掉（`history.replaceState`），不留在浏览器历史里
+- **静态页本身也认 Cookie**：地址栏 token 被抹掉后按 F5 / 点「刷新界面」仍然能加载；否则会 403
 - 接口同时兼容 `X-Admin-Token` 请求头与 `?token=`（试听用的 `<audio>` 和 ZIP 下载要走 URL）
-- 令牌每次启动随机生成、Cookie 用 HMAC 签名且恒定时间比较；关掉窗口就全部失效
-- 若看到「认证失败（403）」，用带令牌的地址重新打开面板即可
+- 默认令牌每次启动随机生成、Cookie 用 HMAC 签名且恒定时间比较；手动 `node admin/server.mjs` 重启后旧 Cookie 失效
+- **`firefly-admin.exe` 会注入固定 `ADMIN_TOKEN`**：在线重启后台时端口与令牌都不变，页面可直接重连、不用重新登录
+- 若看到「认证失败（403）」，用带令牌的地址重新打开面板即可（手动启动时令牌每次都会变）
 
 ## 导航菜单（隐藏 / 改名 / 排序）
 

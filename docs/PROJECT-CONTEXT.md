@@ -50,8 +50,8 @@
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:1263-1324`、`.github/workflows/deploy.yml:58-63` |
 | 上线耗时 | 约 1 分钟 | `admin/README.md:174`、`admin/server.mjs:1321` |
-| 管理面板 | `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin/server.mjs:72,2475` |
-| 面板页签数 | **10 个** | `admin/index.html:213-222` |
+| 管理面板 | 优先双击根目录 `firefly-admin.exe`（单窗口：隐藏 node + Chrome/Edge `--app` 窗口 + 后台日志）；也可 `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin-launcher/FireflyAdminLauncher.cs`、`admin/server.mjs` |
+| 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
 | `/api/*` 路由数 | **36**（35 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
 | 已发布文章 | 4 篇 | `src/content/posts/*.md` 实测 |
@@ -91,7 +91,7 @@
 | 类别 | 判断依据 | 代表路径 | 改动策略 |
 | --- | --- | --- | --- |
 | ① **上游 Firefly/Fuwari 主题文件** | 在初始提交 `862d5c6`（`chore: 基于 Firefly 主题的个人博客（初始提交）`）里就存在，且本仓库后续没有为它建独立模块 | `src/layouts/`、`src/components/`、`src/pages/`、`src/plugins/`、`src/i18n/`、`src/utils/`（大部分）、`src/styles/`（大部分）、`src/types/`（大部分）、`astro.config.mjs`、`biome.json`、`tsconfig.json`、`postcss.config.mjs`、`svelte.config.js`、`vercel.json`、`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`_frontmatter.json`、`CREDITS.md`、`LICENSE`、`UPSTREAM-README.md`、`README.en.md` | 尽量别动。必须动时：小步、单一目的、在提交说明里写清「为什么上游实现不够用」。改完必须过第 11 章三条门禁。**`AGENTS.md` / `CLAUDE.md` 是上游文件，内容与现状的出入已在 `AGENTS.md`/`CLAUDE.md` 中就地标注「本仓库修正」（2026-10-11），逐条差异见 2.5 节** |
-| ② **本仓库自建** | 初始提交之后新增（`git log --diff-filter=A 862d5c6..HEAD` 可复现） | `worker/index.mjs`；`admin/`（14 个文件，含 `README.md`）；`scripts/compress-music.mjs`、`scripts/quarantine-bad-posts.mjs`；`public/vendor/giscus-1.6.0.mjs`；`public/friends/`（友链图标）；`public/pio/README.md`；`src/config/perfConfig.ts`；`src/config/{announcements,friends,music-playlist,nav-overrides}.json`；`src/styles/low-spec.css`；`src/types/navOverrides.ts`；`src/utils/announcement-utils.ts`；`重建依赖.cmd`；`启动管理面板.cmd`；`docs/`（本文档所在目录，新建）；`CREDITS.md`、`UPSTREAM-README.md`（作者整理的说明） | 这是本项目的「自有资产」，可以放心改。但仍要守第 11 章门禁、守零依赖约束（`admin/`） |
+| ② **本仓库自建** | 初始提交之后新增（`git log --diff-filter=A 862d5c6..HEAD` 可复现） | `worker/index.mjs`；`admin/`（18 个文件，含 `README.md`）；`admin-launcher/`（单窗口启动器源码，exe 是构建产物）；`scripts/compress-music.mjs`、`scripts/quarantine-bad-posts.mjs`；`public/vendor/giscus-1.6.0.mjs`；`public/friends/`（友链图标）；`public/pio/README.md`；`src/config/perfConfig.ts`；`src/config/{announcements,friends,music-playlist,nav-overrides}.json`；`src/styles/low-spec.css`；`src/types/navOverrides.ts`；`src/utils/announcement-utils.ts`；`重建依赖.cmd`；`启动管理面板.cmd`；`docs/`（本文档所在目录，新建）；`CREDITS.md`、`UPSTREAM-README.md`（作者整理的说明） | 这是本项目的「自有资产」，可以放心改。但仍要守第 11 章门禁、守零依赖约束（`admin/`、`admin-launcher/`） |
 | ③ **内容与配置（日常改动区）** | 数据/配置类，改动不需要碰逻辑代码 | `src/content/posts/`（文章 + `images/`）、`src/content/spec/`、`src/content/dynamic/`、`src/content/projects/`；`src/config/`（除类型定义外的全部配置）；`public/assets/`（图片/音乐/字体）；`src/assets/`（走 Astro 优化管线的图） | **日常只改这里**。优先用管理面板（第 9 章），它自带快照 + 校验 + 回滚 |
 
 > 复现方式（只读命令）：
@@ -103,9 +103,9 @@
 ```text
 firefly/
 ├── admin/                      # ② 零依赖本地管理面板（18 个文件，只用 node: 内置模块）
-│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2535 行）
-│   ├── index.html              #    单页 UI（10 个页签，内联 JS/CSS，156 KB）
-│   ├── README.md               #    面板完整用法（743 行）★ 改面板前必读
+│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2457 行）
+│   ├── index.html              #    单页 UI（11 个页签，内联 JS/CSS，现代侧边栏外壳）
+│   ├── README.md               #    面板完整用法（617 行）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
 │   ├── avatar.mjs              #    站点头像：魔数校验 + 可选缩放 → 写新文件并改 profileConfig.avatar
@@ -121,6 +121,11 @@ firefly/
 │   ├── import-doc.mjs          #    .docx/.txt/.md → Markdown
 │   ├── audio-meta.mjs          #    从 mp3/flac/m4a 读封面与歌词
 │   └── friends.mjs             #    友链 CRUD + 「从网址抓取」（含 SSRF 防护）
+├── admin-launcher/            # ② 单窗口桌面启动器（C# 5 / .NET Framework，零第三方依赖）
+│   ├── FireflyAdminLauncher.cs #    隐藏 node + Chrome/Edge --app 窗口 + 日志 + 在线重启（716 行）
+│   ├── build.cmd              #    csc 编译到根目录 firefly-admin.exe（exe 被 gitignore）
+│   ├── app.manifest           #    asInvoker + 视觉样式
+│   └── README.md              #    使用 / 构建 / 自检 / 排查
 ├── worker/
 │   └── index.mjs               # ② Cloudflare Worker 入口（222 行，6 项职责）★ 第 5 章
 ├── public/                     # 原样拷贝进 dist/ 的静态文件
@@ -711,17 +716,18 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | --- | --- | --- |
 | 监听地址 | **只监听 `127.0.0.1`**，局域网/公网都访问不到 | `admin/server.mjs:2495`（`server.listen(PORT, "127.0.0.1", ...)`） |
 | 端口 | 默认 **8799**；`--port=8899` 或环境变量 `ADMIN_PORT` 可改 | `admin/server.mjs:67-72` |
-| 令牌 | **每次启动随机生成**：`randomBytes(16).toString("hex")` → 32 位十六进制 | `admin/server.mjs:75` |
-| 打开方式 | 启动时自动打开 `http://127.0.0.1:<PORT>/?token=<TOKEN>`；`--no-open` 可禁自动打开 | `admin/server.mjs:73,2506-2514` |
-| 页面本身也要令牌 | 打开 `/` 或 `/index.html` 时只认 **URL `?token=` 或 `X-Admin-Token` 头**，**不认 Cookie** | `admin/server.mjs:1624-1643` |
-| 会话 Cookie | 页面校验通过后下发 `admin_session=<HMAC-SHA256 hex>`，属性 `HttpOnly; SameSite=Strict; Path=/`，**不含 `Secure`**（只跑在 127.0.0.1） | `admin/server.mjs:81-83,1639` |
-| Cookie 签名密钥 | 就是本次启动的 TOKEN → **重启面板后旧 Cookie 自动失效** | `admin/server.mjs:80-83` |
-| 三选一认证 | 接口接受 `sessionValid(Cookie)` **或** `x-admin-token` **或** `?token=` | `admin/server.mjs:624-627` |
-| 恒定时间比较 | 令牌与 Cookie 签名都用 `timingSafeEqual`，长度不等直接 false | `admin/server.mjs:585-591,610-617` |
-| **`/api/logout` 故意免认证** | 它只清本地 Cookie，没登录时调用也无害；**除它以外所有接口都要凭证** | `admin/server.mjs:1647-1654`（注释写明设计原因，`L7`） |
-| 未认证返回 | `403 {"error":"令牌无效，请重新启动管理后台"}`（**不是 401**） | `admin/server.mjs:1657-1660` |
-| 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs:1600-1616` |
-| 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=` | `admin/README.md:487` |
+| 令牌 | **默认每次启动随机生成**：`randomBytes(16).toString("hex")` → 32 位十六进制；启动器会通过环境变量 `ADMIN_TOKEN` 注入一个**固定令牌**（重启后不变，旧 Cookie 仍有效） | `admin/server.mjs` 顶部 `TOKEN` |
+| 打开方式 | 启动时自动打开 `http://127.0.0.1:<PORT>/?token=<TOKEN>`；`--no-open` 可禁自动打开 | `admin/server.mjs` 启动段 |
+| 页面本身也要令牌 | 打开 `/` 或 `/index.html` 时认 **URL `?token=` / `X-Admin-Token` 头 / 会话 Cookie** 三者之一；**认 Cookie 是为了页面刷新**（地址栏 token 已被 replaceState 抹掉，只认 token 会让 F5 变 403） | `admin/server.mjs` 静态页分支 |
+| 会话 Cookie | 页面校验通过后下发 `admin_session=<HMAC-SHA256 hex>`，属性 `HttpOnly; SameSite=Strict; Path=/`，**不含 `Secure`**（只跑在 127.0.0.1） | `admin/server.mjs` 会话 Cookie 段 |
+| Cookie 签名密钥 | 就是本次启动的 TOKEN；**启动器注入固定 TOKEN，所以在线重启后 Cookie 不会失效**；手动 `node admin/server.mjs` 启动仍是每次随机、重启即失效 | `admin/server.mjs` 顶部 |
+| 托管标记 | 启动器设置 `ADMIN_SUPERVISED=1`；只有该值为 1 时 `POST /api/status {action:"restart"}` 才允许退出并由启动器重新拉起 | `admin/server.mjs` 顶部 / `/api/status` |
+| 三选一认证 | 接口接受 `sessionValid(Cookie)` **或** `x-admin-token` **或** `?token=` | `admin/server.mjs` `authorized()` |
+| 恒定时间比较 | 令牌与 Cookie 签名都用 `timingSafeEqual`，长度不等直接 false | `admin/server.mjs` 认证辅助函数 |
+| **`/api/logout` 故意免认证** | 它只清本地 Cookie，没登录时调用也无害；**除它以外所有接口都要凭证** | `admin/server.mjs` 前置分支 |
+| 未认证返回 | `403 {"error":"令牌无效，请重新启动管理后台"}`（**不是 401**） | `admin/server.mjs` 认证分支 |
+| 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs` `readBody` |
+| 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=`；刷新靠 HttpOnly Cookie | `admin/index.html` 脚本开头 |
 
 ### 9.3 全部 `/api/*` 路由表（36 条）
 
@@ -738,7 +744,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | # | 路由 | 方法（代码实际行为） | 写盘 | 写前快照 | 关键安全约束 / 备注 | 位置 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `/api/logout` | **仅 POST**（否则 405） | 否 | 否 | **故意免认证**；清 Cookie | `:1647-1654` |
-| 2 | `/api/status` | GET（POST 也会执行） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测；`changed[]` 是结构化的待提交文件（`{code,path,origin}`） | `:1667-1680` |
+| 2 | `/api/status` | GET 读状态；**POST `{action:"restart"}`**（仅启动器托管时） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测；`changed[]` 是结构化的待提交文件（`{code,path,origin}`）；`server{pid,port,supervised,startedAt,uptimeMs,logFile}`；`?log=1` 额外返回后台日志尾部（最多 128KB，`log{text,size,truncated,missing}`）；POST restart 先回 `{ok:true}` 再退出，由启动器以同端口/令牌重新拉起；未托管返回 **409**；`POST_BODY_FIELDS` 放行 `action` | `admin/server.mjs` 的 `/api/status` 分支 |
 | 3 | `/api/posts` | GET | 否 | 否 | 文章列表；另返回 `dir` / `imagesDir` / `imagesUrlPrefix`（面板显示「文章存在哪、图片放哪」） | `:1681-1691` |
 | 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir` / `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
 | 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`）；**frontmatter 外科式改写**：日期落盘为不带引号的 `YYYY-MM-DD`、非法日期或空 `title` 一律 400（不落盘）、没编辑的行逐字节保留（**9.12 节**）；返回 `file` / `notes[]`（本次顺手规整了哪一行日期） | `:1745-1780` |
@@ -776,7 +782,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | — | `/api/diff` | GET/POST | 否 | 否 | `git diff --stat` + 结构化的 `files[{code,path,origin}]`（面板据此显示待提交文件的真实路径） | `:2412-2433` |
 | — | 未知 `/api/*` | 任意 | 否 | 否 | `404 {"error":"未知接口: <route>"}` | `:2469-2471` |
 
-### 9.4 页签清单（10 个，实测 `admin/index.html:213-222`）
+### 9.4 页签清单（11 个，实测 `admin/index.html` 的 `nav button[data-tab]`）
 
 | # | 页签 | `data-tab` | 能做什么（摘要） |
 | --- | --- | --- | --- |
@@ -790,8 +796,9 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
 | 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**保留份数可改为任意正整数**（`keep.json`，保存后立即清理旧快照）；CI 失败横幅与「回滚该提交」 |
 | 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
+| 11 | 后台 | `runtime` | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；**后台日志**（读 `logs/admin-server.log` 尾部，2 秒自动刷新、复制、📂 打开文件）；**重启后台**（仅启动器托管时可用，重启后页面自动重连）；**刷新界面**；见 9.13 节 |
 
-> 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），现已改成 **10 个**（`README.md:771`、`README.md:172`）；`admin/README.md:45-56` 的功能表也是 10 行。这个是附录 E.3 事故 2 的现场，留作教材。
+> 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），后来改成 **10 个**；2026-10-19 新增「后台」页签后为 **11 个**。`admin/README.md` 的功能表也同步为 11 行。
 
 ### 9.5 写入安全链（所有写接口共用）
 
@@ -1005,6 +1012,28 @@ published: Expected type `"date"`, received `"string"`
 - `updated` 以外的「复杂结构」（对象数组，如 `projects` 的 `link:`）不做完整建模；那些字段面板不管理，保存时原样保留。
 - 块标量的值按「折叠空白后比较」判断是否被改过：用 `>` 折行的长描述只要语义没变就不会被重排成一行。
 - **本文档 §9.3 / §3.9 里 `server.mjs:行号` 是写作时的快照，本来就与当前文件有 ±20 行的漂移**（实测：文档写 save-post 在 `:1734` 时，真实行号是 1755）。本次修复让 `admin/server.mjs` 从 2536 行变成 **2535 行**（净减 1 行），save-post 那个 case 现在在 `admin/server.mjs:1745-1780`。核对锚点时**按关键词检索**（`case "/api/save-post"`、`function dateNormalizeNotes`）比按旧行号跳更可靠。
+
+### 9.13 单窗口桌面启动器（`firefly-admin.exe`）：在线重启 / 后台日志
+
+**解决什么**：以前是「cmd 窗口跑 node + 浏览器标签页」两处；现在双击项目根目录 `firefly-admin.exe`，只出现一个无标签栏的 Chrome/Edge 窗口，node 隐藏运行，关窗口即停服务。
+
+| 事实 | 说明 |
+| --- | --- |
+| 源码 / 构建 | `admin-launcher/FireflyAdminLauncher.cs`；`admin-launcher/build.cmd` 用 Windows 自带 .NET Framework `csc.exe` 编译到根目录 `firefly-admin.exe`。exe 是构建产物（`.gitignore`），换机器重新跑 `build.cmd` 即可 |
+| 启动 | 单实例 Mutex；在 PATH / 常见安装位置找 Node；从 8799 起找空闲端口；生成**固定** `ADMIN_TOKEN`；设置 `ADMIN_SUPERVISED=1`；隐藏启动 `node admin/server.mjs --no-open --port=<port>` |
+| 浏览器 | 优先 Chrome，其次 Edge；`--app=<URL> --user-data-dir=logs/admin-browser-profile-<浏览器>`（两种浏览器的 profile 格式不兼容，必须分开）；关闭窗口 = 浏览器进程退出 = 启动器结束 node |
+| 日志 | 启动器把 node 的 stdout/stderr 实时追加到 `logs/admin-server.log`；面板「后台」页通过 `GET /api/status?log=1` 读尾部（最多 128KB，去掉 ANSI） |
+| 在线重启 | 面板「重启后台」→ `POST /api/status {action:"restart"}` → 服务端回包后退出 → 启动器用同端口/同 token 拉起 → 页面轮询 `/api/status` 恢复后 `location.reload()`；固定 token 让 Cookie 继续有效 |
+| 刷新页面 | 「刷新界面」= `location.reload()`；静态页现在也认会话 Cookie，不会再因为地址栏没有 token 而 403 |
+| 浏览器沙箱降级 | 正常先带沙箱启动；若 Chromium 在受限环境（嵌套沙箱 / Job Object）里以 `STATUS_BREAKPOINT` 秒退，自动用 `--no-sandbox` 重试一次并写日志；普通桌面不会走降级 |
+| 自检 | `firefly-admin.exe --selftest`：启动后台 → 校验 `supervised` → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1；不打开浏览器窗口 |
+| 手动 node | `node admin/server.mjs` 仍可用，但没有启动器托管：`supervised:false`，「重启后台」禁用；后台日志可能为空（stdout 在终端里） |
+
+> **为什么浏览器 profile 按浏览器分开**：Chrome 与 Edge 的 profile 目录格式不同；共用一个目录会出现「Chrome 秒退 / Edge 白屏」。2026-10-19 实测踩过。
+
+> **界面外壳**：左侧分组导航 + 顶部状态栏 + 内容区卡片；明暗主题切换存在浏览器 `localStorage`（`zhihai-admin-theme`），不写站点配置。页签切换会同步更新浏览器标题。
+
+
 
 ---
 
@@ -1604,7 +1633,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | --- | --- | --- | --- |
 | 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:86-111` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
 | 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（36 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
-| 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 10 个）；② `admin/README.md` 的功能表（`:43-54`）；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
+| 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 11 个）；② `admin/README.md` 的功能表；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
 | 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-41` + `:358`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
 | 6 | **新增构建步骤（`package.json` 的 `build`）** | ① 本文档 11.2 的 8 步链路与「8 步」说法（§1.3 也有一处）；② `CLAUDE.md` / `AGENTS.md` 里的构建说明（上游文件，改动要就地标注「本仓库修正」） | ✅（步骤序列逐条比对 + 三处「N 步」声明，含 `CLAUDE.md`） |

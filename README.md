@@ -170,7 +170,7 @@ Indexed 29 pages
 firefly/
 ├── admin/                     # 零依赖本地管理面板（Node 内置模块，无 npm 依赖）
 │   ├── server.mjs             # HTTP 服务：路由、认证、读写文件、调用 git/pnpm
-│   ├── index.html             # 单页面 UI（10 个页签，内联 JS/CSS）
+│   ├── index.html             # 单页面 UI（11 个页签，内联 JS/CSS）
 │   ├── import-doc.mjs         # .docx/.txt/.md → Markdown（自己读 ZIP + inflateRaw）
 │   ├── audio-meta.mjs         # 从 mp3/flac/m4a 读 ID3/Vorbis/ilst 标签、封面、歌词
 │   ├── doctor.mjs             # 体检 10 项：JSON 合法性、引用、文章 frontmatter（YAML 速查 + 真实构建）、站内链接、密钥、大文件、配置矛盾、git
@@ -182,6 +182,10 @@ firefly/
 │   ├── media-compress.mjs     # 批量转 WebP（只新增 .webp，不删原图）
 │   ├── zip.mjs                # 快照导出 ZIP（store 模式，不压缩）
 │   └── README.md              # 面板详细用法（本文件只做索引）
+├── admin-launcher/            # 单窗口桌面启动器（C# / .NET Framework，零第三方依赖）
+│   ├── FireflyAdminLauncher.cs # 隐藏 node + Chrome/Edge --app 窗口 + 后台日志 + 在线重启
+│   ├── build.cmd              # 编译到根目录 firefly-admin.exe（exe 被 gitignore）
+│   └── README.md              # 使用 / 构建 / 自检 / 排查
 ├── public/                    # 原样拷贝进 dist/ 的静态文件
 │   ├── _headers / _redirects  # ⚠️ 见 FAQ：run_worker_first 之后已不生效，只是文档
 │   ├── assets/music/          # 本地歌单：音频 + cover/ + lrc/（另有 README.md 说明）
@@ -755,23 +759,26 @@ export const tabTitleConfig: TabTitleConfig = {
 
 | 方式 | 命令 / 操作 | 会看到什么 |
 | --- | --- | --- |
-| Windows 双击 | 双击项目根目录的 `启动管理面板.cmd` | 黑窗口先检查 Node 与 `admin\server.mjs`，然后启动服务并自动开浏览器 |
+| **Windows 双击（推荐）** | 双击项目根目录的 **`firefly-admin.exe`** | 只出现**一个**无标签栏的 Chrome / Edge 窗口；node 在后台隐藏运行，关窗口即停。顶栏可「刷新界面 / 重启后台」，侧栏「后台」页看日志 |
+| Windows 双击（旧） | 双击项目根目录的 `启动管理面板.cmd` | 黑窗口先检查 Node 与 `admin\server.mjs`，然后启动服务并自动开浏览器；调试/备用 |
 | 命令行 | `node admin/server.mjs` | 终端打印仓库、分支、访问地址（含 `?token=`），并自动打开浏览器 |
 | 命令行（自定义） | `node admin/server.mjs --port=8899 --no-open` | 换端口 8899、不自动开浏览器；也可以只加 `--no-open` 用默认端口 |
 | 通过 pnpm | `pnpm admin` | 等价于 `node admin/server.mjs` |
 
 默认端口 **8799**（`admin/server.mjs` 的 `PORT = argValue("port", process.env.ADMIN_PORT || 8799)`），也可以用环境变量 `ADMIN_PORT` 覆盖。**窗口/终端关掉服务就停了。**
 
+> `firefly-admin.exe` 的源码在 `admin-launcher/`，重新编译跑 `admin-launcher\build.cmd`（只需 Windows 自带 .NET Framework）。exe 是构建产物，不提交仓库。
+
 ### 8.2 认证机制
 
 - 服务只 `listen(PORT, "127.0.0.1")`，局域网与公网都访问不到。
-- 每次启动生成**一次性令牌**（`randomBytes(16)`），启动信息里的地址形如 `http://127.0.0.1:8799/?token=<hex>`。
-- 打开页面时令牌被换成 **HttpOnly + SameSite=Strict 的会话 Cookie**（值是用本次令牌做 HMAC-SHA256 的签名，用 `timingSafeEqual` **恒定时间比较**）；页面脚本读不到这个 Cookie，重启面板后旧 Cookie 自动失效。
-- 页面加载后会立刻用 `history.replaceState` 把地址栏里的 `?token=` **抹掉**，不留在浏览器历史里。
+- 默认每次启动生成**一次性令牌**（`randomBytes(16)`），启动信息里的地址形如 `http://127.0.0.1:8799/?token=<hex>`；启动器会通过 `ADMIN_TOKEN` 注入**固定令牌**（在线重启后不失效）。
+- 打开页面时令牌被换成 **HttpOnly + SameSite=Strict 的会话 Cookie**（值是用本次令牌做 HMAC-SHA256 的签名，用 `timingSafeEqual` **恒定时间比较**）；页面脚本读不到这个 Cookie。手动 `node admin/server.mjs` 重启后旧 Cookie 自动失效；启动器重启则保持有效。
+- 页面加载后会立刻用 `history.replaceState` 把地址栏里的 `?token=` **抹掉**，不留在浏览器历史里；静态页本身也认会话 Cookie，所以 **F5 / 「刷新界面」不会再 403**。
 - 接口同时兼容 `X-Admin-Token` 请求头与 `?token=`（`<audio>` 试听、ZIP 下载这类走 URL 的请求需要），`/api/logout` 清除 Cookie。
-- 如果看到"认证失败（403）"，用**带令牌的地址**重新打开即可（令牌每次启动都会变）。
+- 如果看到"认证失败（403）"，用**带令牌的地址**重新打开即可（手动启动时令牌每次都会变）。
 
-### 8.3 十个页签能做什么
+### 8.3 十一个页签能做什么
 
 | 页签 | 能做什么 |
 | --- | --- |
@@ -784,6 +791,7 @@ export const tabTitleConfig: TabTitleConfig = {
 | **站点设置** | 可视化表单：站点标题/副标题/描述/关键词/主域/建站日期、页面宽度、导航栏标题、主题色相与默认明暗、卡片样式、博主名字/签名/头像、壁纸模式与暗度、主页横幅标题与副标题（每行一条）、显示设置面板各项开关、页面开关、导航菜单（隐藏/改名/排序）。顶部还有**站点头像**卡片：缩略图 + 「上传新头像…」+「恢复默认」（另存新文件、不覆盖原图、可回滚；见 8.4 示例 D）。表单按用途分了 7 组，每项一张卡片（标题 + 说明 + 控件），写入位置收在「写进 …」折叠里；页面开关用中文名 + 原 key 展示。所有写入前自动备份，写完回读校验，不一致立即回滚 |
 | **体检 / 备份** | 一键体检（10 项：JSON 合法性、歌单引用、公告完整性、**文章 frontmatter**、**文章 schema（跑真实 `astro build`）**、站内链接、疑似密钥、异常大文件、配置矛盾、Git 状态）；写前快照列表 + 一键恢复 + 导出 ZIP + **保留份数可调（任意正整数）**；CI 部署状态（失败时全页红色横幅 + 一键回滚该提交） |
 | **发布** | 同步状态（待推送/落后远端/最后提交时间/最近部署结果）、自动同步开关、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住** —— 文章 frontmatter 写错（例如日期被引号包住 `published: "2026-10-11"`，会让 CI 报 `Expected type "date", received "string"`）现在会在发布前被拦下，并直接告诉你「改哪个文件、哪个字段、怎么改」 |
+| **后台** | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；实时后台日志（2 秒自动刷新、复制、📂 打开日志文件）；「重启后台」（仅 `firefly-admin.exe` 托管时可用，保留端口和登录状态，页面自动重连）；「刷新界面」 |
 
 拖拽上传的落点按当前页签判断（音乐页 → `public/assets/music/`；媒体页 → 下拉框选中的目录；其它页 → `src/content/posts/images/`）。
 
