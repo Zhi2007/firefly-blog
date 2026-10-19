@@ -772,7 +772,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 33 | `/api/compress-media` | **仅 POST** | 是（**只新增 `.webp`**） | 否 | `dirs` 必须在 3 个 `COMPRESS_DIRS` 内；`dryRun` 默认 true 由前端控制；每项含 `rel` / `outRel` | `:2308-2338` |
 | 34 | `/api/run` | POST | 否 | 否 | `script ∈ {build, dev, check}`；找不到 pnpm 时返回**可读提示**（不是报错） | `:2339-2366` |
 | 35 | `/api/avatar` | 非 POST 读状态 / POST 换图或恢复默认 | **是**（新图片 + 改写 `profileConfig.ts` 的 `avatar`） | 是（同名图片覆盖时 + 配置改写前） | 扩展名白名单 + **魔数校验**（改扩展名骗不过）+ 25 MB 上限 + 只写 `public/assets/images`；`{restore:true}` 改回默认；GET 返回 `dir` / `repoPath` / `config:{file,key}`；见 9.8 节 | `:2367-2411` |
-| 36 | `/api/reveal` | **仅 POST** | 否（拉起资源管理器，不碰仓库） | 否 | 「打开所在文件夹」：`path` 必须**落在仓库内**且真实存在（越界 400 / 不存在 404）；只在 Windows 上执行（其它平台 200 + `ok:false` 说明）；`spawn(..., {detached, stdio:"ignore"}).unref()` **不阻塞请求**；`POST_BODY_FIELDS` 只放行 `path`；见 9.10 节 | `:2434-2468` |
+| 36 | `/api/reveal` | **仅 POST** | 否（拉起资源管理器，不碰仓库） | 否 | 「打开所在文件夹」：`path` 必须**落在仓库内**且真实存在（越界 400 / 不存在 404）；只在 Windows 上执行（其它平台 200 + `ok:false` 说明）；文件用 `spawn("explorer.exe", ["/select,", abs], {detached, stdio:"ignore"}).unref()`、目录直接传 `[abs]`，**`/select,` 与路径必须分开传**（合并时含空格路径会被整体加引号，Explorer 会退回「文档」目录），**不阻塞请求**；`POST_BODY_FIELDS` 只放行 `path`；见 9.10 节 | `:2517-2552` |
 | — | `/api/diff` | GET/POST | 否 | 否 | `git diff --stat` + 结构化的 `files[{code,path,origin}]`（面板据此显示待提交文件的真实路径） | `:2412-2433` |
 | — | 未知 `/api/*` | 任意 | 否 | 否 | `404 {"error":"未知接口: <route>"}` | `:2469-2471` |
 
@@ -912,7 +912,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 环节 | 实现 | 依据 |
 | --- | --- | --- |
 | 复制 | **文档级事件委托**处理 `[data-copy]`（徽章会被各页反复重渲染，逐个绑定必然漏）；`copyText()` 先试 `navigator.clipboard.writeText`，失败退回 `document.execCommand("copy")`，再失败就把 `<code>` 里的文本**选中**让用户按 Ctrl+C；成功后按钮上显示 **2 秒**「已复制」 | `admin/index.html` 的 `filePathBadge` / `copyText` / `flashCopied` |
-| 打开所在文件夹 | `[data-reveal]` → `POST /api/reveal {path}`；后端 `resolveInside` 保证目标在**仓库内**、`fs.stat` 保证真实存在、只接受 POST、`spawn("explorer.exe", ["/select,"+abs], {detached, stdio:"ignore"}).unref()` **不阻塞请求**；**仅 Windows**（其它平台 200 + `ok:false` + 中文说明） | `admin/server.mjs` 的 `revealInExplorer` / `/api/reveal`（`:2414-2448`）；前端 `opts.reveal === false` 时不渲染该按钮（文件已删除 / 尚未创建 / 远程 URL） |
+| 打开所在文件夹 | `[data-reveal]` → `POST /api/reveal {path}`；后端 `resolveInside` 保证目标在**仓库内**、`fs.stat` 保证真实存在、只接受 POST；文件用 `spawn("explorer.exe", ["/select,", abs], {detached, stdio:"ignore"}).unref()`、目录用 `[abs]`，`/select,` 与路径**必须分开传**（合并时含空格路径会被整体加引号，Explorer 退回「文档」目录），**不阻塞请求**；**仅 Windows**（其它平台 200 + `ok:false` + 中文说明） | `admin/server.mjs` 的 `revealInExplorer` / `/api/reveal`；前端 `opts.reveal === false` 时不渲染该按钮（文件已删除 / 尚未创建 / 远程 URL） |
 | 路径从哪来 | **只能来自后端**：`fs.readdir`（文章、媒体）、`git status --porcelain -z`（待提交）、实际写入路径（保存后返回的 `file`）、快照目录（`listSnapshots` 的 `dir`），或按站点约定拼好后**当场 `stat` 核对**（`publicUrlToRepoPath` / `describeLocalFiles` / `describeFriendIcons`）。前端**不许**自己拼路径。站内 URL 的 `?v=<内容哈希>` 缓存参数与 `#锚点` 必须先剥掉再拼仓库路径，否则存在的音频 / 封面会被误判成「文件不存在」 | `admin/server.mjs`、`admin/friends.mjs` |
 | 不编造 | 文件不存在时如实标 ⚠️ +「文件不存在」且**不给**「打开所在文件夹」；`/api/nav` 的 `fileExists:false` 显示「（尚未创建，保存后生成）」；新建文章显示「保存后将写入 …（尚未创建）」 | `filePathBadge` 的 `note`/`warn`/`reveal` 三个选项 |
 | 视觉 | `.path-badge` 用等宽小号字 + 次要色，可换行（`overflow-wrap: anywhere`）、hover 用 `title` 显示完整值，**不抢标题的视觉重心**，也不撑破既有表单 / 表格 | `admin/index.html` 的 `.path-badge` 样式 |

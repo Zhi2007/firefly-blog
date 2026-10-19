@@ -746,9 +746,14 @@ async function describeLocalFiles(urls) {
  *   2. `stdio: "ignore"`：不建管道（受限环境里建管道会 EPERM），也不需要它的输出。
  *   3. 同步抛错（例如环境不允许起子进程）在这里接住并返回可读中文，绝不让它冒到最外层变 500。
  *
+ * ⚠️ `/select,` 与路径必须作为**两个参数**传给 spawn（`["/select,", abs]`）。
+ * 合并成一个参数（`"/select," + abs`）时，只要路径含空格，Node 会给整个参数加引号，
+ * Explorer 解析不了这个引号包住的 switch，会退回到默认「文档」目录 —— 实测踩过。
+ * 目录则直接传路径（`[abs]`），打开目录本身。
+ *
  * 非 Windows 一律返回 ok:false + 说明：宁可不做，也不要拉起一个行为不确定的命令。
  */
-function revealInExplorer(abs) {
+function revealInExplorer(abs, isDirectory = false) {
 	if (process.platform !== "win32") {
 		return {
 			ok: false,
@@ -756,7 +761,8 @@ function revealInExplorer(abs) {
 		};
 	}
 	try {
-		const child = spawn("explorer.exe", [`/select,${abs}`], {
+		const args = isDirectory ? [abs] : ["/select,", abs];
+		const child = spawn("explorer.exe", args, {
 			detached: true,
 			stdio: "ignore",
 		});
@@ -2530,7 +2536,7 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 404, { error: `仓库里没有这个路径：${rel}` });
 					return;
 				}
-				const revealed = revealInExplorer(abs);
+				const revealed = revealInExplorer(abs, stat.isDirectory());
 				sendJson(res, 200, {
 					ok: revealed.ok,
 					path: rel,
