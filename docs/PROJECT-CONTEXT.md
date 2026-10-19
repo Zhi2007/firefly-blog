@@ -1025,7 +1025,7 @@ published: Expected type `"date"`, received `"string"`
 | 日志 | 启动器把 node 的 stdout/stderr 实时追加到 `logs/admin-server.log`；面板「后台」页通过 `GET /api/status?log=1` 读尾部（最多 128KB，去掉 ANSI） |
 | 在线重启 | 面板「重启后台」→ `POST /api/status {action:"restart"}` → 服务端回包后退出 → 启动器用同端口/同 token 拉起 → 页面轮询 `/api/status` 恢复后 `location.reload()`；固定 token 让 Cookie 继续有效 |
 | 刷新页面 | 「刷新界面」= `location.reload()`；静态页现在也认会话 Cookie，不会再因为地址栏没有 token 而 403 |
-| 浏览器沙箱降级 | 正常先带沙箱启动；若 Chromium 在受限环境（嵌套沙箱 / Job Object）里以 `STATUS_BREAKPOINT` 秒退，自动用 `--no-sandbox` 重试一次并写日志；普通桌面不会走降级 |
+| 浏览器沙箱降级 | 正常先带沙箱启动；若 Chromium 以 `STATUS_BREAKPOINT` 秒退，自动用 `--no-sandbox --test-type` 重试一次并写日志（`--test-type` 隐藏 Chromium 的「不受支持的命令行标记」提示条）；只影响本机回环面板，不浏览外部网页。某些 Windows / 安全软件环境也会触发 |
 | 自检 | `firefly-admin.exe --selftest`：启动后台 → 校验 `supervised` → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1；不打开浏览器窗口 |
 | 手动 node | `node admin/server.mjs` 仍可用，但没有启动器托管：`supervised:false`，「重启后台」禁用；后台日志可能为空（stdout 在终端里） |
 

@@ -69,6 +69,6 @@ firefly-admin.exe --selftest
 ## 已知限制与排查
 
 - **需要 Node.js 和 Chrome 或 Edge**；找不到时启动器会弹中文错误框。
-- **普通桌面先带 Chromium 沙箱启动**。如果面板窗口一闪而过、日志里出现 `code=-2147483645`（`STATUS_BREAKPOINT`），说明当前环境是嵌套沙箱 / Job Object（例如从某些 AI 终端里启动），启动器会自动用 `--no-sandbox` 再试一次并写日志；在资源管理器里双击通常不会触发降级。
+- **普通桌面先带 Chromium 沙箱启动**。如果面板窗口一闪而过、日志里出现 `code=-2147483645`（`STATUS_BREAKPOINT`），启动器会自动用 `--no-sandbox --test-type` 再试一次并写日志；`--test-type` 用来隐藏 Chromium 的「不受支持的命令行标记」提示条。某些 Windows / 安全软件环境也可能触发降级，不一定是嵌套沙箱；只影响本机回环面板，不用于浏览外部网页。
 - **Chrome 与 Edge 的 profile 不能共用**；分开后避免「Chrome 秒退 / Edge 白屏」。
 - 如果启动器被强杀，Node 可能残留：用任务管理器结束 `node.exe`（命令行含 `admin/server.mjs`）即可；正常关闭窗口不会残留。

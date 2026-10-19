@@ -379,7 +379,9 @@ namespace FireflyAdminLauncher
                 AppendLog("---- 面板窗口首次启动退出（code=" + code + "），尝试兼容模式 ----");
                 try { first.Dispose(); } catch { }
                 Thread.Sleep(350);
-                var fallback = LaunchBrowser(browserPath, arguments + " --no-sandbox");
+                // --test-type 用来抑制 Chromium 对 --no-sandbox 的「不受支持的命令行标记」提示条；
+                // 只在本机回环面板上使用，不涉及外部网页浏览。
+                var fallback = LaunchBrowser(browserPath, arguments + " --no-sandbox --test-type");
                 if (fallback == null) return false;
                 if (fallback.WaitForExit(1200))
                 {
