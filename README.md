@@ -51,6 +51,7 @@
 | 音频边下边播 / 拖动进度条 | `worker/index.mjs` 为 `/assets/music/*` 实现 `206` / `ETag` / `HEAD` / `416`（Workers 静态资源本身不处理 Range） |
 | 看板娘（Live2D） | `src/config/pioConfig.ts` → `live2dWidgetConfig.enable: true`，模型 `/pio/models/live2d/snow_miku/model.json`；Spine 是 `spineModelConfig.enable: false` |
 | 站内搜索（Pagefind） | `navBarConfig.ts` → `navBarSearchConfig.method: NavBarSearchMethod.PageFind`；索引由 `scripts/run-pagefind.ts` 生成，排除规则 `pagefind.yml` |
+| 文章内搜索 | 文章正文上方的搜索栏（`src/components/features/PostSearch.svelte`，挂在文章页正文前）：输入关键字高亮全部匹配，Enter 跳到第一个/下一个，Shift+Enter 上一个，Esc 清除；用 CSS Custom Highlight API，**不修改文章 DOM**（不会破坏 Shiki / KaTeX）；旧浏览器退化为「当前匹配外框」但仍可计数与跳转；加密文章暂不显示 |
 | Giscus 评论（基于 GitHub Discussions） | `src/config/commentConfig.ts` → `type: "giscus"`，`repo: "Zhi2007/my-blog"`、`mapping: "pathname"` |
 | 文章列表布局（列表 / 网格、移动端默认网格） | `siteConfig.ts` → `postListLayout.defaultMode: "list"`、`mobileDefaultMode: "grid"`、`grid.*` |
 | 分类/标签快捷导航栏 | `siteConfig.ts` → `categoryBar: true`、`categoryStyle: "rectangle"`、`tagStyle: "pill"` |

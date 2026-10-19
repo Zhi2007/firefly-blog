@@ -143,7 +143,7 @@ firefly/
 │   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
 │   ├── content/                # ③ 内容：posts/（4 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
-│   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点）
+│   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
 │   ├── pages/                  # ① 文件路由（33 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
 │   ├── styles/                 # ① 全局样式；② low-spec.css 是自建
 │   ├── utils/                  # ① 工具；② announcement-utils.ts 是自建
@@ -162,6 +162,8 @@ firefly/
 ```
 
 > 编码注意：`重建依赖.cmd` 与 `启动管理面板.cmd` 是 **GBK（代码页 936）**，用 UTF-8 读会失败（`read` 工具会直接报 `invalid UTF-8 text`）。读取方式：`node -e "console.log(new TextDecoder('gbk').decode(require('fs').readFileSync('重建依赖.cmd')))"`。
+>
+> 文章内搜索：`src/components/features/PostSearch.svelte` 挂在文章页正文前，只搜 `#post-container .markdown-content`（不搜导航/评论/目录）；用 CSS Custom Highlight API 给 Range 上色，**不改文章 DOM**，所以不会破坏 Shiki / KaTeX；非加密文章显示，Enter 跳到第一个/下一个、Shift+Enter 上一个、Esc 清除；旧浏览器退化为「当前匹配外框」但仍可计数与跳转。
 
 ### 2.4 分目录红线
 

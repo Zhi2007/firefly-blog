@@ -681,3 +681,20 @@ html {
 .pagination-info {
   @apply text-sm text-(--text-secondary) text-center mb-2;
 }
+
+/* 文章内搜索：CSS Custom Highlight API 的高亮样式（不改文章 DOM） */
+::highlight(post-search-hit) {
+  background-color: rgba(250, 204, 21, 0.5);
+}
+
+::highlight(post-search-active) {
+  background-color: #f59e0b;
+  color: #111827;
+}
+
+/* 旧浏览器没有 CSS Custom Highlight 时的当前匹配外框 */
+.post-search-fallback-active {
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
