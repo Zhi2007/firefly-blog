@@ -1,14 +1,14 @@
 ---
 title: 常见文件格式说明书：zip、apk、iso、bat……到底该怎么打开
 published: 2026-10-19
-description: 写给刚接触电脑的人——后缀名到底是什么、压缩包和分卷怎么解、apk 与 apks 差在哪、iso 怎么用、bat 为什么不能乱点、epub 用什么看，附一张速查表和 10 个高频问题。
-tags: [文件格式, 科普, Windows, 新手]
+description: 写给刚接触电脑的人——后缀名是什么、压缩包与分卷怎么解、tar.gz 这类 Linux 常见格式是什么、apk 与 apks 差在哪、iso 怎么用、bat 为什么不能乱点，并给每种文件配了推荐软件（7-Zip、foobar2000、VLC、Calibre 等）。
+tags: [文件格式, 科普, Windows, 新手, 软件推荐]
 category: 科普
 ---
 
 你下载了一个文件，图标是张白纸，双击打不开，或者弹出一堆看不懂的提示——十有八九是没搞明白「文件格式」。
 
-这篇不讲解码、不讲二进制，只讲三件事：**看到这个后缀，它是什么、该拿什么打开、要注意什么。**
+这篇不讲解码、不讲二进制，只讲三件事：**看到这个后缀，它是什么、该拿什么打开、要注意什么。** 每种文件最后都附了推荐软件。
 
 ## 先搞懂三件事
 
@@ -44,14 +44,14 @@ category: 科普
 
 压缩包就是把一堆文件「打包 + 压小」，方便传输和下载；解压就是把它们还原成一堆文件。
 
-| 后缀 | 特点 | 用什么打开 |
+| 后缀 | 特点 | 推荐软件 |
 | --- | --- | --- |
 | `.zip` | 最通用，Windows 自带支持 | 双击即可；或 7-Zip / Bandizip |
-| `.rar` | 压缩率高，需要专门软件 | WinRAR / 7-Zip / Bandizip |
+| `.rar` | 压缩率较高，需要专门软件 | WinRAR / 7-Zip / Bandizip |
 | `.7z` | 压缩率最高，免费开源 | 7-Zip |
 
 > [!TIP] 建议只装一个 7-Zip
-> 免费、无广告、zip / rar / 7z 都能解，还能解分卷。去官网 `7-zip.org` 下载，别点搜索结果里的广告位（那些多半是捆绑软件或山寨站）。
+> 免费、无广告、zip / rar / 7z 都能解，还能解分卷和 tar.gz。去官网 `7-zip.org` 下载，别点搜索结果里的广告位（那些多半是捆绑软件或山寨站）。
 
 ### 怎么用
 
@@ -95,13 +95,51 @@ category: 科普
 | 解压出来文件名是乱码 | 老压缩包的编码问题，换 Bandizip 解压，在「代码页」里换一个编码试试 |
 | 解压后一堆看不懂的文件夹 | 正常，找里面体积最大的 exe 或 setup 文件 |
 
-## 二、手机安装包：apk、apks、xapk
+## 二、进阶压缩包：tar、gz、bz2、xz、zst、cab
 
-| 后缀 | 是什么 | 怎么装 |
+这些名字看着吓人，其实只由两件事拼起来：
+
+- **tar = 打包。** 把一堆文件装进一个大箱子，本身**不压缩**，只是为了方便整体搬运。
+- **gz / bz2 / xz / zst = 压缩。** 把文件压小，一般针对单个文件。
+
+Linux 上习惯「先打包、再压缩」，于是后缀会叠起来——`.tar.gz` 就是「先 tar 打包，再 gzip 压缩」。看到叠后缀别慌，按一个文件处理就行。
+
+| 后缀 | 含义 | 怎么解 |
 | --- | --- | --- |
-| `.apk` | 安卓安装包，最常见 | 传到手机点开安装（需允许「安装未知来源应用」） |
-| `.apks` | 拆分安装包（一个应用被拆成多个 apk） | 不能直接点开，需要 SAI（Split APKs Installer）等工具 |
-| `.xapk` | 安装包 + 数据包（OBB）的合集 | 用 APKPure 客户端或 SAI 安装 |
+| `.tar` | 只打包，没压缩 | 7-Zip 解压 |
+| `.gz` | 单个文件被 gzip 压缩（日志文件常见） | 7-Zip 解压 |
+| `.tar.gz` / `.tgz` | 打包 + gzip 压缩，Linux 源码最常见 | 见下方技巧 |
+| `.tar.bz2` / `.tbz2` | 打包 + bzip2 压缩 | 7-Zip 解压 |
+| `.tar.xz` / `.txz` | 打包 + xz 压缩，压得更小、解得更慢 | 7-Zip 解压 |
+| `.tar.zst` / `.tzst` | 打包 + zstd 压缩，Arch / Fedora 等新系统常见 | 新版 7-Zip / Bandizip |
+| `.cab` | Windows 自带压缩包，驱动和安装包内部常见 | 7-Zip 解压后再装 |
+| `.deb` / `.rpm` | Linux 的安装包（不是 Windows 程序） | Windows 上打不开，别双击 |
+
+> [!TIP] 解压 .tar.gz 的技巧
+> 7-Zip 要解两次：先解出里面的 `.tar`，再解一次才得到文件夹。Bandizip、WinRAR 一般能一步到位。如果你经常碰到这类文件，Bandizip 会更省事。
+
+> [!NOTE] 这些真的需要记吗？
+> 不折腾 Linux、服务器、开发工具的话，基本碰不到。碰不到就跳过，遇到时回来查表即可。只需记住一句：**带 tar 的是「打包」，带 gz / bz2 / xz / zst 的是「压缩」，7-Zip 都能解。**
+
+### 关于 cab：主要是驱动包
+
+从主板、显卡官网下载的「手动安装版」驱动，经常是 `.cab`（或者 zip 里套 cab）。解压后一般长这样：
+
+```text
+setup.exe    ← 有就直接双击它
+xxx.inf      ← 没有 setup.exe 时，右键这个文件 →「安装」
+xxx.sys
+```
+
+普通用户优先找 `setup.exe`；找不到再右键 `.inf` 安装。
+
+## 三、手机安装包：apk、apks、xapk
+
+| 后缀 | 是什么 | 怎么装 | 推荐软件 |
+| --- | --- | --- | --- |
+| `.apk` | 安卓安装包，最常见 | 传到手机点开安装 | 手机自带安装器 |
+| `.apks` | 拆分安装包（一个应用被拆成多个 apk） | 需要专门安装器 | SAI（Split APKs Installer） |
+| `.xapk` | 安装包 + 数据包（OBB）的合集 | 专门安装器或商店客户端 | SAI / APKPure |
 
 要点：
 
@@ -109,7 +147,7 @@ category: 科普
 - 安卓装应用本质是「把文件放进系统」，所以**来源比格式更重要**：优先用手机自带应用商店或应用官网。
 - 苹果手机的安装包是 `.ipa`，普通用户装不了（需要签名、企业证书等）。**不要在网上乱下 ipa 往 iPhone 上装**，那是另一套生态。
 
-## 三、光盘镜像：iso
+## 四、光盘镜像：iso
 
 `.iso` 是一张光盘的「电子版」，里面通常是一整套系统或软件。
 
@@ -118,18 +156,20 @@ category: 科普
 1. **只想看看里面的文件**：Windows 10/11 直接双击 iso，会自动「挂载」成一个虚拟光驱，在「此电脑」里多出一个盘符。用完右键「弹出」。
 2. **装系统 / 做启动盘**：用 Rufus 或 Ventoy 把 iso 写进 U 盘，再从 U 盘启动。**不要把 iso 直接复制进 U 盘**——那样不能启动。
 
+推荐软件：**Rufus**（免费，做单个系统盘）、**Ventoy**（免费，一个 U 盘放多个 iso）、**7-Zip**（只想看内容时直接解压）。
+
 > [!WARNING] 别被「双击自动解压」坑了
 > 装了压缩软件后，双击 iso 可能被当成压缩包解开。这只是方便看文件，**不适合装系统**。装系统请用 Rufus/Ventoy，或者双击挂载后运行里面的 setup。
 
-## 四、电子书：epub、mobi、azw3、pdf、txt
+## 五、电子书：epub、mobi、azw3、pdf、txt
 
-| 后缀 | 特点 | 用什么打开 |
+| 后缀 | 特点 | 推荐软件 |
 | --- | --- | --- |
 | `.epub` | 最通用的电子书格式，排版随屏幕自适应 | 微信读书、多看阅读、Apple Books、Calibre |
 | `.mobi` / `.azw3` | 亚马逊 Kindle 的格式 | Kindle 设备 / Kindle App / Calibre |
-| `.pdf` | 版式固定，像拍照一样锁死版面 | 浏览器、Edge、Adobe Reader、WPS |
+| `.pdf` | 版式固定，像拍照一样锁死版面 | SumatraPDF、Edge、Adobe Reader |
 | `.txt` | 纯文本，没有任何排版 | 记事本或任何阅读器 |
-| `.cbz` / `.cbr` | 漫画打包（本质是 zip/rar 改名） | 漫画阅读器（如 CDisplayEx） |
+| `.cbz` / `.cbr` | 漫画打包（本质是 zip/rar 改名） | CDisplayEx、Calibre |
 
 要点：
 
@@ -137,7 +177,7 @@ category: 科普
 - 格式不通用时可以用 **Calibre**（免费）互相转换，但转换后排版可能变乱。
 - 电子书文件本身不能绕过正版保护，别指望「转换一下就能白嫖」。
 
-## 五、双击就会「运行」的：exe、msi、bat、cmd
+## 六、双击就会「运行」的：exe、msi、bat、cmd
 
 这是风险最高的一类，单独说。
 
@@ -158,16 +198,16 @@ category: 科普
 > ① 把病毒改名成 `照片.jpg.exe`，靠系统隐藏后缀骗你双击；
 > ② 发给你一个「快捷方式」，你以为是文件——其实它只是指向对方电脑路径的「路标」，你这边要么打不开，要么会被带到别的地方。
 
-## 六、办公文档：doc/docx、xls/xlsx、ppt/pptx、pdf
+## 七、办公文档：doc/docx、xls/xlsx、ppt/pptx、pdf
 
-| 后缀 | 是什么 |
-| --- | --- |
-| `.doc` / `.docx` | Word 文档（旧版 / 新版） |
-| `.xls` / `.xlsx` | Excel 表格（旧版 / 新版） |
-| `.ppt` / `.pptx` | PowerPoint 演示文稿（旧版 / 新版） |
-| `.pdf` | 固定版式文档，谁打开都一样 |
-| `.wps` / `.et` / `.dps` | WPS 自己的格式 |
-| `.docm` / `.xlsm` | 带「宏」的 Office 文档 |
+| 后缀 | 是什么 | 推荐软件 |
+| --- | --- | --- |
+| `.doc` / `.docx` | Word 文档（旧版 / 新版） | Microsoft Word、WPS、LibreOffice |
+| `.xls` / `.xlsx` | Excel 表格（旧版 / 新版） | Microsoft Excel、WPS、LibreOffice |
+| `.ppt` / `.pptx` | PowerPoint 演示文稿（旧版 / 新版） | Microsoft PowerPoint、WPS |
+| `.pdf` | 固定版式文档，谁打开都一样 | SumatraPDF、Edge、Adobe Reader |
+| `.wps` / `.et` / `.dps` | WPS 自己的格式 | WPS Office |
+| `.docm` / `.xlsm` | 带「宏」的 Office 文档 | 同上，但陌生来源别启用宏 |
 
 要点：
 
@@ -176,81 +216,114 @@ category: 科普
 - 发文件给别人，最稳的是导出 **pdf**：对方一定打得开，排版也不会乱。
 - 收到 `docm` / `xlsm` 要警惕：宏可以被用来干坏事，陌生来源不要点「启用宏」。
 
-## 七、图片：jpg、png、gif、webp、heic
+## 八、图片：jpg、png、gif、webp、heic
 
-| 后缀 | 特点 | 典型用途 |
+| 后缀 | 特点 | 推荐软件 |
 | --- | --- | --- |
-| `.jpg` / `.jpeg` | 有损压缩，体积小 | 照片 |
-| `.png` | 无损，支持透明背景 | 图标、截图、需要透明的地方 |
-| `.gif` | 支持动图，颜色少 | 表情包、简单动图 |
-| `.webp` | 体积更小的新格式 | 网页图片 |
-| `.heic` | 苹果手机默认照片格式 | iPhone 拍照 |
-| `.svg` | 矢量图，放大不糊 | 图标、logo |
-| `.psd` | Photoshop 工程文件 | 设计稿，普通看图软件打不开 |
+| `.jpg` / `.jpeg` | 有损压缩，体积小 | Windows 照片、Honeyview、ImageGlass |
+| `.png` | 无损，支持透明背景 | 同上 |
+| `.gif` | 支持动图，颜色少 | 同上 |
+| `.webp` | 体积更小的新格式 | Honeyview、浏览器 |
+| `.heic` | 苹果手机默认照片格式 | 需装 HEIF 扩展后用「照片」，或 Honeyview |
+| `.svg` | 矢量图，放大不糊 | 浏览器、Inkscape |
+| `.psd` | Photoshop 工程文件 | Photoshop、GIMP（普通看图软件打不开） |
 
 要点：
 
 - **改后缀不能转格式**：jpg 改名成 png，透明背景不会凭空出现。
-- 想转格式，用「画图」另存为，或在本地转换；**别把隐私照片传到不知名网站转换**。
+- 想转格式：Windows「画图」另存为，或 **XnConvert**（免费批量转换）；**别把隐私照片传到不知名网站转换**。
 - heic 在 Windows 上要装「HEIF 图像扩展」才能直接看，最简单是手机导出 jpg。
 
-## 八、音视频：mp3、flac、wav / mp4、mkv、avi
+## 九、音视频：mp3、flac、wav / mp4、mkv、avi
 
-| 后缀 | 特点 |
-| --- | --- |
-| `.mp3` | 最常见的音频，有损压缩，体积小 |
-| `.flac` | 无损音频，音质好、体积大 |
-| `.wav` | 未压缩音频，体积最大，剪辑常用 |
-| `.m4a` | 苹果/手机录音常用，体积小 |
-| `.mp4` | 最通用的视频格式，手机电脑都能放 |
-| `.mkv` | 常带多音轨、多字幕，影视资源常见 |
-| `.avi` | 老格式，兼容性一般 |
-| `.mov` | 苹果常用格式 |
+| 后缀 | 特点 | 推荐软件 |
+| --- | --- | --- |
+| `.mp3` | 最常见的音频，有损压缩，体积小 | foobar2000、AIMP、VLC |
+| `.flac` | 无损音频，音质好、体积大 | foobar2000、AIMP |
+| `.wav` | 未压缩音频，体积最大，剪辑常用 | foobar2000、Audacity |
+| `.m4a` | 苹果/手机录音常用，体积小 | 同上 |
+| `.mp4` | 最通用的视频格式，手机电脑都能放 | VLC、PotPlayer |
+| `.mkv` | 常带多音轨、多字幕，影视资源常见 | VLC、PotPlayer |
+| `.avi` | 老格式，兼容性一般 | VLC |
+| `.mov` | 苹果常用格式 | VLC、PotPlayer |
 
 要点：
 
-- 播放器推荐 **PotPlayer** 或 **VLC**（都免费），基本什么都能放。Windows 自带的「电影和电视」遇到 mkv 可能没声音或没字幕。
-- 「能播放」和「能转换」是两回事。转换视频很吃配置，别用来路不明的「万能转换器」（常捆绑广告）。
+- 播放器推荐 **VLC**（免费、跨平台、几乎什么都能放）或 **PotPlayer**（功能强，安装时注意取消捆绑勾选）。
+- 「能播放」和「能转换」是两回事。转换视频用 **HandBrake**（免费开源），别用来路不明的「万能转换器」（常捆绑广告）。
 - 网盘里在线播放卡，通常是网盘限速，不是格式问题。
 
-## 九、其他常遇到的格式
+## 十、其他常遇到的格式
 
-| 后缀 | 是什么 | 怎么处理 |
-| --- | --- | --- |
-| `.ttf` / `.otf` | 字体文件 | 双击预览 →「安装」 |
-| `.torrent` | BT 种子，不是资源本身 | 用 qBittorrent 等 BT 客户端打开 |
-| `.html` / `.htm` | 网页 | 双击用浏览器打开 |
-| `.lnk` | Windows 快捷方式 | 双击打开对应程序；**发给别人没用** |
-| `.url` | 网址快捷方式 | 双击用浏览器打开 |
-| `.dll` | 程序运行需要的组件 | 不能双击；**不要从网上乱下载替换** |
-| `.crdownload` / `.part` / `.download` | 浏览器没下完的临时文件 | 等下载完成会自动改名；一直这样说明没下完 |
-| `.tmp` / `.log` | 临时文件 / 日志 | 一般可以删，但别删系统目录里的 |
-| `.md` | Markdown 文本 | 用记事本或支持 Markdown 的编辑器打开 |
+| 后缀 | 是什么 | 怎么处理 | 推荐软件 |
+| --- | --- | --- | --- |
+| `.ttf` / `.otf` | 字体文件 | 双击预览 →「安装」 | Windows 自带 |
+| `.torrent` | BT 种子，不是资源本身 | 用 BT 客户端打开 | qBittorrent、Transmission |
+| `.html` / `.htm` | 网页 | 双击用浏览器打开 | 任意浏览器 |
+| `.lnk` | Windows 快捷方式 | 双击打开对应程序；**发给别人没用** | 系统自带 |
+| `.url` | 网址快捷方式 | 双击用浏览器打开 | 系统自带 |
+| `.dll` | 程序运行需要的组件 | 不能双击；**不要从网上乱下载替换** | 无需 |
+| `.crdownload` / `.part` / `.download` | 浏览器没下完的临时文件 | 等下载完成会自动改名；一直这样说明没下完 | 浏览器 |
+| `.tmp` / `.log` | 临时文件 / 日志 | 一般可以删，但别删系统目录里的 | 记事本 |
+| `.md` | Markdown 文本 | 用文本编辑器打开 | VS Code、Typora、记事本 |
+| `.dmg` | macOS 磁盘映像（安装包） | Windows 打不开，7-Zip 可查看部分内容 | macOS / 7-Zip |
+| `.pkg` | macOS 安装包 | Windows 打不开 | macOS |
+| `.jar` | Java 程序包（Minecraft 模组常见） | 需要 Java 环境；双击没反应是正常的 | Java / Minecraft 启动器 |
 
 > [!NOTE] 关于 dll
 > dll 是给程序「调用」的零件，不是给你双击的。网上那些「dll 下载站」「dll 修复大师」十有八九带毒或带捆绑。程序报缺 dll 时，正确做法是重装那个程序，或者安装对应的运行库。
 
-## 十、一张速查表
+## 十一、软件推荐清单
+
+不想一个个记，就照这张表装：
+
+| 用途 | 首选（免费为主） | 备选 | 说明 |
+| --- | --- | --- | --- |
+| 压缩 / 解压 | **7-Zip** | Bandizip、WinRAR | 7-Zip 免费无广告、格式最全；Bandizip 界面友好但免费版有广告；WinRAR 收费，只有需要「创建 rar」时才值得装 |
+| 视频播放 | **VLC** | PotPlayer、MPC-HC | VLC 几乎什么都能放、跨平台；PotPlayer 功能更强，安装时注意取消捆绑 |
+| 视频转换 / 压缩 | **HandBrake** | ShanaEncoder | 免费开源，大视频压小、转 mp4 很稳 |
+| 音乐播放 | **foobar2000** | AIMP、MusicBee | foobar2000 轻量、支持 flac 和整轨 cue；AIMP 界面更现代 |
+| 音频转换 | **foobar2000**（装编码器） | fre:ac | 转 mp3 / flac / wav |
+| 图片查看 | **Honeyview** | ImageGlass、Windows 照片 | Honeyview 打开快、支持 webp；HEIC 需系统装 HEIF 扩展 |
+| 图片批量转换 | **XnConvert** | 画图「另存为」 | 免费，批量转格式、改尺寸 |
+| 电子书管理 / 转换 | **Calibre** | — | 免费，格式互转、传 Kindle 都靠它 |
+| PDF / epub 阅读 | **SumatraPDF** | Edge、Adobe Reader | 轻量、启动快、免费 |
+| 漫画（cbz / cbr） | **CDisplayEx** | Calibre | 直接打开漫画压缩包 |
+| 办公文档 | **Microsoft Office** | WPS、LibreOffice | Office 兼容性最好；WPS 免费但有广告；LibreOffice 完全免费 |
+| 手机装 apk / apks | **SAI** | 手机自带应用商店 | apks / xapk 必须用它；普通 apk 直接点开 |
+| 做启动盘 | **Rufus** | Ventoy | Rufus 做单个系统盘；Ventoy 一个 U 盘放多个 iso |
+| BT 下载（torrent） | **qBittorrent** | Transmission | 免费开源无广告 |
+| 文本 / Markdown | **VS Code** | Obsidian、Notepad++ | 免费，看 md、改 bat 都行 |
+
+> [!WARNING] 下软件只认官网
+> 搜索软件名时，前几条经常是「下载站」的广告：装完附赠一堆全家桶，甚至被换成带毒的版本。认准官网域名（7-Zip 是 `7-zip.org`、VLC 是 `videolan.org`、foobar2000 是 `foobar2000.org`），或者直接用 Microsoft Store。
+
+## 十二、一张速查表
 
 | 后缀 | 一句话 | 打开方式 |
 | --- | --- | --- |
 | zip / rar / 7z | 压缩包 | 7-Zip 解压 |
+| tar / tar.gz / tgz | Linux 常见打包压缩 | 7-Zip / Bandizip |
+| bz2 / xz / zst | Linux 的单文件压缩 | 7-Zip / Bandizip |
+| cab | Windows 驱动压缩包 | 7-Zip 解压 |
 | part1.rar / z01 / 001 | 分卷压缩，要凑齐 | 解压第一个 |
 | apk | 安卓安装包 | 手机点开安装 |
 | apks / xapk | 拆分 / 带数据的安卓包 | SAI 等工具 |
 | iso | 光盘镜像 | 双击挂载 / Rufus 写 U 盘 |
+| dmg | macOS 磁盘映像 | Windows 打不开 |
 | epub / mobi / azw3 | 电子书 | 阅读器 / Calibre |
 | pdf | 固定版式文档 | 浏览器 / 阅读器 |
 | exe / msi | 程序 / 安装包 | 双击（先确认来源） |
 | bat / cmd | 批处理脚本 | 双击（先看内容） |
 | docx / xlsx / pptx | Office 文档 | Word / Excel / PPT / WPS |
 | jpg / png / gif / webp | 图片 | 看图软件 |
-| mp3 / flac / wav | 音频 | 播放器 |
-| mp4 / mkv / avi | 视频 | PotPlayer / VLC |
+| mp3 / flac / wav | 音频 | foobar2000 / AIMP |
+| mp4 / mkv / avi | 视频 | VLC / PotPlayer |
 | ttf / otf | 字体 | 双击安装 |
 | torrent | BT 种子 | BT 客户端 |
+| jar | Java 程序 / 模组 | Java 环境 |
 
-## 十一、10 个高频问题
+## 十三、12 个高频问题
 
 **1. 为什么我改了后缀还是打不开？**
 因为改后缀只改了名字，文件内容没变。要转换格式，得用软件「另存为 / 导出」。
@@ -270,16 +343,22 @@ category: 科普
 **6. iso 双击变成解压了，正常吗？**
 正常，装了压缩软件后会被关联成压缩包。看文件没问题；装系统请用 Rufus/Ventoy。
 
-**7. 文件图标变成白纸了？**
+**7. tar.gz 解压出来怎么还是个 tar？**
+因为它是「两层」：先解 gz 得到 tar，再解 tar 才是文件。7-Zip 需要解两次；Bandizip、WinRAR 一般一步到位。
+
+**8. 7-Zip 能解 rar，为什么不能创建 rar？**
+rar 格式是闭源的，只有 WinRAR 能创建；7-Zip 只能解压。要打包给别人、又必须用 rar，才需要考虑 WinRAR。
+
+**9. 文件图标变成白纸了？**
 说明系统没有关联打开程序，或者文件已经损坏。右键 →「打开方式」选一个程序即可。
 
-**8. 双击 exe 提示「Windows 已保护你的电脑」？**
+**10. 双击 exe 提示「Windows 已保护你的电脑」？**
 说明程序没有数字签名或下载量太少。先确认来源可靠，再决定要不要点「更多信息 → 仍要运行」。
 
-**9. 为什么别人发我的快捷方式打不开？**
+**11. 为什么别人发我的快捷方式打不开？**
 快捷方式（.lnk）只是指向文件位置的「路标」，指向的是对方电脑上的路径。要发就发原文件。
 
-**10. 怎么知道一个文件多大？**
+**12. 怎么知道一个文件多大？**
 右键 →「属性」看大小。电脑里通常按 1024 换算：1 GB = 1024 MB，1 MB = 1024 KB，1 KB = 1024 字节。
 
 ## 最后三条铁律
