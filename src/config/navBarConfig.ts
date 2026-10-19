@@ -123,38 +123,8 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 				external: true,
 				icon: "fa7-brands:bilibili",
 			},
-			{
-				id: "links-source",
-				name: "本站源码",
-				url: "https://github.com/Zhi2007/firefly-blog",
-				external: true,
-				icon: "fa7-solid:code-branch",
-			},
-			{
-				// 署名：本站使用的主题
-				id: "links-theme",
-				name: "主题 Firefly（CuteLeaf）",
-				url: "https://github.com/CuteLeaf/Firefly",
-				external: true,
-				icon: "material-symbols:favorite",
-			},
-			{
-				id: "links-firefly-docs",
-				name: "Firefly 文档",
-				url: "https://docs-firefly.cuteleaf.cn",
-				external: true,
-				icon: "material-symbols:docs",
-			},
 		],
 	});
-
-	// 文档链接
-	// links.push({
-	// 	name: "文档",
-	// 	url: "https://docs-firefly.cuteleaf.cn",
-	// 	external: true,
-	// 	icon: "material-symbols:docs",
-	// });
 
 	return { links } as NavBarConfig;
 };

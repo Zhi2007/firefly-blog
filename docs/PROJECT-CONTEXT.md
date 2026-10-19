@@ -127,7 +127,7 @@ firefly/
 │   ├── _headers                # ① 上游文件 + 作者注释：run_worker_first 后**已不生效**，只是文档
 │   ├── _redirects              # ① 同上，已不生效
 │   ├── vendor/giscus-1.6.0.mjs # ② 自托管 giscus（25 KB，文件名带版本号 → 1 年 immutable）
-│   ├── friends/                # ② 友链图标（26 个站点的图标，自托管）
+│   ├── friends/                # ② 友链图标（24 个站点的图标，自托管）
 │   ├── assets/{images,music,fonts,css,js}/   # ③ 站点图片 / 音乐 / 字体
 │   ├── assets/music/{cover,lrc}/             # ③ 封面（48 个）与歌词（20 个）
 │   ├── favicon/、gallery/、pio/、.well-known/security.txt
@@ -332,11 +332,11 @@ firefly/
 | --- | --- | --- | --- | --- |
 | `siteConfig.ts`（359 行） | 站点身份、主题色、宽度、列表布局、分页、文章页、各第三方（bilibili/bangumi/vndb/mal）、图片优化、RSS、页面开关 | `title/subtitle/site_url/description/keywords`（`:45-58`）、`themeColor.hue/defaultMode`（`:61-66`）、`pageWidth`（`:71`）、`contentWidth/contentWidthVw`（`:73-74`）、`navbar.*`（`:98-126`）、`siteStartDate`（`:129`）、`timezone`（`:133`）、`postListLayout.*`（`:155-211`）、`pagination.postsPerPage`（`:216`）、`post.*`（`:220-254`）、`imageOptimization.*`（`:327-344`）、`feed.contentMode`（`:351`）、`pages`（`:10-41` + `:358`） | 影响全站；`site_url` 改动必须**同时**改 `wrangler.jsonc:19-25` 与 `worker/index.mjs:16-17`（否则 canonical/RSS/301 目标不一致） | ✅ 14 个字段（`settings.mjs:26-39`）+ 11 个 `pages.*` 开关（动态从 `resolvePageToggles` 读取） |
 | `backgroundWallpaper.ts`（209 行） | 壁纸模式、图片列表、主页横幅文案/链接、轮播、水波纹、渐变、导航栏毛玻璃、全屏模糊渐变 | `mode`（`:5`）、`playerEnable: false`（`:8`）、`src.desktop/mobile`（`:42-59`）、`common.homeText.*`（`:71-122`）、`common.carousel`（`:124-131`）、`common.waves.enable.{desktop,mobile}: false`（`:133-140`）、`banner.navbar.blur: 0`（`:169`）、`overlay.blur: 0`（`:179`）、`fullscreen.blurRamp.enable.{desktop,mobile}: false`（`:200-207`） | 性能相关字段都调过（第 12 章）；`playerEnable: true` 会重新引入视频 | ✅ 11 个字段（`settings.mjs:43-45,61-67`） |
-| `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-53`） | 名字会出现在页脚版权、文章作者、OG 卡片；`avatar` 除表单外还能在「站点设置 → 站点头像」直接上传更换（9.8 节） | ✅ 3 个字段（`settings.mjs:40-42`）+ 头像卡片（`/api/avatar`） |
+| `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-47`） | 名字会出现在页脚版权、文章作者、OG 卡片；`avatar` 除表单外还能在「站点设置 → 站点头像」直接上传更换（9.8 节） | ✅ 3 个字段（`settings.mjs:40-42`）+ 头像卡片（`/api/avatar`） |
 | `displaySettingsConfig.ts`（72 行） | 视图设置面板（🎨）总开关与各切换项 | `enable: true`（`:24`）、`wallpaperModeSwitchable: false`（`:43`）、`overlaySwitchable`（`:62-66`） | **总开关开/关直接决定客户端 JS 体积**（见 4.3）；`wallpaperModeSwitchable: true` 让每页约 +33 KB JS（`settings.mjs:55` 的 label 原话） | ✅ 4 个字段（`settings.mjs:54-57`） |
 | `perfConfig.ts`（21 行） | 低配模式总开关 | `lowSpec: true`（`:20`） | 见 4.3 与第 12 章；改为 `false` 会恢复毛玻璃与装饰动画 | ✅ 见 4.4：该缺陷已修（面板开关现名 `perf.spine`）（面板那个「性能 · Live2D」开关实际控制错了文件里的块） |
-| `featureTourConfig.ts`（15 行） | 主页中间栏「功能导览」部件：开关、自动轮播、触摸滑动与分页内容（数据在 `feature-tour.json`） | `enable`（`:13-14`）、`autoplay.enable`（默认 false）、`swipe`；页面数据见 `src/config/feature-tour.json`（19 条功能，其中 14 条带 `href`） | `enable:false` 首页完全不渲染（产物里也没有标记）；`autoplay.enable:true` 会引入常驻 setTimeout 轮播（默认关闭，与低 GPU 占用方向一致）。**带 `href` 的条目**渲染成 `<a>`（可 Tab 聚焦、`:focus-visible` 有主题色描边），**无 `href` 的条目**是普通文本；`href` **必须是产物里真实存在、且当前页面开关下真的会渲染的地址** —— 目标页面被 `siteConfig.pages` 关掉时产物是 `/404/` 跳转 stub，绝不能当跳转目标。当前 14 个 `href` 全部经「dist 产物存在 + 锚点 id 存在」校验，未演示的能力（数学公式 / 图片灯箱 / Mermaid / PlantUML / 文章加密）宁可不可点 | ✏️ 数据是 JSON，可在面板「配置」页编辑 |
-| `navBarConfig.ts`（456 行） | 导航菜单数组、搜索配置、`LinkPresets`、`applyNavOverrides` | `getDynamicNavBarConfig()`（菜单数组，`:26-150` 的 id/name）、`navBarSearchConfig`（`:163`）、`LinkPresets`（`:171-286`）、`navItemId`（`:298-306`）、`normalizeNavOverrides`（`:331-341`）、`applyNavOverrides`（`:431-451`）、导出（`:453-456`） | 新增菜单项**只能在这里改**；每项必须写显式 `id`，否则面板读不到（`admin/nav.mjs:28`） | ✏️ 只能隐藏/改名/排序（写 `nav-overrides.json`）；**不支持新增**（`admin/nav.mjs:11-12,99`） |
+| `featureTourConfig.ts`（15 行） | 主页中间栏「功能导览」部件：开关、自动轮播、触摸滑动与分页内容（数据在 `feature-tour.json`） | `enable`（`:13-14`；**当前 `feature-tour.json` 里为 `false`，首页已关闭、不渲染该卡片**）、`autoplay.enable`（默认 false）、`swipe`；页面数据见 `src/config/feature-tour.json`（19 条功能，其中 14 条带 `href`） | `enable:false` 首页完全不渲染（产物里也没有标记）；`autoplay.enable:true` 会引入常驻 setTimeout 轮播（默认关闭，与低 GPU 占用方向一致）。**带 `href` 的条目**渲染成 `<a>`（可 Tab 聚焦、`:focus-visible` 有主题色描边），**无 `href` 的条目**是普通文本；`href` **必须是产物里真实存在、且当前页面开关下真的会渲染的地址** —— 目标页面被 `siteConfig.pages` 关掉时产物是 `/404/` 跳转 stub，绝不能当跳转目标。当前 14 个 `href` 全部经「dist 产物存在 + 锚点 id 存在」校验，未演示的能力（数学公式 / 图片灯箱 / Mermaid / PlantUML / 文章加密）宁可不可点 | ✏️ 数据是 JSON，可在面板「配置」页编辑 |
+| `navBarConfig.ts`（426 行） | 导航菜单数组、搜索配置、`LinkPresets`、`applyNavOverrides` | `getDynamicNavBarConfig()`（菜单数组，`:17-130` 的 id/name）、`navBarSearchConfig`（`:133`）、`LinkPresets`（`:141-255`）、`navItemId`（`:268-276`）、`normalizeNavOverrides`（`:301-311`）、`applyNavOverrides`（`:401-421`）、导出（`:423-426`） | 新增菜单项**只能在这里改**；每项必须写显式 `id`，否则面板读不到（`admin/nav.mjs:28`） | ✏️ 只能隐藏/改名/排序（写 `nav-overrides.json`）；**不支持新增**（`admin/nav.mjs:11-12,99`） |
 | `sidebarConfig.ts`（328 行） | 侧栏位置（left/right/both）、平板端选哪侧、左右组件列表与顺序 | `enable`（`:7`）、`position: "both"`（`:14`）、`tabletSidebar: "left"`（`:19`）、`hideSidebarOnPostPage`（`:22`）、`noSidebarContentWidth: 0.6`（`:25`）、`leftComponents[]`（`:36+`，含被关掉的 `announcement`） | 组件顺序 = 数组顺序（`top` 优先于 `sticky`） | ❌（「配置」页编辑器可整文编辑） |
 | `commentConfig.ts` | 评论系统选择与五个后端配置 | `type: "giscus"`（`:5`）、`giscus.repo: "Zhi2007/my-blog"`（`:57`）、`repoId`（`:59`）、`categoryId`（`:63`） | ⚠️ giscus 的仓库 `Zhi2007/my-blog` **不是**本仓库（`Zhi2007/firefly-blog`）：评论存在 Discussions 里；改错 = 评论区空白 | ❌（配置页可编辑） |
 | `musicConfig.ts` | 播放器入口、悬浮播放器、模式（meting/local）、音量、循环、歌词 | `showInNavbar: true`（`:14`）、`showInSidebar: false`（`:17`）、`floating.enable`（`:21`）、`mode: "local"`（`:26`）、`local.playlist`（`:58`，`import` 自 JSON） | `mode: "meting"` 会切到在线歌单（外链，受 CSP `connect-src https:` 约束） | ✏️ 歌单数据由「音乐」页写 `music-playlist.json` |
@@ -365,8 +365,8 @@ firefly/
 | 其中「壁纸模式切换」是体积大头 | 为支持运行时切换，构建期要把各壁纸模式的整套内容打进产物，**约 +33 KB/页**，因此已关（`wallpaperModeSwitchable: false`） | `displaySettingsConfig.ts:17-18`、`settings.mjs:55` |
 | 环境变量可覆盖总开关 | `PUBLIC_DISPLAY_SETTINGS=true/1/on/yes/enable/enabled` 开启，`false/0/off/no/disable/disabled` 关闭；**环境变量优先于配置文件**；取值无法识别则用文件里的值 | `src/utils/display-settings-utils.ts:7-8,53-58` |
 | 页面开关也有环境变量覆盖 | `PUBLIC_PAGES_<KEY>`（KEY 为大写的 `pages` 键名），优先于 `siteConfig.pages.<KEY>` | `src/utils/page-toggle-utils.ts:18-44` |
-| `nav-overrides.json` 的能力边界 | 只能 **隐藏 / 改名 / 排序**。`applyNavOverrides` 处理顺序：先 `hidden` → 再 `order` → 最后 `renamed`（改名不影响 id）；三个字段全空时**原样返回同一对象引用**（= 完全不影响现有行为） | `navBarConfig.ts:431-451`、`admin/nav.mjs:4-12` |
-| **新增菜单项必须改 `navBarConfig.ts`** | 面板提交的 id 集合必须与配置完全一致，多了就 400：「未知菜单项 id…（面板不支持新增菜单项，请改 navBarConfig.ts）」；新增时要在 `getDynamicNavBarConfig()` 里加项并**显式写 `id`** | `admin/nav.mjs:94-100`、`navBarConfig.ts:26-150` |
+| `nav-overrides.json` 的能力边界 | 只能 **隐藏 / 改名 / 排序**。`applyNavOverrides` 处理顺序：先 `hidden` → 再 `order` → 最后 `renamed`（改名不影响 id）；三个字段全空时**原样返回同一对象引用**（= 完全不影响现有行为） | `navBarConfig.ts:401-421`、`admin/nav.mjs:4-12` |
+| **新增菜单项必须改 `navBarConfig.ts`** | 面板提交的 id 集合必须与配置完全一致，多了就 400：「未知菜单项 id…（面板不支持新增菜单项，请改 navBarConfig.ts）」；新增时要在 `getDynamicNavBarConfig()` 里加项并**显式写 `id`** | `admin/nav.mjs:94-100`、`navBarConfig.ts:17-130` |
 | 低配模式为什么必须「移除属性」 | 见第 12 章第 12.4 节（`backdrop-filter` 存在即生成合成层，把模糊设 0 无效） | `src/styles/low-spec.css:4-8`、`perfConfig.ts:4-6` |
 | 内容宽度用 `min(px, vw)` 且兜底不用 `min()` | 见第 12 章第 12.3 节（压缩器会简化成裸 `vw` 丢上限） | `src/layouts/Layout.astro:493-494`、`src/styles/variables.styl:170` |
 
@@ -784,7 +784,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 2 | 文章 | `posts` | 列表/新建/编辑/删除；标签分类候选下拉；密码/草稿/置顶；Markdown 预览 + 字数；封面上传；**从 Word/txt 导入**。每篇显示真实文件路径 `src/content/posts/<文件名>`（+ URL，由文件名决定）；编辑器里显示当前文件、图片目录与正文引用到的图片路径（见 9.10 节） |
 | 3 | 公告 | `announce` | 公告增删改（含固定为弹窗的那一条）与弹窗版本号；**「生成草稿」**（读 git log → 填表单，只产草稿、不自动发布，见 9.9 节）；显示数据文件 `src/config/announcements.json` |
 | 4 | 音乐 | `music` | 上传音频/封面/歌词、编辑歌曲、排序、本地试听；一键压缩（试算/只压封面/全压）；显示歌单文件 `src/config/music-playlist.json` 与每首歌音频/封面/歌词的真实路径 |
-| 5 | 友链 | `friends` | 26 条友链的增删改排序 + 启停；「从网址抓取」自动猜标题/简介/图标（只填表单，需人工确认）；显示 `src/config/friends.json` 与每个图标的 `public/friends/<文件名>` |
+| 5 | 友链 | `friends` | 24 条友链的增删改排序 + 启停；「从网址抓取」自动猜标题/简介/图标（只填表单，需人工确认）；显示 `src/config/friends.json` 与每个图标的 `public/friends/<文件名>` |
 | 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
 | 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
 | 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
@@ -1410,7 +1410,7 @@ pnpm build
 | 4 | **面板起不来？** | 先看是不是 `EADDRINUSE`（提示已写在 `server.mjs:2468-2470`）：① 用已经开着的那个窗口；② 结束任务管理器里的 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。注意默认端口是 **8799**（`server.mjs:72`），别名里写的 8899 只是示例 |
 | 5 | **评论区空白？** | 按 12.6 节的排查顺序：① 浏览器控制台有没有 **CSP 报错**（要改就改 `worker/index.mjs:31`，改 `_headers` 无效）；② `public/vendor/giscus-1.6.0.mjs` 是否真的部署上去了（`Giscus.astro:68` 的 import 是否 200）；③ `commentConfig.ts:57,59,63` 的 `repo` / `repoId` / `categoryId` 是否与 GitHub Discussions 配置一致；④ Swup 换页后重新初始化是否还在（`Giscus.astro:85-91`） |
 | 6 | **音乐不能拖进度条 / 不能边下边播？** | 这是 Workers 静态资源不处理 `Range` 的固有问题，必须靠 Worker：确认 `wrangler.jsonc:11` 的 `run_worker_first: true` 还在、`worker/index.mjs:59-61` 的 `/assets/music/` 分支还在。`README.md:988` 有同样的问答 |
-| 7 | **想新增一个导航菜单项？** | **只能改 `src/config/navBarConfig.ts`**（面板不支持新增，`admin/nav.mjs:99`）。在 `getDynamicNavBarConfig()` 里加项，**必须写显式 `id`**，否则面板读不到它（`navBarConfig.ts:26-150`）。加完可以再用面板做隐藏/改名/排序 |
+| 7 | **想新增一个导航菜单项？** | **只能改 `src/config/navBarConfig.ts`**（面板不支持新增，`admin/nav.mjs:99`）。在 `getDynamicNavBarConfig()` 里加项，**必须写显式 `id`**，否则面板读不到它（`navBarConfig.ts:17-130`）。加完可以再用面板做隐藏/改名/排序 |
 | 8 | **想改站点标题 / 副标题 / 主题色？** | 面板「站点设置」：`site.title`、`site.subtitle`、`site.description`、`site.keywords`、`navbar.title`、`theme.hue`、`theme.defaultMode`（`admin/settings.mjs:26-37`）。等价位置 `siteConfig.ts:45-66,114` |
 | 9 | **文章链接 404 / 我换了文件名？** | URL 由文件路径决定（3.4 节）。重命名 = 旧链接失效；Worker 只处理 `/blog/*` 的历史跳转（`worker/index.mjs:84-90`），不会自动给任意旧 URL 兜底。要保留旧链接就在 `worker/index.mjs` 的 `legacyRedirect()` 里加规则 |
 | 10 | **想给文章配图，放哪？** | 三种都行（3.5 节）：放进 `src/content/posts/images/` 然后正文写 `./images/xxx.png`（面板上传走这里）；封面可放 `src/assets/...`（走优化）；站点级图片放 `public/assets/images/` 并用 `/assets/images/...` 引用。**动图必须放 `public/`** |

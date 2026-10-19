@@ -46,7 +46,7 @@
 | 文章系列（series / seriesOrder） | frontmatter `series` / `seriesOrder`；导航组件 `src/components/misc/SeriesNav.astro` |
 | 文章封面 + LQIP 模糊占位图 | `src/config/coverImageConfig.ts`（`enableInPost` / `enableInPostOverlay` / 随机封面 API）；占位数据由 `scripts/generate-lqips.ts` 生成到 `src/constants/lqips.json` |
 | 音乐播放器（悬浮左下角，可收起） | `src/config/musicConfig.ts` → `floating.enable: true`、`position: "bottom-left"`；歌单 `src/config/music-playlist.json` |
-| **主页功能导览**（首页中间栏顶部，可翻页） | 5 页 / 19 条功能，新访客一进站就知道本站有什么；其中 14 条带 `href`，渲染成可 Tab 聚焦的真链接，直接跳到真的能演示它的页面或锚点（`/search/`、`/friends/`、`/announcement/`、`/rss.xml`、`/sitemap-index.xml`，以及文章页目录/评论区锚点），其余 5 条当前没有产物可演示，保持为普通文本、不做成假链接；上一页/下一页/圆点、←/→ 键盘、触摸滑动（滑动那一下不会误触发链接）；默认不自动轮播。数据 `src/config/feature-tour.json`（可在面板「配置」页编辑），开关 `src/config/featureTourConfig.ts` |
+| **主页功能导览**（首页中间栏顶部，可翻页；**当前已关闭**） | 5 页 / 19 条功能，新访客一进站就知道本站有什么；其中 14 条带 `href`，渲染成可 Tab 聚焦的真链接，直接跳到真的能演示它的页面或锚点（`/search/`、`/friends/`、`/announcement/`、`/rss.xml`、`/sitemap-index.xml`，以及文章页目录/评论区锚点），其余 5 条当前没有产物可演示，保持为普通文本、不做成假链接；上一页/下一页/圆点、←/→ 键盘、触摸滑动（滑动那一下不会误触发链接）；默认不自动轮播。数据 `src/config/feature-tour.json`（可在面板「配置」页编辑），开关 `src/config/featureTourConfig.ts`。**当前 `feature-tour.json` 的 `enable` 为 `false`，首页不渲染这个部件**（代码与数据保留，改回 `true` 即可恢复） |
 | 歌词逐行高亮 | `musicConfig.ts` → `showLyrics: true`；每首歌的 `lrc` 指向 `public/assets/music/lrc/*.lrc`（带时间戳才逐行高亮） |
 | 音频边下边播 / 拖动进度条 | `worker/index.mjs` 为 `/assets/music/*` 实现 `206` / `ETag` / `HEAD` / `416`（Workers 静态资源本身不处理 Range） |
 | 看板娘（Live2D） | `src/config/pioConfig.ts` → `live2dWidgetConfig.enable: true`，模型 `/pio/models/live2d/snow_miku/model.json`；Spine 是 `spineModelConfig.enable: false` |
