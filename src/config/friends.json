@@ -214,23 +214,5 @@
 		"tags": ["友链"],
 		"weight": 1,
 		"enabled": true
-	},
-	{
-		"title": "Firefly 主题文档",
-		"imgurl": "https://docs-firefly.cuteleaf.cn/logo.png",
-		"desc": "本站所用主题的官方文档（中文）",
-		"siteurl": "https://docs-firefly.cuteleaf.cn",
-		"tags": ["文档"],
-		"weight": 2,
-		"enabled": true
-	},
-	{
-		"title": "Astro",
-		"imgurl": "https://avatars.githubusercontent.com/u/44914786?v=4&s=640",
-		"desc": "本站使用的静态站点框架",
-		"siteurl": "https://github.com/withastro/astro",
-		"tags": ["框架"],
-		"weight": 1,
-		"enabled": true
 	}
 ]

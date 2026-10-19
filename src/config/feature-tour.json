@@ -1,5 +1,5 @@
 {
-	"enable": true,
+	"enable": false,
 	"autoplay": {
 		"enable": false,
 		"intervalMs": 8000

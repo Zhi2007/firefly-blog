@@ -39,12 +39,6 @@ export const profileConfig: ProfileConfig = {
 			showName: true,
 		},
 		{
-			name: "本站源码",
-			icon: "fa7-solid:code-branch",
-			url: "https://github.com/Zhi2007/firefly-blog",
-			showName: true,
-		},
-		{
 			name: "RSS",
 			icon: "fa7-solid:rss",
 			url: "/rss/",

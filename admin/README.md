@@ -583,7 +583,7 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 
 ## 友链管理
 
-友链页的 26 条数据原来硬编码在 `src/config/friendsConfig.ts` 里。现在数据搬到了 **`src/config/friends.json`**，
+友链页的数据原来硬编码在 `src/config/friendsConfig.ts` 里。现在数据搬到了 **`src/config/friends.json`**，
 `friendsConfig.ts` 只负责 `import` 它（`friendsPageConfig` 与 `getEnabledFriends()` 行为完全不变），
 于是面板可以安全地增删改，而不必去改写 TS 源码 —— 改坏一个引号就会让整站构建失败。
 
