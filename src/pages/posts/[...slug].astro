@@ -4,6 +4,7 @@ import Comment from "@components/comment/index.astro";
 import Markdown from "@components/common/Markdown.astro";
 import EncryptedPost from "@components/features/EncryptedPost.astro";
 import KatexManager from "@components/features/KatexManager.astro";
+import PostSearch from "@components/features/PostSearch.svelte";
 import License from "@components/misc/License.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
@@ -519,6 +520,9 @@ const seriesData = await getSeriesPosts(entry);
         </EncryptedPost>
       ) : (
         <>
+          {/* 文章内搜索：只搜当前文章正文，不影响站内 Pagefind 搜索 */}
+          <PostSearch client:load />
+
           <Markdown class="mb-6 markdown-content onload-animation">
             <Content />
           </Markdown>
