@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * 批量压缩站点媒体资源（音乐 / 封面），体积与流量都能明显下降。
  *
@@ -22,14 +23,16 @@
  * - 需要 ffmpeg：优先用环境变量 FFMPEG_PATH，其次 PATH，最后查常见安装位置
  */
 
-import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const { extractAudioMeta } = await import(new URL("../admin/audio-meta.mjs", import.meta.url).href);
+const { extractAudioMeta } = await import(
+	new URL("../admin/audio-meta.mjs", import.meta.url).href
+);
 
 // 封面显示尺寸（播放器 / 歌单卡片）远小于这个值，600px 已经足够清晰
 const COVER_MAX = 600;
@@ -48,7 +51,9 @@ const dirArg = (() => {
 	const i = args.indexOf("--dir");
 	return i >= 0 ? args[i + 1] : null;
 })();
-const musicDir = dirArg ? path.resolve(dirArg) : path.join(ROOT, "public", "assets", "music");
+const musicDir = dirArg
+	? path.resolve(dirArg)
+	: path.join(ROOT, "public", "assets", "music");
 const coverDir = path.join(musicDir, "cover");
 const playlistPath = path.join(ROOT, "src", "config", "music-playlist.json");
 const targetKbps = Number.parseInt(bitrate, 10) || 128;
@@ -58,20 +63,44 @@ function findFfmpeg() {
 	const candidates = [];
 	if (process.env.FFMPEG_PATH) candidates.push(process.env.FFMPEG_PATH);
 	if (process.env.TEMP) {
-		candidates.push(path.join(process.env.TEMP, "fftools", "node_modules", "ffmpeg-static", "ffmpeg.exe"));
+		candidates.push(
+			path.join(
+				process.env.TEMP,
+				"fftools",
+				"node_modules",
+				"ffmpeg-static",
+				"ffmpeg.exe",
+			),
+		);
 		// 之前用 npmmirror 包临时装的 ffmpeg（@ffmpeg-installer/win32-x64）
-		candidates.push(path.join(process.env.TEMP, "fftools", "package", "ffmpeg.exe"));
+		candidates.push(
+			path.join(process.env.TEMP, "fftools", "package", "ffmpeg.exe"),
+		);
 	}
 	try {
 		const which = process.platform === "win32" ? "where" : "which";
-		const out = execFileSync(which, ["ffmpeg"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-		candidates.push(...out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean));
+		const out = execFileSync(which, ["ffmpeg"], {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+		candidates.push(
+			...out
+				.split(/\r?\n/)
+				.map((s) => s.trim())
+				.filter(Boolean),
+		);
 	} catch {
 		// PATH 里没有就继续找常见位置
 	}
 	for (const p of [
 		"C:\\ffmpeg\\bin\\ffmpeg.exe",
-		path.join(process.env.LOCALAPPDATA ?? "", "Microsoft", "WinGet", "Links", "ffmpeg.exe"),
+		path.join(
+			process.env.LOCALAPPDATA ?? "",
+			"Microsoft",
+			"WinGet",
+			"Links",
+			"ffmpeg.exe",
+		),
 		path.join(process.env.USERPROFILE ?? "", "scoop", "shims", "ffmpeg.exe"),
 		"/usr/bin/ffmpeg",
 		"/usr/local/bin/ffmpeg",
@@ -93,13 +122,20 @@ const BITRATE_TABLE = {
 	1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
 	2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
 };
-const SAMPLE_RATE_TABLE = { 1: [44100, 48000, 32000], 2: [22050, 24000, 16000], 2.5: [11025, 12000, 8000] };
+const SAMPLE_RATE_TABLE = {
+	1: [44100, 48000, 32000],
+	2: [22050, 24000, 16000],
+	2.5: [11025, 12000, 8000],
+};
 
 export function probeMp3(buffer) {
 	let offset = 0;
 	if (buffer.toString("latin1", 0, 3) === "ID3") {
 		const size =
-			((buffer[6] & 0x7f) << 21) | ((buffer[7] & 0x7f) << 14) | ((buffer[8] & 0x7f) << 7) | (buffer[9] & 0x7f);
+			((buffer[6] & 0x7f) << 21) |
+			((buffer[7] & 0x7f) << 14) |
+			((buffer[8] & 0x7f) << 7) |
+			(buffer[9] & 0x7f);
 		offset = 10 + size;
 	}
 	const limit = Math.min(buffer.length - 4, offset + 2_000_000);
@@ -109,7 +145,13 @@ export function probeMp3(buffer) {
 		const layerBits = (buffer[i + 1] >> 1) & 0x03;
 		const bitrateIndex = (buffer[i + 2] >> 4) & 0x0f;
 		const sampleRateIndex = (buffer[i + 2] >> 2) & 0x03;
-		if (versionBits === 1 || layerBits === 0 || bitrateIndex === 0 || bitrateIndex === 15) continue;
+		if (
+			versionBits === 1 ||
+			layerBits === 0 ||
+			bitrateIndex === 0 ||
+			bitrateIndex === 15
+		)
+			continue;
 		if (sampleRateIndex === 3) continue;
 		const version = versionBits === 3 ? 1 : versionBits === 2 ? 2 : 2.5;
 		const table = version === 1 ? BITRATE_TABLE[1] : BITRATE_TABLE[2];
@@ -136,7 +178,10 @@ function run(cmd, cmdArgs) {
 }
 
 function shortHash(file) {
-	return createHash("sha256").update(fs.readFileSync(file)).digest("hex").slice(0, 8);
+	return createHash("sha256")
+		.update(fs.readFileSync(file))
+		.digest("hex")
+		.slice(0, 8);
 }
 
 /** 给歌单里的音频与封面地址补上内容哈希（文件没变则哈希不变，浏览器不会再拿旧缓存） */
@@ -147,7 +192,9 @@ function syncPlaylist(coverRename) {
 	for (const song of playlist) {
 		// 音频
 		if (typeof song.url === "string" && song.url.includes("/assets/music/")) {
-			const rel = decodeURIComponent(song.url.split("?")[0].replace("/assets/music/", ""));
+			const rel = decodeURIComponent(
+				song.url.split("?")[0].replace("/assets/music/", ""),
+			);
 			const file = path.join(musicDir, rel);
 			if (fs.existsSync(file)) {
 				const next = `${song.url.split("?")[0]}?v=${shortHash(file)}`;
@@ -158,8 +205,13 @@ function syncPlaylist(coverRename) {
 			}
 		}
 		// 封面（可能已被重命名为 .jpg）
-		if (typeof song.cover === "string" && song.cover.includes("/assets/music/cover/")) {
-			const oldName = decodeURIComponent(song.cover.split("?")[0].replace("/assets/music/cover/", ""));
+		if (
+			typeof song.cover === "string" &&
+			song.cover.includes("/assets/music/cover/")
+		) {
+			const oldName = decodeURIComponent(
+				song.cover.split("?")[0].replace("/assets/music/cover/", ""),
+			);
 			const newName = coverRename.get(oldName) ?? oldName;
 			const base = `/assets/music/cover/${newName}`;
 			const file = path.join(coverDir, newName);
@@ -171,7 +223,11 @@ function syncPlaylist(coverRename) {
 		}
 	}
 	if (touched > 0) {
-		fs.writeFileSync(playlistPath, `${JSON.stringify(playlist, null, "\t")}\n`, "utf8");
+		fs.writeFileSync(
+			playlistPath,
+			`${JSON.stringify(playlist, null, "\t")}\n`,
+			"utf8",
+		);
 		console.log(`\n歌单已更新：${touched} 处地址（带内容哈希）`);
 	}
 }
@@ -179,7 +235,9 @@ function syncPlaylist(coverRename) {
 // ── 主流程 ───────────────────────────────────────────────────────────────────
 const ffmpeg = findFfmpeg();
 if (!ffmpeg) {
-	console.error("找不到 ffmpeg。请先安装（winget install Gyan.FFmpeg）或用 FFMPEG_PATH 指定路径。");
+	console.error(
+		"找不到 ffmpeg。请先安装（winget install Gyan.FFmpeg）或用 FFMPEG_PATH 指定路径。",
+	);
 	process.exit(1);
 }
 if (!fs.existsSync(musicDir)) {
@@ -189,9 +247,13 @@ if (!fs.existsSync(musicDir)) {
 
 console.log(`ffmpeg : ${ffmpeg}`);
 console.log(`目录   : ${musicDir}`);
-console.log(`任务   : ${doAudio ? `音频→${bitrate}` : ""}${doAudio && doCovers ? " + " : ""}${doCovers ? `封面→JPEG 最长边${COVER_MAX}px` : ""}${dryRun ? "（演练模式，不写文件）" : ""}\n`);
+console.log(
+	`任务   : ${doAudio ? `音频→${bitrate}` : ""}${doAudio && doCovers ? " + " : ""}${doCovers ? `封面→JPEG 最长边${COVER_MAX}px` : ""}${dryRun ? "（演练模式，不写文件）" : ""}\n`,
+);
 
-const tmpDir = fs.mkdtempSync(path.join(process.env.TEMP ?? "/tmp", "music-cmp-"));
+const tmpDir = fs.mkdtempSync(
+	path.join(process.env.TEMP ?? "/tmp", "music-cmp-"),
+);
 const coverRename = new Map();
 
 try {
@@ -221,8 +283,12 @@ try {
 			}
 
 			if (dryRun) {
-				const estimated = Math.round(inputBuf.length * (targetKbps / (probe?.bitrate ?? targetKbps)));
-				console.log(`待压缩 ${name}  ${probe?.bitrate ?? "?"}kbps ${human(inputBuf.length)} → 约 ${human(estimated)}`);
+				const estimated = Math.round(
+					inputBuf.length * (targetKbps / (probe?.bitrate ?? targetKbps)),
+				);
+				console.log(
+					`待压缩 ${name}  ${probe?.bitrate ?? "?"}kbps ${human(inputBuf.length)} → 约 ${human(estimated)}`,
+				);
 				afterTotal += estimated;
 				continue;
 			}
@@ -230,16 +296,28 @@ try {
 			const output = path.join(tmpDir, name);
 			try {
 				run(ffmpeg, [
-					"-hide_banner", "-loglevel", "error", "-y",
-					"-i", input,
-					"-map", "0:a:0",
-					"-map", "0:v:0?",
-					"-c:a", "libmp3lame",
-					"-b:a", bitrate,
-					"-c:v", "copy",
-					"-disposition:v", "attached_pic",
-					"-id3v2_version", "3",
-					"-map_metadata", "0",
+					"-hide_banner",
+					"-loglevel",
+					"error",
+					"-y",
+					"-i",
+					input,
+					"-map",
+					"0:a:0",
+					"-map",
+					"0:v:0?",
+					"-c:a",
+					"libmp3lame",
+					"-b:a",
+					bitrate,
+					"-c:v",
+					"copy",
+					"-disposition:v",
+					"attached_pic",
+					"-id3v2_version",
+					"3",
+					"-map_metadata",
+					"0",
 					output,
 				]);
 
@@ -257,7 +335,9 @@ try {
 				fs.copyFileSync(output, input);
 				afterTotal += outBuf.length;
 				replaced++;
-				const cover = meta.cover ? ` 封面${Math.round(meta.cover.data.length / 1024)}KB` : "";
+				const cover = meta.cover
+					? ` 封面${Math.round(meta.cover.data.length / 1024)}KB`
+					: "";
 				const lyrics = meta.lyrics ? " 歌词在" : "";
 				console.log(
 					`压缩  ${name}  ${probe?.bitrate ?? "?"}kbps → ${outProbe?.bitrate ?? "?"}kbps  ${human(inputBuf.length)} → ${human(outBuf.length)}${cover}${lyrics}`,
@@ -290,7 +370,9 @@ try {
 				continue;
 			}
 			if (dryRun) {
-				console.log(`待压缩 ${name}  ${Math.round(before / 1024)}KB → 约 ${Math.round((before * (isPng ? 0.12 : 0.45)) / 1024)}KB`);
+				console.log(
+					`待压缩 ${name}  ${Math.round(before / 1024)}KB → 约 ${Math.round((before * (isPng ? 0.12 : 0.45)) / 1024)}KB`,
+				);
 				cAfter += Math.round(before * (isPng ? 0.12 : 0.45));
 				continue;
 			}
@@ -299,11 +381,18 @@ try {
 			const tmp = path.join(tmpDir, `cover-${outName}`);
 			try {
 				run(ffmpeg, [
-					"-hide_banner", "-loglevel", "error", "-y",
-					"-i", full,
-					"-vf", `scale='min(${COVER_MAX},iw)':-2:flags=lanczos`,
-					"-q:v", String(COVER_QUALITY),
-					"-pix_fmt", "yuvj420p",
+					"-hide_banner",
+					"-loglevel",
+					"error",
+					"-y",
+					"-i",
+					full,
+					"-vf",
+					`scale='min(${COVER_MAX},iw)':-2:flags=lanczos`,
+					"-q:v",
+					String(COVER_QUALITY),
+					"-pix_fmt",
+					"yuvj420p",
 					tmp,
 				]);
 				const after = fs.statSync(tmp).size;
@@ -317,7 +406,9 @@ try {
 				coverRename.set(name, outName);
 				cAfter += after;
 				cChanged++;
-				console.log(`压缩  ${name}${outName === name ? "" : ` → ${outName}`}  ${Math.round(before / 1024)}KB → ${Math.round(after / 1024)}KB`);
+				console.log(
+					`压缩  ${name}${outName === name ? "" : ` → ${outName}`}  ${Math.round(before / 1024)}KB → ${Math.round(after / 1024)}KB`,
+				);
 			} catch (error) {
 				cAfter += before;
 				console.log(`失败  ${name}  ${error.message}`);
@@ -335,5 +426,7 @@ try {
 }
 
 if (!dryRun) {
-	console.log("记得提交并推送：改动在 public/assets/music/ 与 src/config/music-playlist.json");
+	console.log(
+		"记得提交并推送：改动在 public/assets/music/ 与 src/config/music-playlist.json",
+	);
 }
