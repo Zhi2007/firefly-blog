@@ -134,6 +134,55 @@
 			#toast div.err { border-left-color: var(--err); }
 			#toast div.ok { border-left-color: var(--ok); }
 			.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+			/* ── 站点设置：分组 + 卡片式表单（提高长表单的可读性） ───────────── */
+			.settings-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+			.settings-section:first-child { margin-top: 4px; padding-top: 0; border-top: 0; }
+			.settings-section-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+			.settings-section-head h3 { margin: 0; font-size: 14px; }
+			.settings-section-head .section-hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+			.settings-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 10px; }
+			.setting {
+				display: flex; flex-direction: column; gap: 6px; min-width: 0;
+				padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+				background: rgba(127, 127, 127, .045);
+			}
+			.setting.wide { grid-column: 1 / -1; }
+			.setting-head { display: flex; align-items: flex-start; gap: 10px; }
+			.setting-label { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.45; }
+			.setting-id {
+				margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap;
+				font-family: ui-monospace, Consolas, monospace;
+			}
+			.setting-hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+			.setting-control { min-width: 0; }
+			.setting-control input[type="number"] { max-width: 220px; }
+			.setting-toggle {
+				display: inline-flex; align-items: center; gap: 8px; margin: 0;
+				font-size: 13px; color: var(--text); cursor: pointer;
+			}
+			.setting-toggle input { width: 18px; height: 18px; accent-color: var(--primary); }
+			.setting-path { margin-top: 2px; font-size: 11px; color: var(--muted); }
+			.setting-path summary { cursor: pointer; color: var(--muted); }
+			.setting-path summary:hover { color: var(--text); }
+			.setting-path .path-block { margin-top: 6px; }
+			.settings-actions {
+				position: sticky; bottom: 0; z-index: 2; margin-top: 16px;
+				padding: 10px 0 6px; border-top: 1px solid var(--border); background: var(--card);
+			}
+			.page-toggle-grid {
+				display: grid; gap: 8px; margin-top: 10px;
+				grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+			}
+			.page-toggle {
+				display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px;
+				border: 1px solid var(--border); border-radius: 9px;
+				background: rgba(127, 127, 127, .045); color: var(--text); font-size: 13px; cursor: pointer;
+			}
+			.page-toggle input { width: 17px; height: 17px; accent-color: var(--primary); flex: none; }
+			.page-toggle .page-key {
+				margin-left: auto; font-size: 11px; color: var(--muted);
+				font-family: ui-monospace, Consolas, monospace;
+			}
 			#dropOverlay {
 				position: fixed; inset: 0; z-index: 90; display: none;
 				align-items: center; justify-content: center;
@@ -641,15 +690,10 @@
 				<div class="card">
 					<h2>站点设置</h2>
 					<div class="hint">
-						这些字段来自 <code>src/config</code> 的白名单。<b>保存前会自动备份原文件</b>，写入后会回读校验，校验不过立即回滚 —— 不会留下改坏的文件。
-					</div>
-					<div class="row" style="margin:10px 0 4px;align-items:center">
-						<label style="min-width:200px;display:inline-block">首页横幅副标题<br><span class="muted small">banner.subtitles（每行一条）</span></label>
-						<textarea id="bannerSubtitles" rows="4" placeholder="每行一条副标题"></textarea>
-						<span id="bannerSubtitlesPath" class="path-block"></span>
+						这些字段来自 <code>src/config</code> 的白名单，按用途分了组；每一项都可以展开「写进 …」查看它落到哪个文件的哪个字段。<b>保存前会自动备份原文件</b>，写入后会回读校验，校验不过立即回滚 —— 不会留下改坏的文件。
 					</div>
 					<div id="settingsForm" class="small">加载中…</div>
-					<div class="row" style="margin-top:12px">
+					<div class="row settings-actions">
 						<button class="action" id="btnSaveSettings">保存设置</button>
 						<button class="action ghost" id="btnReloadSettings">放弃改动并重载</button>
 						<span class="muted small">保存后到「发布」页推送即生效</span>
@@ -1434,11 +1478,11 @@
 			 * 这是「这一项会被写进哪个文件的哪个块」的唯一依据 —— 校验脚本会逐个断言
 			 * 那个文件存在、且文件里真的能找到那个块。
 			 */
-			function settingPathBadge(def) {
+			function settingPathBadge(def, label = "写进：") {
 				const target = settingTarget(def);
 				if (!target) return "";
 				return filePathBadge(def.file, {
-					label: "写进：",
+					label,
 					display: target,
 					copy: target,
 					title: target,
@@ -1446,47 +1490,176 @@
 				});
 			}
 
-			function settingsField(def, value) {
-				const id = `set-${def.id.replace(/[^\w-]/g, "_")}`;
-				const label = `<label style="min-width:200px;display:inline-block">${escapeHtml(def.label)}<br><span class="muted small">${escapeHtml(def.id)}</span></label>`;
-				const badge = settingPathBadge(def);
-				const row = (inner) => `<div class="row" style="margin:8px 0;align-items:center">${label}${inner}${badge}</div>`;
-				if (def.type === "boolean") {
-					return row(`<input type="checkbox" id="${id}" data-set="${def.id}" ${value ? "checked" : ""} style="width:auto">`);
+			// 设置项按用途分组：长表单分组后更容易扫读；未知 id 落到「其他」，不会丢项
+			const SETTING_GROUPS = [
+				{ id: "site", title: "站点信息", hint: "标题、描述、关键词和站点地址，会出现在浏览器标签、SEO 与分享卡片里。" },
+				{ id: "layout", title: "布局与导航", hint: "控制页面宽度、主内容区宽度和导航栏标题。" },
+				{ id: "theme", title: "主题与卡片", hint: "主题色相、默认明暗模式和卡片样式。" },
+				{ id: "profile", title: "博主资料", hint: "名字、签名和头像；会显示在侧栏、页脚和文章署名里。" },
+				{ id: "wallpaper", title: "壁纸与横幅", hint: "首页壁纸模式、遮罩暗度和横幅文字。" },
+				{ id: "display", title: "显示设置面板", hint: "访客可用的外观设置入口；关掉可以少加载一些资源。" },
+				{ id: "perf", title: "性能开关", hint: "最耗 GPU 的特效都在这里，低配设备可以逐项关掉。" },
+				{ id: "other", title: "其他", hint: "" },
+			];
+			// 枚举值翻成人话（值本身仍按原样提交，不影响写入）
+			const SETTING_ENUM_LABELS = {
+				"theme.defaultMode": { light: "浅色", dark: "深色", system: "跟随系统" },
+				"wallpaper.mode": {
+					banner: "横幅 Banner",
+					fullscreen: "全屏壁纸",
+					overlay: "覆盖模式",
+					none: "无壁纸",
+				},
+			};
+			const SETTING_EXTRA_HINTS = {
+				"site.title": "会出现在浏览器标签、页脚和分享卡片里。",
+				"site.startDate": "格式 YYYY-MM-DD；用于页脚时间进度和运行天数。",
+				"site.contentWidthVw": "和「主内容区最大宽度」共同决定内容宽度。",
+				"profile.avatar": "以 / 开头表示 public 目录；也可以直接用上方「站点头像」上传。",
+				"theme.hue": "0–360 的色相值，例如 250 偏蓝紫。",
+				"perf.spine": "看板娘是否渲染；关闭可明显降低 GPU 占用。",
+			};
+			const PAGE_LABELS = {
+				friends: "友链",
+				guestbook: "留言板",
+				dynamic: "动态",
+				projects: "项目",
+				gallery: "相册",
+				booknav: "书签导航",
+				bilibili: "哔哩哔哩追番",
+				bangumi: "番组计划",
+				vndb: "VNDB",
+				mal: "MyAnimeList",
+				sponsor: "打赏",
+			};
+
+			/** 把「主标题（补充说明）」拆成两行显示，长标签更好读 */
+			function splitSettingLabel(label) {
+				const text = String(label ?? "").trim();
+				const match = /^([\s\S]+?)（([\s\S]+)）$/.exec(text);
+				return match ? { label: match[1].trim(), hint: match[2].trim() } : { label: text, hint: "" };
+			}
+
+			function settingGroupKey(id) {
+				if (id === "navbar.title") return "layout";
+				if (["site.pageWidth", "site.contentWidth", "site.contentWidthVw"].includes(id)) return "layout";
+				if (id.startsWith("site.")) return "site";
+				if (id.startsWith("theme.") || id.startsWith("card.")) return "theme";
+				if (id.startsWith("profile.")) return "profile";
+				if (id.startsWith("wallpaper.") || id === "banner.subtitles") return "wallpaper";
+				if (id.startsWith("display.")) return "display";
+				if (id.startsWith("perf.")) return "perf";
+				return "other";
+			}
+
+			function settingShortTarget(def) {
+				return settingTarget(def).replace(/^src\/config\//, "");
+			}
+
+			function renderSetting(def, value) {
+				const htmlId = `set-${def.id.replace(/[^\w-]/g, "_")}`;
+				const { label, hint } = splitSettingLabel(def.label);
+				const extraHint = SETTING_EXTRA_HINTS[def.id] || hint;
+				const rangeHint =
+					def.type === "number" &&
+					def.min !== undefined &&
+					def.max !== undefined &&
+					!extraHint.includes(String(def.min))
+						? `可填 ${def.min}–${def.max}`
+						: "";
+				const hintText = [extraHint, rangeHint]
+					.filter(Boolean)
+					.map((part) => String(part).replace(/[。；;]+$/, ""))
+					.join("；");
+				const shortTarget = settingShortTarget(def);
+				let control;
+				if (def.id === "banner.subtitles") {
+					const text = Array.isArray(value) ? value.join("\n") : String(value ?? "");
+					control = `<textarea id="bannerSubtitles" rows="4" placeholder="每行一条副标题">${escapeHtml(text)}</textarea>`;
+				} else if (def.type === "boolean") {
+					control = `<label class="setting-toggle"><input type="checkbox" id="${htmlId}" data-set="${escapeHtml(def.id)}" ${value ? "checked" : ""}> <span>开启</span></label>`;
+				} else if (def.type === "enum") {
+					const labels = SETTING_ENUM_LABELS[def.id] || {};
+					const opts = (def.values || [])
+						.map(
+							(v) =>
+								`<option value="${escapeHtml(v)}" ${v === value ? "selected" : ""}>${escapeHtml(labels[v] || v)}</option>`,
+						)
+						.join("");
+					control = `<select id="${htmlId}" data-set="${escapeHtml(def.id)}">${opts}</select>`;
+				} else if (def.type === "number") {
+					const step = def.max !== undefined && def.max <= 1 ? "0.01" : "1";
+					control = `<input type="number" id="${htmlId}" data-set="${escapeHtml(def.id)}" data-kind="number" step="${step}" value="${escapeHtml(String(value ?? ""))}" ${def.min !== undefined ? `min="${def.min}"` : ""} ${def.max !== undefined ? `max="${def.max}"` : ""}>`;
+				} else {
+					const text = Array.isArray(value) ? value.join(", ") : String(value ?? "");
+					control = `<input type="text" id="${htmlId}" data-set="${escapeHtml(def.id)}" data-kind="${escapeHtml(def.type)}" value="${escapeHtml(text)}">`;
 				}
-				if (def.type === "enum") {
-					const opts = (def.values || []).map((v) => `<option value="${v}" ${v === value ? "selected" : ""}>${escapeHtml(v)}</option>`).join("");
-					return row(`<select id="${id}" data-set="${def.id}">${opts}</select>`);
+				return `<div class="setting${def.id === "banner.subtitles" ? " wide" : ""}">
+					<div class="setting-head">
+						<div class="setting-label">${escapeHtml(label)}</div>
+						<code class="setting-id">${escapeHtml(def.id)}</code>
+					</div>
+					${hintText ? `<div class="setting-hint">${escapeHtml(hintText)}</div>` : ""}
+					<div class="setting-control">${control}</div>
+					<details class="setting-path">
+						<summary>写进 ${escapeHtml(shortTarget)}</summary>
+						<div class="path-block">${settingPathBadge(def, "")}</div>
+					</details>
+				</div>`;
+			}
+
+			function renderSettingsSections(defs, values) {
+				const groups = SETTING_GROUPS.map((group) => ({ ...group, defs: [] }));
+				const byId = new Map(groups.map((group) => [group.id, group]));
+				for (const def of defs) {
+					const group = byId.get(settingGroupKey(def.id)) || byId.get("other");
+					group.defs.push(def);
 				}
-				if (def.type === "number") {
-					return row(`<input type="number" id="${id}" data-set="${def.id}" data-kind="number" value="${value ?? ""}" ${def.min !== undefined ? `min="${def.min}"` : ""} ${def.max !== undefined ? `max="${def.max}"` : ""}>`);
-				}
-				const text = Array.isArray(value) ? value.join(", ") : (value ?? "");
-				return row(`<input id="${id}" data-set="${def.id}" data-kind="${def.type}" value="${escapeHtml(String(text))}">`);
+				return groups
+					.filter((group) => group.defs.length)
+					.map(
+						(group) => `<section class="settings-section">
+							<div class="settings-section-head">
+								<h3>${escapeHtml(group.title)}</h3>
+								${group.hint ? `<span class="section-hint">${escapeHtml(group.hint)}</span>` : ""}
+							</div>
+							<div class="settings-grid">
+								${group.defs.map((def) => renderSetting(def, values[def.id])).join("")}
+							</div>
+						</section>`,
+					)
+					.join("");
 			}
 
 			function renderPageToggles() {
 				const { values, pagePrefix, pageToggle } = settingsCache;
 				const keys = Object.keys(values).filter((k) => k.startsWith(pagePrefix));
+				if (!keys.length) {
+					$("pageToggles").textContent = "（没有读到页面开关）";
+					return;
+				}
 				const file = pageToggle?.file ?? "";
 				const block = pageToggle?.block ?? "";
-				$("pageToggles").innerHTML = keys.length
-					? keys
-							.map((k) => {
-								const name = k.slice(pagePrefix.length);
-								const target = file && block ? `${file} → ${block}.${name}` : file;
-								const badge = file
-									? filePathBadge(file, {
-											label: "写进：",
-											display: target,
-											copy: target,
-											title: target,
-										})
-									: "";
-								return `<div class="row" style="margin:6px 0;align-items:center"><label style="min-width:200px;display:inline-block">${escapeHtml(name)}</label><input type="checkbox" data-page="${escapeHtml(name)}" ${values[k] ? "checked" : ""} style="width:auto">${badge}</div>`;
-							})
-							.join("")
-					: "（没有读到页面开关）";
+				const target = file && block ? `${file} → ${block}.*` : file;
+				// 所有页面开关都写进同一个文件的同一个块，所以只在上面标一次，列表不再逐项重复
+				const badge = file
+					? filePathBadge(file, {
+							label: "全部写进：",
+							display: target,
+							copy: target,
+							title: target,
+						})
+					: "";
+				$("pageToggles").innerHTML = `${badge}<div class="page-toggle-grid">${keys
+					.map((k) => {
+						const name = k.slice(pagePrefix.length);
+						return `<label class="page-toggle">
+							<input type="checkbox" data-page="${escapeHtml(name)}" ${values[k] ? "checked" : ""}>
+							<span>${escapeHtml(PAGE_LABELS[name] || name)}</span>
+							<span class="page-key">${escapeHtml(name)}</span>
+						</label>`;
+					})
+					.join("")}</div>`;
 			}
 
 			async function loadSettings() {
@@ -1499,17 +1672,12 @@
 						pageToggle: data.pageToggle || null,
 					};
 					const main = settingsCache.defs.filter(
-						(d) => !d.id.startsWith(settingsCache.pagePrefix) && d.id !== "banner.subtitles",
+						(d) => !d.id.startsWith(settingsCache.pagePrefix),
 					);
+					// banner.subtitles 也按普通设置项渲染（在「壁纸与横幅」组里，多行文本框）
 					$("settingsForm").innerHTML = main.length
-						? main.map((d) => settingsField(d, settingsCache.values[d.id])).join("")
+						? renderSettingsSections(main, settingsCache.values)
 						: "（没有可编辑的设置项）";
-					// 首页横幅副标题的多行文本框是手写的，它的路径徽章也要显示（同样取自 SETTINGS_DEFS）
-					const bannerDef = settingsCache.defs.find((d) => d.id === "banner.subtitles");
-					$("bannerSubtitlesPath").innerHTML = bannerDef
-						? settingPathBadge(bannerDef) +
-							`<span class="path-note">（文本域里的每一行 = 数组里的一项）</span>`
-						: "";
 					applyBannerSubtitles();
 					renderPageToggles();
 				} catch (error) {
@@ -1529,10 +1697,13 @@
 					values[`${settingsCache.pagePrefix}${el.dataset.page}`] = el.checked;
 				});
 				// 首页横幅副标题：每行一条（多行文本框是唯一来源，避免与通用字段重复提交）
-				values["banner.subtitles"] = $("bannerSubtitles")
-					.value.split("\n")
-					.map((line) => line.trim())
-					.filter(Boolean);
+				const bannerField = $("bannerSubtitles");
+				if (bannerField) {
+					values["banner.subtitles"] = bannerField.value
+						.split("\n")
+						.map((line) => line.trim())
+						.filter(Boolean);
+				}
 				if (!confirm(`确定保存 ${Object.keys(values).length} 项设置？\n（原文件会自动备份，可随时恢复）`)) return;
 				try {
 					const result = await api("/api/settings", { method: "POST", body: { values } });
