@@ -2730,7 +2730,9 @@
 
 			/** 把站内公开路径转成仓库路径，用于本地试听 */
 			function publicToRepo(p) {
-				return p.startsWith("/") ? `public${p}` : p;
+				// 站内地址可能带 ?v=缓存参数 / #锚点：真实文件没有这段，试听 / 预览前先剥掉
+				const clean = String(p ?? "").split("#")[0].split("?")[0];
+				return clean.startsWith("/") ? `public${clean}` : clean;
 			}
 
 			function audioSrc(url) {
