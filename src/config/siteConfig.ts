@@ -85,12 +85,17 @@ export const siteConfig: SiteConfig = {
 	// 如果启用了OpenGraph图片功能，数组中需要包含png格式的favicon图标
 	favicon: [
 		{
-			// 图标文件路径
-			src: "/favicon/firefly-32.png",
+			// 图标文件路径（192 放第一位：OG 分享图会取第一张 png 作为 logo，32px 放大会糊）
+			src: "/favicon/firefly-192.png",
 			// 可选，指定主题 'light' | 'dark'
 			// theme: "light",
 			// 可选，图标大小
-			// sizes: "32x32",
+			sizes: "192x192",
+		},
+		{
+			// 浏览器标签页用的小尺寸图标
+			src: "/favicon/firefly-32.png",
+			sizes: "32x32",
 		},
 	],
 
@@ -106,8 +111,9 @@ export const siteConfig: SiteConfig = {
 		// 例如: { type: "image", value: "assets/images/logo.png", valueDark: "assets/images/logo-dark.png", alt: "Logo" }
 		// 使用 Astro 图标库时不需要设置 valueDark，图标会自动跟随主题亮暗色切换
 		logo: {
-			type: "icon",
-			value: "material-symbols:menu-book",
+			type: "image",
+			// 走 src/assets 优化管线：导航栏用它，结构化数据（Organization.logo）也能拿到绝对 URL
+			value: "assets/images/site-icon.png",
 			alt: "栀海的博客",
 		},
 		// 导航栏标题
