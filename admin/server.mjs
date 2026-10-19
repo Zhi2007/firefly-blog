@@ -672,16 +672,31 @@ async function exists(p) {
 // 面板上每一处路径都必须来自后端：要么是 fs.readdir / git 返回的，要么是按**站点约定**拼出来
 // 并当场 stat 核对过的。这一组小函数就是后半句的公共实现，前端只负责显示，绝不自己拼路径。
 
+/** decodeURIComponent 的容错版：非法 % 序列不抛错，按原文返回 */
+function decodeUrlPath(text) {
+	try {
+		return decodeURIComponent(text);
+	} catch {
+		return text;
+	}
+}
+
 /**
  * 站内公开路径 → 仓库相对路径。
  * 站点的 web 根是 `public/`（`astro` 的约定），所以 `/assets/music/a.mp3` 就是
  * `public/assets/music/a.mp3`。只认「以单个 / 开头」的写法；远程 URL、`//` 协议相对、
  * 相对路径一律返回 null（**不猜**）。
+ * 站内地址经常带缓存参数 / 锚点（如压缩脚本写入的 `?v=<内容哈希>`）：真实文件没有这段，
+ * 必须先剥掉再 stat，否则存在的文件会被误判成「文件不存在」。
  */
 function publicUrlToRepoPath(url) {
-	const text = String(url ?? "").trim();
+	const text = String(url ?? "")
+		.trim()
+		.split("#")[0]
+		.split("?")[0];
 	if (!text.startsWith("/") || text.startsWith("//")) return null;
-	return `public${text.replace(/\\/g, "/")}`;
+	// 文件名可能是百分号编码（中文、空格）：解码后再拼仓库路径，才能 stat 到真实文件。
+	return `public${decodeUrlPath(text).replace(/\\/g, "/")}`;
 }
 
 /**
@@ -1936,7 +1951,9 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "缺少音频路径或歌词文本" });
 					return;
 				}
-				const base = path.basename(String(audioUrl)).replace(/\.[^.]+$/, "");
+				const base = path
+					.basename(decodeUrlPath(String(audioUrl).split("#")[0].split("?")[0]))
+					.replace(/\.[^.]+$/, "");
 				const lrc = plainLyricsToLrc(String(text), Number(duration) || 0);
 				if (!lrc) {
 					sendJson(res, 400, { error: "歌词内容为空" });
@@ -1959,7 +1976,11 @@ const server = createServer(async (req, res) => {
 
 			case "/api/extract-audio": {
 				// 对已经存在的音频重新提取一次（老歌曲也能补上封面/歌词）
-				const repoPath = String(body.repoPath || (body.url ? `public${body.url}` : ""));
+				const repoPath = body.repoPath ? String(body.repoPath) : publicUrlToRepoPath(body.url);
+				if (!repoPath) {
+					sendJson(res, 400, { error: "音频路径要以 / 开头（站内路径）" });
+					return;
+				}
 				let file;
 				try {
 					file = resolveInside(repoPath, [MEDIA_DIRS.music]);

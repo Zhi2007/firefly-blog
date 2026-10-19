@@ -709,6 +709,8 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 
 1. **复用 `filePathBadge()`**，不要各页自己拼 HTML —— 复制、已复制反馈、打开文件夹只有这一份实现（`data-copy` / `data-reveal` 由文档级事件委托统一处理，新徽章自动生效）。
 2. **路径只能来自后端**：`fs.readdir` / `git status --porcelain -z` / 实际写入路径（保存后返回的 `file`）/ 快照目录，或按站点约定拼好后**当场 `stat` 核对**（如 `publicUrlToRepoPath` / `describeLocalFiles` / `describeFriendIcons`）。**前端不许自己拼路径** —— 拼错就等于让作者去文件管理器里白找一趟。
+
+   > 站内 URL 可能带缓存参数（`compress-music.mjs` 会往歌单里写 `?v=<内容哈希>`）或 `#锚点`：转仓库路径前必须先剥掉 `?` / `#` 再 `stat`，否则会把存在的音频 / 封面误判成「文件不存在」。
 3. **不许编造**：文件不存在就如实标 ⚠️ +「文件不存在」并隐藏「打开文件夹」按钮；还没创建的文件标「（尚未创建）」；远程 URL 只显示 URL 本身。
 4. 添加了新的路径字段，就在上面的表里补一行，并同步 `docs/PROJECT-CONTEXT.md` 第 9.10 节与附录 E.2 第 11 行。
 
