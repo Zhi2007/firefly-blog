@@ -680,7 +680,7 @@ export const tabTitleConfig: TabTitleConfig = {
 
 - 改 `floating.enable` / `position`：左下角悬浮播放器开关与位置；`showInNavbar` 控制导航栏入口；`showInSidebar` 是旧的侧边栏组件（当前 `false`）。
 - 改 `mode`：`"local"` 用仓库里的歌单，`"meting"` 用在线 Meting API（配置在同文件的 `meting` 块里，含 `api` / `server` / `type` / `id` 与 `fallbackApis`）。
-- 改 `volume` / `playMode` / `showLyrics`：默认音量、播放模式、是否显示歌词。
+- 改 `volume` / `playMode` / `showLyrics`：默认音量、播放模式、是否显示歌词。**`playMode` 默认 `"random"`**：进入/刷新页面时随机挑一首开始，切歌也是随机；想固定顺序就改成 `"list"`。
 - 加歌最省事的方式是管理面板的「音乐」页（见第 8 节）。
 
 ### 7.11 `announcements.json`

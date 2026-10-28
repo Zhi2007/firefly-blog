@@ -28,8 +28,8 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// 默认音量 (0-1)
 	volume: 0.7,
 
-	// 播放模式：'list'=列表循环, 'one'=单曲循环, 'random'=随机播放
-	playMode: "list",
+	// 播放模式：'list'=列表循环, 'one'=单曲循环, 'random'=随机播放；默认随机（每次打开随机挑一首）
+	playMode: "random",
 
 	// 是否显启用歌词
 	showLyrics: true,
