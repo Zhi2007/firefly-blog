@@ -50,6 +50,9 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		],
 	});
 
+	// 工具箱（独立页面，见 src/pages/tools.astro）
+	links.push(LinkPresets.Tools);
+
 	//社交及其子菜单
 	links.push({
 		id: "social",
@@ -210,6 +213,13 @@ export const LinkPresets: Record<string, NavBarLink> = {
 		url: "/booknav/",
 		icon: "material-symbols:bookmarks",
 		pageKey: "booknav",
+	},
+	Tools: {
+		id: "tools",
+		name: "工具",
+		url: "/tools/",
+		icon: "material-symbols:handyman",
+		pageKey: "tools",
 	},
 	Bilibili: {
 		id: "bilibili",

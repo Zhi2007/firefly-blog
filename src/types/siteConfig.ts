@@ -93,6 +93,7 @@ export type SiteConfig = {
 		friends: boolean; // 友链页面开关
 		sponsor: boolean; // 打赏页面开关
 		guestbook: boolean; // 留言板页面开关
+		tools: boolean; // 工具箱页面开关
 		bangumi: boolean;
 		vndb: boolean;
 		mal: boolean; // MyAnimeList 页面开关

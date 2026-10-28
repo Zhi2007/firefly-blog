@@ -140,12 +140,12 @@ firefly/
 │   └── anime-list.json
 ├── src/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
-│   ├── config/                 # ③ 配置区（33 个文件：23 个 *Config.ts + backgroundWallpaper.ts
+│   ├── config/                 # ③ 配置区（35 个文件：25 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
 │   ├── content/                # ③ 内容：posts/（5 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
-│   ├── pages/                  # ① 文件路由（33 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
+│   ├── pages/                  # ① 文件路由（34 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
 │   ├── styles/                 # ① 全局样式；② low-spec.css 是自建
 │   ├── utils/                  # ① 工具；② announcement-utils.ts 是自建
 │   ├── types/                  # ① 类型；② navOverrides.ts 是自建
@@ -323,9 +323,9 @@ firefly/
 
 | 口径 | 数量 | 清单 |
 | --- | --- | --- |
-| `*Config.ts` | **24** | analytics, announcement, booknav, comment, coverImage, displaySettings, dynamic, effects, expressiveCode, font, friends, gallery, license, mermaid, music, navBar, perf, pio, plantuml, profile, sidebar, site, sponsor |
-| 目录下全部 `.ts` | **26** | 上面 23 个 + `backgroundWallpaper.ts`（壁纸，不以 Config 结尾）+ `index.ts`（统一导出，`src/config/index.ts:58-89`） |
-| 目录下全部文件 | **33** | 上面 25 个 + `README.md` + `FooterConfig.html` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json` |
+| `*Config.ts` | **25** | analytics, announcement, booknav, comment, coverImage, displaySettings, dynamic, effects, expressiveCode, font, friends, gallery, license, mermaid, music, navBar, perf, pio, plantuml, profile, sidebar, site, sponsor, tools |
+| 目录下全部 `.ts` | **27** | 上面 25 个 + `backgroundWallpaper.ts`（壁纸，不以 Config 结尾）+ `index.ts`（统一导出，`src/config/index.ts:58-89`） |
+| 目录下全部文件 | **35** | 上面 27 个 + `README.md` + `FooterConfig.html` + `announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json`、`feature-tour.json`、`tools.json` |
 | 面板「配置」页可编辑白名单 | **15** | `admin/server.mjs:86-111` 的 `CONFIG_FILES` |
 | 面板「站点设置」可视化字段 | **33 条 def，落在 5 个文件** | `admin/settings.mjs:25-68` |
 | 面板管理的 JSON 数据 | **3 + 1** | `announcements.json`、`music-playlist.json`（`server.mjs:206-209` 的 `DATA_FILES`）+ `friends.json`（`admin/friends.mjs`）+ `nav-overrides.json`（`admin/nav.mjs`） |
@@ -338,7 +338,7 @@ firefly/
 
 | 文件 | 控制什么 | 关键字段（实测） | 改了会怎样 | 面板 |
 | --- | --- | --- | --- | --- |
-| `siteConfig.ts`（359 行） | 站点身份、主题色、宽度、列表布局、分页、文章页、各第三方（bilibili/bangumi/vndb/mal）、图片优化、RSS、页面开关 | `title/subtitle/site_url/description/keywords`（`:45-58`）、`themeColor.hue/defaultMode`（`:61-66`）、`pageWidth`（`:71`）、`contentWidth/contentWidthVw`（`:73-74`）、`navbar.*`（`:98-126`）、`siteStartDate`（`:129`）、`timezone`（`:133`）、`postListLayout.*`（`:155-211`）、`pagination.postsPerPage`（`:216`）、`post.*`（`:220-254`）、`imageOptimization.*`（`:327-344`）、`feed.contentMode`（`:351`）、`pages`（`:10-41` + `:358`） | 影响全站；`site_url` 改动必须**同时**改 `wrangler.jsonc:19-25` 与 `worker/index.mjs:16-17`（否则 canonical/RSS/301 目标不一致） | ✅ 14 个字段（`settings.mjs:26-39`）+ 11 个 `pages.*` 开关（动态从 `resolvePageToggles` 读取） |
+| `siteConfig.ts`（371 行） | 站点身份、主题色、宽度、列表布局、分页、文章页、各第三方（bilibili/bangumi/vndb/mal）、图片优化、RSS、页面开关 | `title/subtitle/site_url/description/keywords`（`:45-58`）、`themeColor.hue/defaultMode`（`:61-66`）、`pageWidth`（`:71`）、`contentWidth/contentWidthVw`（`:73-74`）、`navbar.*`（`:98-126`）、`siteStartDate`（`:129`）、`timezone`（`:133`）、`postListLayout.*`（`:155-211`）、`pagination.postsPerPage`（`:216`）、`post.*`（`:220-254`）、`imageOptimization.*`（`:327-344`）、`feed.contentMode`（`:351`）、`pages`（`:10-46` + `:369`） | 影响全站；`site_url` 改动必须**同时**改 `wrangler.jsonc:19-25` 与 `worker/index.mjs:16-17`（否则 canonical/RSS/301 目标不一致） | ✅ 14 个字段（`settings.mjs:26-39`）+ 12 个 `pages.*` 开关（动态从 `resolvePageToggles` 读取） |
 | `backgroundWallpaper.ts`（209 行） | 壁纸模式、图片列表、主页横幅文案/链接、轮播、水波纹、渐变、导航栏毛玻璃、全屏模糊渐变 | `mode`（`:5`）、`playerEnable: false`（`:8`）、`src.desktop/mobile`（`:42-59`）、`common.homeText.*`（`:71-122`）、`common.carousel`（`:124-131`）、`common.waves.enable.{desktop,mobile}: false`（`:133-140`）、`banner.navbar.blur: 0`（`:169`）、`overlay.blur: 0`（`:179`）、`fullscreen.blurRamp.enable.{desktop,mobile}: false`（`:200-207`） | 性能相关字段都调过（第 12 章）；`playerEnable: true` 会重新引入视频 | ✅ 11 个字段（`settings.mjs:43-45,61-67`） |
 | `profileConfig.ts` | 头像、名字、签名、社交链接 | `avatar`（`:14`）、`name: "栀海"`（`:17`）、`bio`（`:20`）、`links[]`（`:28-47`） | 名字会出现在页脚版权、文章作者、OG 卡片；`avatar` 除表单外还能在「站点设置 → 站点头像」直接上传更换（9.8 节） | ✅ 3 个字段（`settings.mjs:40-42`）+ 头像卡片（`/api/avatar`） |
 | `displaySettingsConfig.ts`（72 行） | 视图设置面板（🎨）总开关与各切换项 | `enable: true`（`:24`）、`wallpaperModeSwitchable: false`（`:43`）、`overlaySwitchable`（`:62-66`） | **总开关开/关直接决定客户端 JS 体积**（见 4.3）；`wallpaperModeSwitchable: true` 让每页约 +33 KB JS（`settings.mjs:55` 的 label 原话） | ✅ 4 个字段（`settings.mjs:54-57`） |
@@ -362,6 +362,7 @@ firefly/
 | `galleryConfig.ts` | 相册列表 + 瀑布流列宽 | `albums[2]`（`:6-37`，含一个密码相册 `123456`）、`columnWidth: 240`（`:41`） | 相册页由 `pages.gallery` 开关控制，当前为 `false`（`siteConfig.ts:25`），页面不生成 | ❌ |
 | `dynamicConfig.ts` | 动态页标题/评论/每页条数/数据源 | `itemsPerPage: 20`（`:17`）、`apiUrl: "/api/dynamic.json"`（`:23`）、`memos.enable: false`（`:30`） | 页面开关 `pages.dynamic: false`（`siteConfig.ts:21`），当前不生成页面 | ❌ |
 | `booknavConfig.ts`（156 行） | 书签导航分组与条目 + favicon 接口 | `booknavPageConfig.favicon.api`（`:20`）、`booknavConfig[]`（`:26-155`） | 页面开关 `pages.booknav: false`（`siteConfig.ts:27`）；favicon 走第三方 `a.favicon.im`（受 CSP `img-src https:`） | ❌ |
+| `toolsConfig.ts`（13 行） | 工具箱页面（`/tools/`）的页面文案 + 分类 / 工具数据（数据在 `tools.json`） | `toolsPageConfig.title`（`:7`）、`toolsPageConfig.description`（`:8-9`）、`toolsCategories`（`:13`，`import` 自 JSON） | 加工具 / 分类只改 `tools.json`；页面开关 `pages.tools`（`:45`） | ✏️ 直接改 `tools.json`（暂无面板入口） |
 | `sponsorConfig.ts` | 打赏方式与打赏者列表 | `showButtonInPost: false`（`:21`）、四种 `enabled: false`（`:32,40,48,56`）、`sponsors[]` 示例数据（`:61-78`） | 页面开关 `pages.sponsor: false`（`siteConfig.ts:40`） | ❌ |
 | `index.ts` | 统一导出 + `navbarMode` 解析 | `resolveNavbarMode`（`:8-14`）、`navbarMode`（`:17`）、类型导出（`:20-57`）、配置导出（`:58-89`） | 增删导出会影响所有 `@/config` 引用点 | ❌ |
 
@@ -797,7 +798,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 5 | 友链 | `friends` | 24 条友链的增删改排序 + 启停；「从网址抓取」自动猜标题/简介/图标（只填表单，需人工确认）；显示 `src/config/friends.json` 与每个图标的 `public/friends/<文件名>` |
 | 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
 | 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
-| 8 | 站点设置 | `settings` | 33 条可视化字段（**含 11 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
+| 8 | 站点设置 | `settings` | 33 条可视化字段（+ **12 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
 | 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**保留份数可改为任意正整数**（`keep.json`，保存后立即清理旧快照）；CI 失败横幅与「回滚该提交」 |
 | 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
 | 11 | 后台 | `runtime` | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；**后台日志**（读 `logs/admin-server.log` 尾部，2 秒自动刷新、复制、📂 打开文件）；**重启后台**（仅启动器托管时可用，重启后页面自动重连）；**刷新界面**；见 9.13 节 |
@@ -1471,7 +1472,7 @@ pnpm build
 | 9 | **文章链接 404 / 我换了文件名？** | URL 由文件路径决定（3.4 节）。重命名 = 旧链接失效；Worker 只处理 `/blog/*` 的历史跳转（`worker/index.mjs:84-90`），不会自动给任意旧 URL 兜底。要保留旧链接就在 `worker/index.mjs` 的 `legacyRedirect()` 里加规则 |
 | 10 | **想给文章配图，放哪？** | 三种都行（3.5 节）：放进 `src/content/posts/images/` 然后正文写 `./images/xxx.png`（面板上传走这里）；封面可放 `src/assets/...`（走优化）；站点级图片放 `public/assets/images/` 并用 `/assets/images/...` 引用。**动图必须放 `public/`** |
 | 11 | **想改主页横幅文字？** | 面板「站点设置」：`wallpaper.title`（主标题）、`banner.subtitles`（副标题，每行一条）。等价位置 `backgroundWallpaper.ts:75,79-84`。打字机开关在 `:87-98` |
-| 12 | **想开/关某个页面（相册、动态、打赏…）？** | 面板「站点设置 → 页面开关」（`pages.*`，从 `siteConfig.ts:10-41` 的 `resolvePageToggles` 动态读取）。等价位置 `siteConfig.ts:14-40`；也可用环境变量 `PUBLIC_PAGES_<KEY>`（`page-toggle-utils.ts:18-44`）。**关掉页面会同时隐藏对应导航项并返回 404**（`siteConfig.ts:9` 注释） |
+| 12 | **想开/关某个页面（相册、动态、打赏…）？** | 面板「站点设置 → 页面开关」（`pages.*`，从 `siteConfig.ts:10-46` 的 `resolvePageToggles` 动态读取）。等价位置 `siteConfig.ts:14-40`；也可用环境变量 `PUBLIC_PAGES_<KEY>`（`page-toggle-utils.ts:18-44`）。**关掉页面会同时隐藏对应导航项并返回 404**（`siteConfig.ts:9` 注释） |
 | 13 | **想改 CSP 放行一个新域名？** | 改 `worker/index.mjs:31`（**唯一生效处**），并**同步**改 `public/_headers:32` 保持一致；在旁边的注释里写清为什么放行（`public/_headers:13-23` 就是先例）。改完建议先临时改成 `Content-Security-Policy-Report-Only` 观察，再正式生效 |
 | 14 | **换了域名要改哪几处？** | 四处：`siteConfig.ts:51`、`wrangler.jsonc:17-26`、`worker/index.mjs:16-17`、`public/.well-known/security.txt`（7.5 场景 B） |
 | 15 | **面板点了「发布」，线上没变？** | ① 看返回的 message 里有没有「**已跳过**」——你改的文件可能在 `PUBLISH_SCOPE` 之外（10.3）；② 看 Actions 是否成功（面板 CI 横幅）；③ 等约 1 分钟；④ 确认 `git push` 真的成功（面板会提示「已推送到 GitHub」）；⑤ 若是 HTML 缓存问题，确认没有在 Cloudflare 加了「Cache Everything」类规则（6.7 第 4 条） |
@@ -1589,13 +1590,13 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 
 | 口径 | 数量 | 本文覆盖 |
 | --- | --- | --- |
-| `*Config.ts` | **24** | ✅ 4.2 节表格 24 行逐行覆盖 |
+| `*Config.ts` | **25** | ✅ 4.2 节表格 25 行逐行覆盖 |
 | 非 `*Config.ts` 的 `.ts` | **2**（`backgroundWallpaper.ts`、`index.ts`） | ✅ 4.2 节首行与末行 |
-| 关键 JSON | **4**（`announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json`） | ✅ 4.1 节表 + 4.2 节对应 `*Config.ts` 行的「面板」列 |
+| 关键 JSON | **5**（`announcements.json`、`friends.json`、`music-playlist.json`、`nav-overrides.json`、`tools.json`） | ✅ 4.1 节表 + 4.2 节对应 `*Config.ts` 行的「面板」列 |
 | 面板可编辑白名单 | 15（`server.mjs:86-111`） | ✅ 4.1 节表 |
-| 站点设置字段 | 33 条 def / 5 个文件（实测 `readSettings` 返回 44 个键，含 11 个 `pages.*`） | ✅ 4.1 节表 + 4.2 节「面板」列 |
+| 站点设置字段 | 33 条 def / 5 个文件（实测 `readSettings` 返回 45 个键，含 12 个 `pages.*`） | ✅ 4.1 节表 + 4.2 节「面板」列 |
 
-复现命令：`Get-ChildItem src/config -Filter *Config.ts | Measure-Object` → 24（2026-10-11 复测；`pnpm check-docs` 的第 3 组也按 24 校验）。
+复现命令：`Get-ChildItem src/config -Filter *Config.ts | Measure-Object` → 25（2026-10-28 复测；`pnpm check-docs` 的第 3 组也按 25 校验）。
 
 ### C.5 `AGENTS.md` 只多了指针段落
 
@@ -1661,7 +1662,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:86-111` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
 | 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（37 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
 | 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 11 个）；② `admin/README.md` 的功能表；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
-| 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-41` + `:358`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
+| 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-46` + `:369`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
 | 6 | **新增构建步骤（`package.json` 的 `build`）** | ① 本文档 11.2 的 8 步链路与「8 步」说法（§1.3 也有一处）；② `CLAUDE.md` / `AGENTS.md` 里的构建说明（上游文件，改动要就地标注「本仓库修正」） | ✅（步骤序列逐条比对 + 三处「N 步」声明，含 `CLAUDE.md`） |
 | 7 | **新增 `public/vendor/` 类自托管资源** | ① 缓存规则：`worker/index.mjs:122-129` 与 `public/_headers:38-45`（两边都要写）；② CSP（自托管一般不用放行，除非是 worker / iframe / wasm）；③ 本文档第 5 / 6 章 | ⚠️ 部分（只保证 CSP 三处一致；缓存规则要人看） |

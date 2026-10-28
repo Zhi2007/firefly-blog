@@ -58,6 +58,12 @@ const KEY_PAGES: KeyPage[] = [
 		pageKey: "booknav",
 	},
 	{
+		labelKey: I18nKey.tools,
+		path: "/tools/",
+		descKey: I18nKey.toolsDescription,
+		pageKey: "tools",
+	},
+	{
 		labelKey: I18nKey.bilibili,
 		path: "/bilibili/",
 		descKey: I18nKey.bilibiliSubtitle,

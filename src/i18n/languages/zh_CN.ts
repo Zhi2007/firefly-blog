@@ -84,6 +84,8 @@ export const zh_CN: Translation = {
 	[Key.friendsDescription]: "这里是我的朋友们，欢迎互相访问交流",
 	[Key.searchFriends]: "搜索友链...",
 	[Key.friendsEmpty]: "暂无友情链接",
+	[Key.tools]: "工具箱",
+	[Key.toolsDescription]: "收藏好用的网页工具，按用途分类整理",
 	[Key.booknav]: "书签导航",
 	[Key.booknavDescription]: "收藏一些好用的网站，按分类整理",
 	[Key.searchBooknav]: "搜索书签...",

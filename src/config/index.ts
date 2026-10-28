@@ -55,6 +55,11 @@ export type {
 	FontDefinition,
 	FontSelectionConfig,
 } from "../types/fontConfig"; // 字体类型定义
+export type {
+	ToolCategory,
+	ToolItem,
+	ToolsPageConfig,
+} from "../types/toolsConfig";
 export { analyticsConfig } from "./analyticsConfig"; // 统计分析配置
 export { announcementConfig } from "./announcementConfig"; // 公告配置
 // 样式配置
@@ -87,3 +92,4 @@ export { sidebarLayoutConfig } from "./sidebarConfig"; // 侧边栏布局配置
 // 核心配置
 export { siteConfig } from "./siteConfig"; // 站点基础配置
 export { sponsorConfig } from "./sponsorConfig"; // 打赏配置
+export { toolsCategories, toolsPageConfig } from "./toolsConfig"; // 工具箱配置

@@ -42,6 +42,7 @@
 | 切换标签页时轮播标题 | `effectsConfig.ts` → `tabTitleConfig.enable: true`、`titles`、`intervalMs` |
 | 公告：首访弹窗 + 公告页 + 导航入口 | `src/config/announcementConfig.ts` → `modal.enable: true`、`modal.storageKey: "zhi-blog-announcement-version"`；数据在 `src/config/announcements.json` |
 | 文章置顶 | 文章 frontmatter `pinned: true`（`src/content.config.ts` 的 `posts` schema） |
+| **工具箱**（`/tools/`） | 按用途分类收录网页工具，每个工具有简介、亮点、标签与外链；数据在 `src/config/tools.json`，页面文案在 `src/config/toolsConfig.ts`，入口开关 `siteConfig.pages.tools` |
 | 文章加密（密码 + 密码提示） | 文章 frontmatter `password` / `passwordHint`；渲染在 `src/pages/posts/[...slug].astro` 里的 `EncryptedPost` 组件 |
 | 文章系列（series / seriesOrder） | frontmatter `series` / `seriesOrder`；导航组件 `src/components/misc/SeriesNav.astro` |
 | 文章封面 + LQIP 模糊占位图 | `src/config/coverImageConfig.ts`（`enableInPost` / `enableInPostOverlay` / 随机封面 API）；占位数据由 `scripts/generate-lqips.ts` 生成到 `src/constants/lqips.json` |
@@ -753,6 +754,42 @@ export const tabTitleConfig: TabTitleConfig = {
 - 这是页脚（版权行上方）的自定义 HTML 片段，直接改就能改页脚链接。
 - 文件顶部注释写明：**页脚下方的 "Powered by Astro & Firefly" 是主题作者要求的署名，请勿删除**；开源项目的完整致谢在 `/announcement/` 公告页与首访弹窗里。
 - 面板的「配置」页把它列为可编辑文件之一，所以也可以不改代码直接改。
+
+### 7.15 `toolsConfig.ts` / `tools.json`（工具箱）
+
+```ts
+// src/config/tools.json（结构：categories[] → tools[]）
+{
+	"categories": [
+		{
+			"id": "crypto-text",
+			"name": "加密与文本",
+			"icon": "material-symbols:lock",
+			"description": "一句话说明这个分类适合什么场景",
+			"tools": [
+				{
+					"id": "example",
+					"name": "工具名",
+					"url": "https://example.com/",
+					"sourceUrl": "https://github.com/owner/repo",
+					"tagline": "一句话定位",
+					"description": "2~4 句介绍：它是什么、怎么用、适合谁",
+					"badges": ["免费"],
+					"features": ["亮点 1", "亮点 2"],
+					"tags": ["标签"],
+					"note": "使用提示 / 许可证提醒（可选）"
+				}
+			]
+		}
+	]
+}
+```
+
+- **加工具只改 `src/config/tools.json`**：在对应分类的 `tools` 数组里加一条即可；分类不够就加一个 `categories` 项。
+- **页面文案**在 `src/config/toolsConfig.ts` 的 `toolsPageConfig.title / description`，会作为页面标题和 SEO 描述。
+- **页面开关**是 `siteConfig.pages.tools`（默认 `true`）；设为 `false` 时 `/tools/` 返回 404，导航项自动隐藏。
+- 页面模板在 `src/pages/tools.astro`，样式在 `src/styles/pages/tools.css`；移动端单列、宽屏两列，长介绍按 1.85 行高排版。
+- 加新工具时建议顺手检查：链接是否可访问、是否开源、许可证是否允许分享；有风险的在 `note` 里写清楚。
 
 ## 8. 管理面板
 

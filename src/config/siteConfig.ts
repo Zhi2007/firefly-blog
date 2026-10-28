@@ -38,6 +38,11 @@ const pages = resolvePageToggles({
 
 	// 打赏页面开关
 	sponsor: false,
+
+	// ── 工具 (Tools) ──────────────────────────────────
+
+	// 工具箱页面开关
+	tools: true,
 });
 
 export const siteConfig: SiteConfig = {

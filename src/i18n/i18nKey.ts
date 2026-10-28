@@ -116,6 +116,10 @@ enum I18nKey {
 	guestbookDescription = "guestbookDescription",
 	bangumi = "bangumi",
 
+	// 工具箱
+	tools = "tools",
+	toolsDescription = "toolsDescription",
+
 	// 书签导航
 	booknav = "booknav",
 	booknavDescription = "booknavDescription",

@@ -1,0 +1,208 @@
+---
+import { Icon } from "astro-icon/components";
+import { siteConfig, toolsCategories, toolsPageConfig } from "@/config";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import "@/styles/pages/common.css";
+import "@/styles/pages/tools.css";
+
+// 页面开关：设为 false 时和主题的其它可选页面一样返回 404（导航项也会自动隐藏）
+if (!siteConfig.pages.tools) {
+	return Astro.redirect("/404/");
+}
+
+const categories = toolsCategories.filter(
+	(category) => category.tools.length > 0,
+);
+const toolCount = categories.reduce(
+	(sum, category) => sum + category.tools.length,
+	0,
+);
+
+const title = toolsPageConfig.title || "工具箱";
+const description = toolsPageConfig.description || "";
+---
+
+<MainGridLayout title={title} description={description}>
+  <div
+    class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
+  >
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+      <!-- 页面标题与简介 -->
+      <div class="mb-5">
+        <div class="page-heading">
+          <div class="page-icon" aria-hidden="true">
+            <Icon name="material-symbols:handyman" />
+          </div>
+          <div class="min-w-0">
+            <h2>{title}</h2>
+            {description && <p>{description}</p>}
+          </div>
+        </div>
+      </div>
+
+      <!-- 数量概览 -->
+      {
+        toolCount > 0 && (
+          <div class="tools-meta mb-6">
+            <span class="page-count">
+              <Icon name="material-symbols:widgets" aria-hidden="true" />
+              <strong>{toolCount}</strong>
+              <span>个工具 · {categories.length} 个分类</span>
+            </span>
+            <span class="tools-meta-hint">
+              点击分类可直接跳到对应区块；卡片里的「打开工具」会在新标签页打开。
+            </span>
+          </div>
+        )
+      }
+
+      <!-- 分类锚点 -->
+      {
+        categories.length > 1 && (
+          <nav class="tools-toc mb-8" aria-label="工具分类">
+            {categories.map((category) => (
+              <a href={`#${category.id}`} class="tools-pill">
+                {category.icon && (
+                  <Icon name={category.icon} aria-hidden="true" />
+                )}
+                <span>{category.name}</span>
+                <span class="tools-pill-count">{category.tools.length}</span>
+              </a>
+            ))}
+          </nav>
+        )
+      }
+
+      <!-- 分类与工具卡片 -->
+      {
+        categories.length === 0 && (
+          <div class="tools-empty">
+            <Icon
+              name="material-symbols:inventory-2-outline-rounded"
+              aria-hidden="true"
+            />
+            <p>工具箱还是空的，先往 src/config/tools.json 里加一个吧。</p>
+          </div>
+        )
+      }
+      <div class="tools-groups">
+        {categories.map((category) => (
+          <section
+            id={category.id}
+            class="tools-group mb-10 last:mb-2 scroll-mt-24"
+          >
+            <div class="tools-group-heading">
+              {category.icon && (
+                <span class="tools-group-icon" aria-hidden="true">
+                  <Icon name={category.icon} />
+                </span>
+              )}
+              <div class="min-w-0">
+                <h3>{category.name}</h3>
+                {category.description && <p>{category.description}</p>}
+              </div>
+            </div>
+
+            <div class="tools-grid">
+              {category.tools.map((tool) => (
+                <article class="tool-card">
+                  <div class="tool-card-head">
+                    <h4>
+                      <a
+                        href={tool.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {tool.name}
+                      </a>
+                    </h4>
+                    {tool.badges && tool.badges.length > 0 && (
+                      <div class="tool-badges">
+                        {tool.badges.map((badge) => (
+                          <span class="tool-badge">{badge}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <p class="tool-tagline">{tool.tagline}</p>
+                  <p class="tool-desc">{tool.description}</p>
+
+                  {tool.features && tool.features.length > 0 && (
+                    <ul class="tool-features">
+                      {tool.features.map((feature) => (
+                        <li>
+                          <Icon
+                            name="material-symbols:check-circle-rounded"
+                            aria-hidden="true"
+                          />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {tool.tags && tool.tags.length > 0 && (
+                    <div class="tool-tags" aria-label="标签">
+                      {tool.tags.map((tag) => (
+                        <span>{tag}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {tool.note && (
+                    <p class="tool-note">
+                      <Icon
+                        name="material-symbols:info-outline-rounded"
+                        aria-hidden="true"
+                      />
+                      <span>{tool.note}</span>
+                    </p>
+                  )}
+
+                  <div class="tool-actions">
+                    <a
+                      class="tool-btn tool-btn-primary"
+                      href={tool.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Icon
+                        name="material-symbols:open-in-new-rounded"
+                        aria-hidden="true"
+                      />
+                      打开工具
+                    </a>
+                    {tool.sourceUrl && (
+                      <a
+                        class="tool-btn"
+                        href={tool.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Icon name="fa7-brands:github" aria-hidden="true" />
+                        源码
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <!-- 免责声明 -->
+      <div class="tools-disclaimer">
+        <Icon
+          name="material-symbols:shield-outline-rounded"
+          aria-hidden="true"
+        />
+        <p>
+          这些工具都由第三方网站提供；本站只做整理与介绍，不对它们的可用性、安全性或隐私政策负责。
+          涉及账号、密钥或私密内容时，请先看清对方的使用条款与许可证，并自行判断风险。
+        </p>
+      </div>
+    </div>
+  </div>
+</MainGridLayout>
