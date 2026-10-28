@@ -362,7 +362,7 @@ firefly/
 | `galleryConfig.ts` | 相册列表 + 瀑布流列宽 | `albums[2]`（`:6-37`，含一个密码相册 `123456`）、`columnWidth: 240`（`:41`） | 相册页由 `pages.gallery` 开关控制，当前为 `false`（`siteConfig.ts:25`），页面不生成 | ❌ |
 | `dynamicConfig.ts` | 动态页标题/评论/每页条数/数据源 | `itemsPerPage: 20`（`:17`）、`apiUrl: "/api/dynamic.json"`（`:23`）、`memos.enable: false`（`:30`） | 页面开关 `pages.dynamic: false`（`siteConfig.ts:21`），当前不生成页面 | ❌ |
 | `booknavConfig.ts`（156 行） | 书签导航分组与条目 + favicon 接口 | `booknavPageConfig.favicon.api`（`:20`）、`booknavConfig[]`（`:26-155`） | 页面开关 `pages.booknav: false`（`siteConfig.ts:27`）；favicon 走第三方 `a.favicon.im`（受 CSP `img-src https:`） | ❌ |
-| `toolsConfig.ts`（13 行） | 工具箱页面（`/tools/`）的页面文案 + 分类 / 工具数据（数据在 `tools.json`） | `toolsPageConfig.title`（`:7`）、`toolsPageConfig.description`（`:8-9`）、`toolsCategories`（`:13`，`import` 自 JSON） | 加工具 / 分类只改 `tools.json`；页面开关 `pages.tools`（`:45`） | ✏️ 直接改 `tools.json`（暂无面板入口） |
+| `toolsConfig.ts`（13 行） | 工具箱页面（`/tools/`）的页面文案 + 分类 / 工具数据（数据在 `tools.json`） | `toolsPageConfig.title`（`:7`）、`toolsPageConfig.description`（`:8-9`）、`toolsCategories`（`:13`，`import` 自 JSON） | 加工具 / 分类只改 `tools.json`；工具可写 `localUrl` 指定站内托管版（如 `/tools/abracadabra/`，镜像放 `public/tools/`）；页面开关 `pages.tools`（`:45`） | ✏️ 直接改 `tools.json`（暂无面板入口） |
 | `sponsorConfig.ts` | 打赏方式与打赏者列表 | `showButtonInPost: false`（`:21`）、四种 `enabled: false`（`:32,40,48,56`）、`sponsors[]` 示例数据（`:61-78`） | 页面开关 `pages.sponsor: false`（`siteConfig.ts:40`） | ❌ |
 | `index.ts` | 统一导出 + `navbarMode` 解析 | `resolveNavbarMode`（`:8-14`）、`navbarMode`（`:17`）、类型导出（`:20-57`）、配置导出（`:58-89`） | 增删导出会影响所有 `@/config` 引用点 | ❌ |
 
@@ -1104,6 +1104,7 @@ export const PUBLISH_SCOPE = [
   "public/assets", // 媒体库上传与压缩产物（图片、音乐、封面）
   "public/friends",// 友链图标
   "public/vendor", // 自托管第三方脚本（如 giscus）
+  "public/tools",  // 站内托管的网页工具静态镜像（如 Abracadabra）
   "src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，须随文章一起发布
 ];
 ```

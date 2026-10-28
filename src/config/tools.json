@@ -10,18 +10,20 @@
 					"id": "abracadabra",
 					"name": "Abracadabra 魔曰",
 					"url": "https://abra.js.org/",
+					"localUrl": "/tools/abracadabra/",
 					"sourceUrl": "https://github.com/SheepChef/Abracadabra",
 					"tagline": "把一段话加密成一篇文言文，只有拿到密钥的人能还原",
 					"description": "开源的文本加密工具：输入任意文字，加密后得到一篇文言文风格的密文，复制到聊天框里像随手发了一段古文。核心用标准 AES-256-CTR，可选强 IV、HMAC-SHA256、PBKDF2、TOTP 等高级套件，配合三重转轮混淆和智能压缩；提供网页版、浏览器插件与 Android 客户端，也可以自托管。",
-					"badges": ["源码公开", "免费", "可离线"],
+					"badges": ["源码公开", "免费", "可离线", "站内可用"],
 					"features": [
 						"文言文仿真密文，发在社交软件里不突兀",
 						"标准 AES-256 加密，不是自制的「土加密」",
 						"网页版加载后可完全离线运行，另有 Chrome / Edge / Firefox 插件",
-						"短文本用 Unishox2 压缩、长文本用 GZIP，密文不会无谓变长"
+						"短文本用 Unishox2 压缩、长文本用 GZIP，密文不会无谓变长",
+						"官网打不开也能用：本站已镜像一份静态版，点「站内打开」直接在本站使用"
 					],
 					"tags": ["加密", "文本", "隐私"],
-					"note": "使用前请阅读项目的 AIPL-1.2 许可证；工具由第三方提供，本页只做介绍，不代管任何内容。"
+					"note": "站内版镜像自官方静态站点（版权归 SheepChef，AIPL-1.2 许可）；本页只做整理与介绍，不代管任何内容。"
 				}
 			]
 		}

@@ -161,8 +161,17 @@ const description = toolsPageConfig.description || "";
                   )}
 
                   <div class="tool-actions">
+                    {tool.localUrl && (
+                      <a class="tool-btn tool-btn-primary" href={tool.localUrl}>
+                        <Icon
+                          name="material-symbols:rocket-launch-rounded"
+                          aria-hidden="true"
+                        />
+                        站内打开
+                      </a>
+                    )}
                     <a
-                      class="tool-btn tool-btn-primary"
+                      class="tool-btn"
                       href={tool.url}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -171,7 +180,7 @@ const description = toolsPageConfig.description || "";
                         name="material-symbols:open-in-new-rounded"
                         aria-hidden="true"
                       />
-                      打开工具
+                      {tool.localUrl ? "打开官网" : "打开工具"}
                     </a>
                     {tool.sourceUrl && (
                       <a

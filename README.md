@@ -42,7 +42,7 @@
 | 切换标签页时轮播标题 | `effectsConfig.ts` → `tabTitleConfig.enable: true`、`titles`、`intervalMs` |
 | 公告：首访弹窗 + 公告页 + 导航入口 | `src/config/announcementConfig.ts` → `modal.enable: true`、`modal.storageKey: "zhi-blog-announcement-version"`；数据在 `src/config/announcements.json` |
 | 文章置顶 | 文章 frontmatter `pinned: true`（`src/content.config.ts` 的 `posts` schema） |
-| **工具箱**（`/tools/`） | 按用途分类收录网页工具，每个工具有简介、亮点、标签与外链；数据在 `src/config/tools.json`，页面文案在 `src/config/toolsConfig.ts`，入口开关 `siteConfig.pages.tools` |
+| **工具箱**（`/tools/`） | 按用途分类收录网页工具，每个工具有简介、亮点、标签与外链；支持 `localUrl` 站内托管版（官网打不开时的备用入口，镜像在 `public/tools/`）。数据在 `src/config/tools.json`，页面文案在 `src/config/toolsConfig.ts`，入口开关 `siteConfig.pages.tools` |
 | 文章加密（密码 + 密码提示） | 文章 frontmatter `password` / `passwordHint`；渲染在 `src/pages/posts/[...slug].astro` 里的 `EncryptedPost` 组件 |
 | 文章系列（series / seriesOrder） | frontmatter `series` / `seriesOrder`；导航组件 `src/components/misc/SeriesNav.astro` |
 | 文章封面 + LQIP 模糊占位图 | `src/config/coverImageConfig.ts`（`enableInPost` / `enableInPostOverlay` / 随机封面 API）；占位数据由 `scripts/generate-lqips.ts` 生成到 `src/constants/lqips.json` |
@@ -790,6 +790,7 @@ export const tabTitleConfig: TabTitleConfig = {
 - **页面开关**是 `siteConfig.pages.tools`（默认 `true`）；设为 `false` 时 `/tools/` 返回 404，导航项自动隐藏。
 - 页面模板在 `src/pages/tools.astro`，样式在 `src/styles/pages/tools.css`；移动端单列、宽屏两列，长介绍按 1.85 行高排版。
 - 加新工具时建议顺手检查：链接是否可访问、是否开源、许可证是否允许分享；有风险的在 `note` 里写清楚。
+- **站内托管版**：在工具条目里加 `"localUrl": "/tools/<name>/"`，把该工具的静态文件放到 `public/tools/<name>/`（`public/tools` 已在 `PUBLISH_SCOPE` 里），卡片就会出现「站内打开」按钮；官网不可访问时仍能用。首个示例是 Abracadabra（`public/tools/abracadabra/`，约 3.9 MB，AIPL-1.2 许可、版权归原作者，见该目录的 `ATTRIBUTION.md`）。
 
 ## 8. 管理面板
 

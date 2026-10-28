@@ -17,6 +17,7 @@ export const PUBLISH_SCOPE = [
 	"public/assets", // 媒体库上传与压缩产物（图片、音乐、封面）
 	"public/friends", // 友链图标
 	"public/vendor", // 自托管第三方脚本（如 giscus）
+	"public/tools", // 站内托管的网页工具静态镜像（如 Abracadabra）
 	"src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，必须随文章一起发布，否则线上少了封面占位数据
 ];
 

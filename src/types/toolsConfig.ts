@@ -5,6 +5,8 @@ export type ToolItem = {
 	url: string;
 	/** 源码地址（可选，有就显示「源码」按钮） */
 	sourceUrl?: string;
+	/** 站内托管版地址（可选，有就显示「站内打开」按钮，例如 /tools/abracadabra/） */
+	localUrl?: string;
 	/** 一句话定位，显示在名称下方 */
 	tagline: string;
 	/** 2~4 句介绍，说明它是什么、怎么用、适合谁 */
