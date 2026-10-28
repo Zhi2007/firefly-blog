@@ -288,9 +288,9 @@ namespace FireflyAdminLauncher
 
                 lock (gate) { server = process; }
 
-                if (!WaitForReady(TimeSpan.FromSeconds(25)))
+                if (!WaitForReady(TimeSpan.FromSeconds(60)))
                 {
-                    AppendLog("---- 后台在 25 秒内没有就绪 ----");
+                    AppendLog("---- 后台在 60 秒内没有就绪 ----");
                     KillTree(process);
                     return false;
                 }
@@ -432,6 +432,15 @@ namespace FireflyAdminLauncher
 
         // ── 就绪检测 / HTTP ─────────────────────────────────────────────
 
+        /// <summary>
+        /// 就绪探针专用：轻量接口，只读内存状态（不跑 git、不联网、不 spawn），毫秒级。
+        /// 老版本 server.mjs 没有这个接口时，WaitForReady 会自动退回 StatusUrl。
+        /// </summary>
+        private string HealthUrl
+        {
+            get { return "http://127.0.0.1:" + port + "/api/health?token=" + token; }
+        }
+
         private string StatusUrl
         {
             get { return "http://127.0.0.1:" + port + "/api/status?token=" + token; }
@@ -440,29 +449,52 @@ namespace FireflyAdminLauncher
         private bool WaitForReady(TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow.Add(timeout);
+            var attempts = 0;
+            var lastError = "还没有拿到响应";
+            // 先打轻量接口 /api/health（毫秒级，不跑 git / 不联网 / 不 spawn）。
+            // 老版本 server.mjs 没有这个接口（404）时退回 /api/status，兼容旧仓库。
+            var url = HealthUrl;
             while (DateTime.UtcNow < deadline)
             {
                 if (shuttingDown) return false;
+                attempts++;
                 try
                 {
-                    var body = HttpGet(StatusUrl);
+                    var body = HttpGet(url, 5000);
                     if (body != null && body.Contains("\"supervised\":true")) return true;
+                    lastError = "响应里没有 supervised:true";
                 }
-                catch
+                catch (WebException error)
                 {
-                    // 还没起来，继续等
+                    var response = error.Response as HttpWebResponse;
+                    if (response != null && (int)response.StatusCode == 404 && url != StatusUrl)
+                    {
+                        AppendLog("---- 服务端没有 /api/health（404），退回 /api/status 做就绪检测 ----");
+                        url = StatusUrl;
+                        lastError = "健康接口不存在，已退回 /api/status";
+                    }
+                    else
+                    {
+                        lastError = response != null ? ("HTTP " + (int)response.StatusCode) : error.Message;
+                    }
                 }
-                Thread.Sleep(300);
+                catch (Exception error)
+                {
+                    lastError = error.Message;
+                }
+                Thread.Sleep(250);
             }
+            // 探针失败时把「试了几次 + 最后一次错误」写进日志，避免下次只剩一句「没就绪」无从查起
+            AppendLog("---- 就绪检测失败：尝试 " + attempts + " 次，最后错误：" + lastError + " ----");
             return false;
         }
 
-        private static string HttpGet(string url)
+        private static string HttpGet(string url, int timeoutMs)
         {
             var request = (HttpWebRequest)WebRequest.Create(url);
             request.Proxy = null;
-            request.Timeout = 2500;
-            request.ReadWriteTimeout = 2500;
+            request.Timeout = timeoutMs;
+            request.ReadWriteTimeout = timeoutMs;
             request.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
             using (var response = (HttpWebResponse)request.GetResponse())
             using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
@@ -506,7 +538,7 @@ namespace FireflyAdminLauncher
             }
             try
             {
-                var first = HttpGet(StatusUrl);
+                var first = HttpGet(StatusUrl, 10000);
                 var supervised = first.Contains("\"supervised\":true");
                 var firstPid = ExtractPid(first);
 
@@ -519,7 +551,7 @@ namespace FireflyAdminLauncher
                     Thread.Sleep(700);
                     try
                     {
-                        var body = HttpGet(StatusUrl);
+                        var body = HttpGet(StatusUrl, 10000);
                         var pid = ExtractPid(body);
                         if (pid != null && pid != firstPid && body.Contains("\"supervised\":true"))
                         {

@@ -1030,18 +1030,23 @@ async function repoInfo() {
 	};
 }
 
+/** /api/status 里查 Actions 的超时：必须明显小于启动器 5 秒的就绪探针，慢就降级成「没有 CI 信息」 */
+const LATEST_ACTION_TIMEOUT_MS = 2500;
+
 /** 查最近一次 GitHub Actions 运行（仓库公开，无需鉴权） */
 async function latestAction() {
 	const info = await repoInfo();
 	if (!info.owner || !info.repo) return null;
 	try {
-		const res = await fetch(
+		// 用共享的 fetchWithCache：自带 AbortSignal 超时 + 成功缓存（TTL）+ 失败降级，绝不抛错。
+		// 以前这里是裸 fetch，没有超时；GitHub 一卡，/api/status 就跟着卡，启动器的就绪探针
+		// 整轮超时，最后把「后台已启动、只是探针慢」误判成启动失败（2026-10-28 实测踩过）。
+		const result = await fetchWithCache(
 			`https://api.github.com/repos/${info.owner}/${info.repo}/actions/runs?per_page=1`,
-			{ headers: { "User-Agent": "zhi-blog-admin", Accept: "application/vnd.github+json" } },
+			{ ttlMs: CI_CACHE_TTL_MS, timeoutMs: LATEST_ACTION_TIMEOUT_MS },
 		);
-		if (!res.ok) return null;
-		const data = await res.json();
-		const run = data.workflow_runs?.[0];
+		if (!result.ok) return null;
+		const run = result.data?.workflow_runs?.[0];
 		if (!run) return null;
 		return {
 			name: run.display_title,
@@ -1236,17 +1241,28 @@ async function ciStatus() {
 	};
 }
 
-/** 找 pnpm：直接命令 → corepack → npx（找不到返回 null） */
-async function findPnpm() {
-	const direct = await run("pnpm", ["--version"], { shell: process.platform === "win32" });
-	if (direct.ok) return { cmd: "pnpm", prefix: [], shell: process.platform === "win32" };
-	const corepack = await run("corepack", ["pnpm", "--version"], {
-		shell: process.platform === "win32",
-	});
-	if (corepack.ok) {
-		return { cmd: "corepack", prefix: ["pnpm"], shell: process.platform === "win32" };
+/** 找 pnpm：直接命令 → corepack（找不到返回 null）。
+ *
+ * 结果在进程内缓存（含「找不到」）：探测要 spawn 一个 shell + pnpm 进程，在仓库目录下实测
+ * 约 1.1 秒；/api/status 每次都重新探测的话，启动器 5 秒的就绪探针会被白白吃掉一大截。
+ * 面板运行期间不会「中途装上 pnpm」，缓存到进程退出即可（装好 pnpm 后重启面板）。
+ */
+let pnpmLookup = null;
+function findPnpm() {
+	if (!pnpmLookup) {
+		pnpmLookup = (async () => {
+			const direct = await run("pnpm", ["--version"], { shell: process.platform === "win32" });
+			if (direct.ok) return { cmd: "pnpm", prefix: [], shell: process.platform === "win32" };
+			const corepack = await run("corepack", ["pnpm", "--version"], {
+				shell: process.platform === "win32",
+			});
+			if (corepack.ok) {
+				return { cmd: "corepack", prefix: ["pnpm"], shell: process.platform === "win32" };
+			}
+			return null;
+		})();
 	}
-	return null;
+	return pnpmLookup;
 }
 
 /**
@@ -1641,6 +1657,8 @@ const POST_BODY_FIELDS = {
 	"/api/diff": [],
 	// 只读 + 拉起资源管理器（不写盘）；path 必须落在仓库内且真实存在
 	"/api/reveal": ["path"],
+	// 启动器就绪探针：只读 GET（登记空数组 → 带字段 POST 一律 400，不静默执行）
+	"/api/health": [],
 	"/api/status": ["action"],
 	"/api/media": [],
 	"/api/posts": [],
@@ -1734,6 +1752,25 @@ const server = createServer(async (req, res) => {
 		const body = req.method === "POST" ? assertPostBody(route, await readBody(req)) : {};
 
 		switch (route) {
+			// 启动器就绪探针专用：只回内存里的进程/托管状态，不跑 git、不联网、不 spawn 子进程，
+			// 所以是毫秒级。为什么不复用 /api/status：它要等 GitHub Actions + pnpm 探测 + 12 个
+			// git 子进程，启动器 5 秒/次的探针会被拖超时，最后把「后台已启动」误判成启动失败
+			// （2026-10-28 实测踩过，见 docs/PROJECT-CONTEXT.md 9.13）。
+			case "/api/health": {
+				if (req.method !== "GET") {
+					sendJson(res, 405, { error: "请用 GET 调用 /api/health" });
+					return;
+				}
+				sendJson(res, 200, {
+					ok: true,
+					ready: true,
+					pid: process.pid,
+					port: PORT,
+					supervised: SUPERVISED,
+					startedAt: STARTED_AT,
+				});
+				return;
+			}
 			case "/api/status": {
 				if (req.method === "POST") {
 					// 由启动器托管时，响应后退出，启动器会用同样的端口/令牌把服务重新拉起来。
