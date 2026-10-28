@@ -124,10 +124,46 @@ namespace FireflyAdminLauncher
 
     internal static class Program
     {
+        /// <summary>当前进程是否提权运行（UAC 已同意 / 以管理员身份启动）。</summary>
+        private static bool IsElevated()
+        {
+            try
+            {
+                using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+                {
+                    var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                    return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         [STAThread]
         private static int Main(string[] args)
         {
             var options = Options.Parse(args);
+
+            // 以管理员身份运行会带来两个系统级限制：
+            //   1) Chrome/Edge 从提权进程启动时会立刻退出 —— 面板窗口打不开，表现为「浏览器退出码 0」；
+            //   2) explorer.exe 不允许从提权进程拉起 —— 面板里的「打开所在文件夹」必然失败。
+            // 所以这里直接拦住，避免用户看到两个打不开的面板窗口。
+            if (IsElevated())
+            {
+                MessageBox.Show(
+                    "请不要以管理员身份运行本启动器。\n\n"
+                        + "以管理员身份运行时：\n"
+                        + "· Chrome / Edge 会拒绝打开面板窗口（提示「浏览器退出码 0」）；\n"
+                        + "· 面板里的「打开所在文件夹」也会被 Windows 拒绝。\n\n"
+                        + "请关闭本提示后，直接双击 firefly-admin.exe（不需要管理员权限）。",
+                    "栀海博客 · 管理面板",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return 0;
+            }
+
             if (options.SelfTest)
             {
                 using (var launcher = new Launcher(options))

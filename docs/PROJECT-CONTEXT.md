@@ -1033,6 +1033,7 @@ published: Expected type `"date"`, received `"string"`
 | 浏览器沙箱降级 | 正常先带沙箱启动；若 Chromium 以 `STATUS_BREAKPOINT` 秒退，自动用 `--no-sandbox --test-type` 重试一次并写日志（`--test-type` 隐藏 Chromium 的「不受支持的命令行标记」提示条）；只影响本机回环面板，不浏览外部网页。某些 Windows / 安全软件环境也会触发 |
 | 自检 | `firefly-admin.exe --selftest`：启动后台 → 校验 `supervised` → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1；不打开浏览器窗口 |
 | 手动 node | `node admin/server.mjs` 仍可用，但没有启动器托管：`supervised:false`，「重启后台」禁用；后台日志可能为空（stdout 在终端里） |
+| 管理员权限 | **启动器入口直接拦截**：检测到提权就弹窗「请不要以管理员身份运行」并退出。原因：管理员权限下 Chrome/Edge 会拒绝打开面板窗口（表现为「浏览器退出码 0」，还会因为重试多开窗口），explorer.exe 也不允许从提权进程拉起（「打开所在文件夹」必然 `0xC0000142`）；正常双击即可 |
 
 > **为什么浏览器 profile 按浏览器分开**：Chrome 与 Edge 的 profile 目录格式不同；共用一个目录会出现「Chrome 秒退 / Edge 白屏」。2026-10-19 实测踩过。
 

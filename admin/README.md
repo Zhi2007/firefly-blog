@@ -69,6 +69,8 @@ node admin/server.mjs --port=8899 --no-open
 
 `admin-launcher/FireflyAdminLauncher.cs` 是一个零依赖的 .NET Framework WinForms 启动器，编译产物是仓库根目录的 `firefly-admin.exe`：
 
+> ⚠️ **不要以管理员身份运行**：启动器会在入口处检测并弹窗拦截。管理员权限下 Chrome/Edge 打不开面板窗口（提示「浏览器退出码 0」，兼容重试还会多开窗口），面板里的「打开所在文件夹」也会被 Windows 拒绝（explorer `0xC0000142`）。正常双击即可。
+
 | 能力 | 说明 |
 | --- | --- |
 | 单窗口 | 用 Chrome / Edge 的 `--app` 模式打开面板（没有标签栏、地址栏）；后台 node 不弹黑窗 |
