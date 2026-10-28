@@ -72,6 +72,7 @@ firefly-admin.exe --selftest
 - **需要 Node.js 和 Chrome 或 Edge**；找不到时启动器会弹中文错误框。
 - **不要以管理员身份运行**：启动器会检测提权并直接弹窗退出。管理员权限下浏览器会拒绝打开面板窗口（「浏览器退出码 0」），`explorer.exe` 也无法从提权进程拉起（「打开所在文件夹」失败）。正常双击即可。
 - **仓库目录被标记为低完整性（Low integrity）时，仓库里的 exe 也会以 Low integrity 运行** → 面板里的「打开所在文件夹」会被 Windows 拒绝（`explorer.exe` 退出码 `0xC0000142`）。本机 2026-10-28 实测：agent 沙箱往仓库写过文件后出现。两个解法：① 把 `firefly-admin.exe` 复制到普通目录（如 `%LOCALAPPDATA%\FireflyAdmin\`），用 `--root="<仓库绝对路径>"` 指回来（桌面快捷方式即可）；② 管理员权限执行 `icacls "<仓库>" /setintegritylevel (OI)(CI)Medium /T` 重置完整性标签后重新编译。**验证方法**：面板报错信息会写 `当前进程为 Low 完整性`；cmd 里直接 `node admin/server.mjs` 能打开资源管理器，说明代码没问题，是启动器所在位置的完整性标签问题。
+- **不想动 ACL 的绕法（已实测）**：在仓库外编译出 exe（例如 `csc ... /out:"D:\firefly-admin-tmp.exe"`），再用 `Move-Item` / `move` 把它**移入**仓库根目录。同一磁盘卷内的 rename 会保留文件自身的安全描述符（含完整性标签），不会继承仓库目录的低标签。2026-10-28 实测：这样移入后**直接双击仓库里的 `firefly-admin.exe`**，面板进程就是 Medium，`/api/reveal` 返回 `ok:true` 并成功打开资源管理器。注意：用 `build.cmd` 直接覆盖一个已有的低标签 exe 会保留旧标签，所以不要「先放低标签 exe 再覆盖」。
 - **普通桌面先带 Chromium 沙箱启动**。如果面板窗口一闪而过、日志里出现 `code=-2147483645`（`STATUS_BREAKPOINT`），启动器会自动用 `--no-sandbox --test-type` 再试一次并写日志；`--test-type` 用来隐藏 Chromium 的「不受支持的命令行标记」提示条。某些 Windows / 安全软件环境也可能触发降级，不一定是嵌套沙箱；只影响本机回环面板，不用于浏览外部网页。
 - **Chrome 与 Edge 的 profile 不能共用**；分开后避免「Chrome 秒退 / Edge 白屏」。
 - **后台明明起来了却提示「后台启动失败」**：看 `logs/admin-server.log` 里 `---- 就绪检测失败：尝试 N 次，最后错误：… ----`。就绪探针只打 `/api/health`（毫秒级）；如果这里还超时，多半是 node 没起来或端口被占，而不是探针本身的问题。
