@@ -10,7 +10,7 @@
  *   node admin/server.mjs --port=8899 --no-open
  */
 
-import { execFile, spawn } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
@@ -776,14 +776,20 @@ function revealInExplorer(abs, isDirectory = false) {
 		};
 	}
 	try {
+		// Windows 上 explorer.exe 只是把请求转给已运行的 shell：正常 100ms 左右就退出（退出码常见 1）。
+		// 必须用 spawnSync 才能知道「到底有没有拉起来」——用 spawn 时异步 error 会被吞掉，
+		// 进程根本没起来接口也会返回 ok:true，前端弹「已定位」但什么都不会打开（2026-10-28 踩到）。
 		const args = isDirectory ? [abs] : ["/select,", abs];
-		const child = spawn("explorer.exe", args, {
-			detached: true,
+		const result = spawnSync("explorer.exe", args, {
 			stdio: "ignore",
+			timeout: 5000,
 		});
-		// 拉起失败（缺 explorer.exe）也不能变成未捕获异常：错误已经按 ok:false 回给前端了
-		child.on("error", () => {});
-		child.unref();
+		if (result.error) {
+			const code = result.error.code || result.error.message;
+			console.error(`[reveal] 拉起 explorer.exe 失败：${code}（${abs}）`);
+			return { ok: false, message: `没能拉起资源管理器（${code}）：` };
+		}
+		// 退出码 1 是 explorer.exe 的正常返回值（它把请求转交给 shell 后就退出），不能当失败
 		return { ok: true };
 	} catch (error) {
 		return { ok: false, message: `没能拉起资源管理器：${error?.message ?? error}` };

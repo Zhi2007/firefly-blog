@@ -763,7 +763,8 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 
 - `path` 是**仓库内相对路径**；越界 → `400`（`{"error":"只能打开仓库内的路径：…"}`），不存在 → `404`。
 - 只接受 POST（GET → 405）；未认证照样 `403`（没有为它放宽任何鉴权）；`POST_BODY_FIELDS` 只放行 `path`（多带字段 → 400）。
-- **拉起方式是 `spawn("explorer.exe", ["/select,", 绝对路径], { detached: true, stdio: "ignore" })` 且 `unref()`**：**不阻塞请求**、不建管道、不等它退出（explorer 的退出码通常是 1，等它没有意义）。目录路径则直接 `spawn("explorer.exe", [绝对路径])` 打开该目录。
+- **拉起方式是 `spawnSync("explorer.exe", [...], { stdio: "ignore", timeout: 5000 })`：同步等它退出、拿真实结果**。explorer 只负责把请求转给已运行的 shell，正常 100ms 左右退出，**退出码 1 也是成功**；只有 `result.error`（例如 EPERM / ENOENT）才返回 `ok:false` + 中文原因。目录路径直接传 `[绝对路径]` 打开该目录。
+  - ⚠️ **不要用 `spawn(...).unref()` 再吞掉 error**：在启动器托管的环境里 node 没有控制台窗口，这样拉起 explorer 可能根本没成功，接口却仍返回 `ok:true`，前端弹「已在资源管理器中定位」但实际上什么都不打开（2026-10-28 实测踩到）。
   - ⚠️ `/select,` 与路径必须作为**两个参数**传：合并成 `"/select," + path` 时，路径含空格会被 Node 整体加引号，Explorer 解析失败会退回默认「文档」目录（本项目路径里就有 `DeepSeek Harness` 空格，实测必现）。
 - **仅 Windows**：其它平台返回 HTTP 200 + `{"ok": false, "message": "「打开所在文件夹」只在 Windows 上可用；…"}`，不会去尝试 `open` / `xdg-open` 之类行为不确定的命令。
 - 它**不写盘、不打快照、不碰仓库内容**，只是把文件管理器叫起来。
