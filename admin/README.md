@@ -72,7 +72,7 @@ node admin/server.mjs --port=8899 --no-open
 | 能力 | 说明 |
 | --- | --- |
 | 单窗口 | 用 Chrome / Edge 的 `--app` 模式打开面板（没有标签栏、地址栏）；后台 node 不弹黑窗 |
-| 启动流程 | 单实例 Mutex → 找 Node → 从 8799 起找空闲端口 → 生成固定 `ADMIN_TOKEN` → 设置 `ADMIN_SUPERVISED=1` → 隐藏启动 `node admin/server.mjs --no-open --port=<port>` → 轮询 `/api/status` 就绪 → 开浏览器 |
+| 启动流程 | 单实例 Mutex → 找 Node → 从 8799 起找空闲端口 → 生成固定 `ADMIN_TOKEN` → 设置 `ADMIN_SUPERVISED=1` → 隐藏启动 `node admin/server.mjs --no-open --port=<port>` → 轮询 `/api/health` 就绪（轻量：只读内存状态，单次 5 秒、总窗口 60 秒；旧版服务端 404 时自动退回 `/api/status`）→ 开浏览器 |
 | 关闭 | 关闭浏览器窗口 = 浏览器进程退出 = 启动器结束 node；不会留下后台孤儿进程 |
 | 日志 | node 的 stdout/stderr 实时写入 `logs/admin-server.log`；「后台」页通过 `GET /api/status?log=1` 读最后 128KB |
 | 在线重启 | 面板发 `POST /api/status {"action":"restart"}` → 服务端退出 → 启动器用**同端口 + 同 token** 重新拉起 → 页面轮询恢复后自动刷新；Cookie 不失效 |

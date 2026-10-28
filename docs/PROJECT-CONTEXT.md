@@ -46,15 +46,15 @@
 | Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.7.0 |
 | 包管理器 | `pnpm@11.22.0`（`preinstall` 强制 pnpm） | `package.json:8,24` |
 | 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
-| 构建产物页数 | **29 个 HTML** | `dist/` 实测 29（2026-10-11 新增 1 篇文章后）；提交 `704baad`/`bc3f0b2` 等历史上以「astro build 28 页」为验收，页数随文章数变化 |
+| 构建产物页数 | **30 个 HTML** | `dist/` 实测 30（2026-10-19 新增 1 篇文章后；此前为 29 / 28）；提交 `704baad`/`bc3f0b2` 等历史上以「astro build 28 页」为验收，页数随文章数变化 |
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:1263-1324`、`.github/workflows/deploy.yml:58-63` |
 | 上线耗时 | 约 1 分钟 | `admin/README.md:174`、`admin/server.mjs:1321` |
 | 管理面板 | 优先双击根目录 `firefly-admin.exe`（单窗口：隐藏 node + Chrome/Edge `--app` 窗口 + 后台日志）；也可 `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin-launcher/FireflyAdminLauncher.cs`、`admin/server.mjs` |
 | 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
-| `/api/*` 路由数 | **36**（35 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
+| `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
-| 已发布文章 | 4 篇 | `src/content/posts/*.md` 实测 |
+| 已发布文章 | 5 篇 | `src/content/posts/*.md` 实测 |
 
 ### 1.4 最容易踩的 5 条（背下来）
 
@@ -124,6 +124,7 @@ firefly/
 ├── admin-launcher/            # ② 单窗口桌面启动器（C# 5 / .NET Framework，零第三方依赖）
 │   ├── FireflyAdminLauncher.cs #    隐藏 node + Chrome/Edge --app 窗口 + 日志 + 在线重启（716 行）
 │   ├── build.cmd              #    csc 编译到根目录 firefly-admin.exe（exe 被 gitignore）
+│   ├── app.ico                #    exe 图标（/win32icon 嵌入）
 │   ├── app.manifest           #    asInvoker + 视觉样式
 │   └── README.md              #    使用 / 构建 / 自检 / 排查
 ├── worker/
@@ -141,7 +142,7 @@ firefly/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
 │   ├── config/                 # ③ 配置区（33 个文件：23 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
-│   ├── content/                # ③ 内容：posts/（4 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
+│   ├── content/                # ③ 内容：posts/（5 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
 │   ├── pages/                  # ① 文件路由（33 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
@@ -215,7 +216,7 @@ firefly/
 | `dynamic` | `src/content/dynamic` | **只认 `.md`**（`content.config.ts:100`） | `published` |
 | `projects` | `src/content/projects` | `.md` / `.mdx` | `title`、`published` |
 
-当前内容实况（实测）：`posts/` 4 篇（`deploy-to-cloudflare.md`、`hello-world.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
+当前内容实况（实测）：`posts/` 5 篇（`deploy-to-cloudflare.md`、`hello-world.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`、`common-file-formats.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
 
 ### 3.3 `posts` frontmatter 全字段（逐个核对 `src/content.config.ts:64-90`）
 
@@ -731,9 +732,9 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs` `readBody` |
 | 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=`；刷新靠 HttpOnly Cookie | `admin/index.html` 脚本开头 |
 
-### 9.3 全部 `/api/*` 路由表（36 条）
+### 9.3 全部 `/api/*` 路由表（37 条）
 
-**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **35** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **36** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1564-1602`）登记 **34** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
+**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **36** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **37** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1564-1602`）登记 **35** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
 
 > ⚠️ 新增 `/api/*` 路由时**必须同时往 `POST_BODY_FIELDS` 加一行**：未登记的接口跳过字段校验（`assertPostBody` 里 `if (!allowed) return body;`，`admin/server.mjs:1592`），等于放弃「字段打错不许静默执行」这道保护。
 
@@ -746,6 +747,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | # | 路由 | 方法（代码实际行为） | 写盘 | 写前快照 | 关键安全约束 / 备注 | 位置 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `/api/logout` | **仅 POST**（否则 405） | 否 | 否 | **故意免认证**；清 Cookie | `:1647-1654` |
+| — | `/api/health` | **仅 GET**（否则 405） | 否 | 否 | 启动器就绪探针专用：只回 `{ok,ready,pid,port,supervised,startedAt}`，**不跑 git、不联网、不 spawn 子进程**（毫秒级）；`POST_BODY_FIELDS` 登记空数组；见 9.13 节 | `admin/server.mjs` 的 `/api/health` 分支 |
 | 2 | `/api/status` | GET 读状态；**POST `{action:"restart"}`**（仅启动器托管时） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测；`changed[]` 是结构化的待提交文件（`{code,path,origin}`）；`server{pid,port,supervised,startedAt,uptimeMs,logFile}`；`?log=1` 额外返回后台日志尾部（最多 128KB，`log{text,size,truncated,missing}`）；POST restart 先回 `{ok:true}` 再退出，由启动器以同端口/令牌重新拉起；未托管返回 **409**；`POST_BODY_FIELDS` 放行 `action` | `admin/server.mjs` 的 `/api/status` 分支 |
 | 3 | `/api/posts` | GET | 否 | 否 | 文章列表；另返回 `dir` / `imagesDir` / `imagesUrlPrefix`（面板显示「文章存在哪、图片放哪」） | `:1681-1691` |
 | 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir` / `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
@@ -1024,6 +1026,7 @@ published: Expected type `"date"`, received `"string"`
 | 源码 / 构建 | `admin-launcher/FireflyAdminLauncher.cs`；`admin-launcher/build.cmd` 用 Windows 自带 .NET Framework `csc.exe` 编译到根目录 `firefly-admin.exe`。exe 是构建产物（`.gitignore`），换机器重新跑 `build.cmd` 即可 |
 | 启动 | 单实例 Mutex；在 PATH / 常见安装位置找 Node；从 8799 起找空闲端口；生成**固定** `ADMIN_TOKEN`；设置 `ADMIN_SUPERVISED=1`；隐藏启动 `node admin/server.mjs --no-open --port=<port>` |
 | 浏览器 | 优先 Chrome，其次 Edge；`--app=<URL> --user-data-dir=logs/admin-browser-profile-<浏览器>`（两种浏览器的 profile 格式不兼容，必须分开）；关闭窗口 = 浏览器进程退出 = 启动器结束 node |
+| 就绪检测 | 轮询 `GET /api/health?token=…`（只读内存状态，毫秒级）：单次 5 秒、总窗口 60 秒；旧版服务端没有该接口（404）时自动退回 `/api/status`；失败会在 `logs/admin-server.log` 里写「尝试次数 + 最后错误」。**不要再拿 `/api/status` 当就绪探针** —— 它要等 GitHub Actions + pnpm 探测 + 12 个 git 子进程，2026-10-28 实测把 25 秒窗口拖爆，把「后台已启动」误判成「启动失败」 |
 | 日志 | 启动器把 node 的 stdout/stderr 实时追加到 `logs/admin-server.log`；面板「后台」页通过 `GET /api/status?log=1` 读尾部（最多 128KB，去掉 ANSI） |
 | 在线重启 | 面板「重启后台」→ `POST /api/status {action:"restart"}` → 服务端回包后退出 → 启动器用同端口/同 token 拉起 → 页面轮询 `/api/status` 恢复后 `location.reload()`；固定 token 让 Cookie 继续有效 |
 | 刷新页面 | 「刷新界面」= `location.reload()`；静态页现在也认会话 Cookie，不会再因为地址栏没有 token 而 403 |
@@ -1133,7 +1136,7 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 | --- | --- | --- | --- |
 | 1 | 类型检查 | `tsc --noEmit --isolatedDeclarations`（`package.json:16`） | ✅ **exit 0**（无输出）。因为本机 `npx` 可能被执行策略挡，我用的是等价命令 `node node_modules/typescript/bin/tsc --noEmit --isolatedDeclarations` |
 | 2 | Lint / 格式 | `biome ci src`（CI 口径）或 `pnpm lint`（`biome check --write ./src ./scripts`，`package.json:23`） | ✅ **exit 0**：`Checked 320 files in 143ms. No fixes applied.`（2026-10-11 复跑实测；文档早先记录的 315 是 `764ffbe` 加新组件之前的数字）。等价命令 `node node_modules/@biomejs/biome/bin/biome ci src`；本地 biome 版本 2.5.12，与 `package.json:100` 一致 |
-| 3 | 构建 | `pnpm build`（`package.json:13`，8 步链路） | ✅ **2026-10-11 完整 8 步已跑通**：`pnpm build` → **exit 0 / `29 page(s) built`**（新增 1 篇文章后页数为 29，此前为 28）；历史上 `704baad`/`89a4246`/`bc3f0b2`/`5123b6d` 的验收标准是「astro build 28 页」 |
+| 3 | 构建 | `pnpm build`（`package.json:13`，8 步链路） | ✅ **2026-10-19 完整 8 步已跑通**：`pnpm build` → **exit 0 / `30 page(s) built`**（2026-10-11 为 29 页、此前 28 页，页数随文章数变化）；历史上 `704baad`/`89a4246`/`bc3f0b2`/`5123b6d` 的验收标准是「astro build 28 页」 |
 
 `pnpm build` 的完整链路（`package.json:13`）：
 
@@ -1355,7 +1358,7 @@ pnpm build
 | 路径穿越 | 父会话记录「**32 组载荷全挡**」 | 同上脚本第 11 节 | ⚠️ 该脚本里实际是 **15 组**穿越读取 × 2 条断言 = 30 条；「32 组」可能来自其它测试文件（`ff-cc*.mjs`，本次未逐一清点）→ **需确认** |
 | 上传扩展名白名单 | 成立 | `admin/server.mjs:154-160`（实测：5 个目录各自的 `UPLOAD_EXT` 正则，仅图片/音频/`.lrc`） | ✅ |
 | 头像上传的**魔数校验** | 成立（新增能力，本次实测） | `admin/avatar.mjs` 的 `sniffImageFormat`：把文本/PHP 改名成 `.png`（含 `a.php.png`）一律 400 且不落盘；落盘扩展名取真实格式。38 条模块级断言 + 21 条 HTTP 断言全绿（夹具仓库，未碰真实头像） | ✅ |
-| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 29 个 HTML（2026-10-11 新增 1 篇文章后）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
+| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 30 个 HTML（2026-10-19 新增文章后）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
 | CSP 两份一致 | 成立 | 实测：`worker/index.mjs:31` 与 `public/_headers:32` 都是 **407 字符**且逐字节相同；两份都不含 `esm.sh`、都含 `giscus.app` | ✅ |
 | 面板只监听 127.0.0.1 | 成立 | `admin/server.mjs:2495` | ✅ |
 | 备份/日志/产物不入库 | 成立 | `.gitignore:2,5,8,20,23`（`dist/`、`public/vndb-covers/`、`.astro/`、`logs/`、`admin-backups/`） | ✅ |
@@ -1407,7 +1410,7 @@ pnpm build
 
 | 脚本（`%TEMP%`，未入库） | 父会话概述 | 本次逐行清点 | 差异说明 |
 | --- | --- | --- | --- |
-| `ff-admin-auth-test.mjs` | 「32 个受保护路由 × 6 种凭据 = 364 条断言全部 403」 | 脚本从源码提取 **33 条** `/api` 路由（32 条在 switch 内 + `/api/logout`）；断言总数 **488 条**，其中「必须 403」的 **330 条**（§1 无凭据 33×2=66；§2 错令牌 33×3=99；§3 伪造 Cookie 33×5=165） | 两个数字都对不上：`32 × 6 = 192 ≠ 364`；脚本结构也数不出 364。**结论：路由数 33（其中 32 个受保护）可信；「364」需以实际运行脚本的输出为准 → 标注需确认**。注：这是**父会话当时的清点**；新增 `/api/avatar` 后为 34 条（33 个受保护），再新增 `/api/announcement-draft` 后为 35 条（34 个受保护），**再新增 `/api/reveal`（路径徽章的「打开所在文件夹」）后为 36 条（35 个受保护）**，见 9.3 节 |
+| `ff-admin-auth-test.mjs` | 「32 个受保护路由 × 6 种凭据 = 364 条断言全部 403」 | 脚本从源码提取 **33 条** `/api` 路由（32 条在 switch 内 + `/api/logout`）；断言总数 **488 条**，其中「必须 403」的 **330 条**（§1 无凭据 33×2=66；§2 错令牌 33×3=99；§3 伪造 Cookie 33×5=165） | 两个数字都对不上：`32 × 6 = 192 ≠ 364`；脚本结构也数不出 364。**结论：路由数 33（其中 32 个受保护）可信；「364」需以实际运行脚本的输出为准 → 标注需确认**。注：这是**父会话当时的清点**；新增 `/api/avatar` 后为 34 条（33 个受保护），再新增 `/api/announcement-draft` 后为 35 条（34 个受保护），**再新增 `/api/reveal`（路径徽章的「打开所在文件夹」）后为 36 条（35 个受保护）**，再新增 `/api/health`（启动器就绪探针，2026-10-28）后为 **37 条（36 个受保护）**，见 9.3 节 |
 | `ff-draft-unit.mjs`（本次新增，`%TEMP%`，未入库） | —— | **136 条断言全绿**：提交解析（各种 Conventional 形态 / 空 subject / 超长行 / 多行 body / 合并提交 / RS 伪造记录）、分组与排序、去重、Markdown 转义（`#` `*` 反引号 HTML 标签）、`parseDraftQuery` 全部参数分支、日期与 id 生成；外加 `admin/index.html` 的 `vm.Script` 语法检查、id 唯一性、`$("…")` 引用完整性 | ✅ 一致（本次实跑） |
 | `ff-draft-e2e.mjs`（本次新增，`%TEMP%`，未入库） | —— | **52 条断言全绿**：真实起 `node admin/server.mjs --port=8799 --no-open`，验证未认证 403 / 非法参数 400 / 不存在的 sha 400 / POST 405 与带字段 400 / 正常 200（固定 `since=2d0b39e` 让标题稳定为「更新：新增 1 项」）/ 空区间 `hasDraft:false` / `?token=` 认证 / 既有 `/api/announcements` 未被破坏；并做只读验证（见 13.2 那两行） | ✅ 一致（本次实跑） |
 | `ff-ssrf-test.mjs` | 「87/87 拦截」 | **87 条**（40+16+15+14+2） | ✅ 一致 |
@@ -1541,17 +1544,17 @@ dist\vendor\giscus-1.6.0.mjs       admin-backups                     node_module
 **统计方式**（脚本化，可复现）：
 
 ```js
-const cases = [...new Set([...src.matchAll(/case\s+"(\/api\/[^"]+)"/g)].map(m => m[1]))];   // → 35
+const cases = [...new Set([...src.matchAll(/case\s+"(\/api\/[^"]+)"/g)].map(m => m[1]))];   // → 36
 const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"/g)].map(m => m[1]))]; // → ["/api/logout"]
-// 并集去重 → 36
+// 并集去重 → 37
 ```
 
 | 口径 | 数字 |
 | --- | --- |
-| switch 内 `case "/api/..."` | 35 |
+| switch 内 `case "/api/..."` | 36 |
 | switch 之外前置处理 | 1（`/api/logout`） |
-| **唯一 `/api/*` 路由总数** | **36** ← 本文 9.3 节表格逐行列出，数量一致 |
-| `POST_BODY_FIELDS` 登记 | 34（未登记的是 `/api/post` 与 `/api/logout`：前者只读 query、后者在 switch 之前处理，都没有 POST body 语义） |
+| **唯一 `/api/*` 路由总数** | **37** ← 本文 9.3 节表格逐行列出，数量一致 |
+| `POST_BODY_FIELDS` 登记 | 35（未登记的是 `/api/post` 与 `/api/logout`：前者只读 query、后者在 switch 之前处理，都没有 POST body 语义） |
 | 非 `/api` 的 case | 1（`/media-file`，本文 9.3 节第 15 行同样列出） |
 
 ### C.3 frontmatter 字段与 `src/content.config.ts` 一致
@@ -1634,7 +1637,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | # | 改动的类型 | 必须同步的文件与章节 | 检查器 |
 | --- | --- | --- | --- |
 | 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:86-111` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
-| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（36 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
+| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（37 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
 | 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 11 个）；② `admin/README.md` 的功能表；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
 | 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-41` + `:358`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |

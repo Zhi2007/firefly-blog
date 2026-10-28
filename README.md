@@ -147,7 +147,7 @@ pnpm preview
 
 > 站点根目录由 `scripts/site-root.ts` 决定：有 `dist/client` 就用它（Cloudflare Pages 形态），否则用 `dist`（本仓库的实际形态）。
 
-示例输出（形态如下；**页数会随文章数变化**——本仓库当前 `dist/` 里有 29 个 `.html`，所以是 `29 page(s) built`；耗时随机器与图片数量变化）：
+示例输出（形态如下；**页数会随文章数变化**——本仓库当前 `dist/` 里有 30 个 `.html`，所以是 `30 page(s) built`；耗时随机器与图片数量变化）：
 
 ```text
 ▶ src/pages/index.astro
@@ -155,15 +155,16 @@ pnpm preview
 ...
 ▶ src/pages/posts/[...slug].astro
   └─ /posts/hello-world/index.html
-[build] 29 page(s) built in 12.4s
+[build] 30 page(s) built in 12.4s
 [build] Complete!
 
 Running Pagefind v1.5.2
 Running on directory dist
-Indexed 29 pages
+Found 30 files matching **/*.{html}
+Indexed 9 pages
 ```
 
-> 上例是**格式示意**：本机沙箱环境跑 `astro build` 时会因为本地 `node_modules` 与 lockfile 不一致而报 `require is not defined`（picomatch），所以这里给出的不是本次实跑日志；页数 28 与 `dist/` 的实际 `.html` 数量一致。修复办法见 FAQ。
+> 上例是**格式示意**：本机沙箱环境跑 `astro build` 时会因为本地 `node_modules` 与 lockfile 不一致而报 `require is not defined`（picomatch），所以这里给出的不是本次实跑日志；页数 30 与 `dist/` 的实际 `.html` 数量一致。修复办法见 FAQ。
 
 ## 5. 目录结构
 
