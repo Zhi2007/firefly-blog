@@ -8,7 +8,7 @@ if not exist "%CSC%" (
   echo [ERROR] csc.exe not found. Install .NET Framework 4.x.
   exit /b 1
 )
-"%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /win32manifest:"%~dp0app.manifest" /out:"%~dp0..\firefly-admin.exe" /r:System.dll /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll "%~dp0FireflyAdminLauncher.cs"
+"%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /win32icon:"%~dp0app.ico" /win32manifest:"%~dp0app.manifest" /out:"%~dp0..\firefly-admin.exe" /r:System.dll /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll "%~dp0FireflyAdminLauncher.cs"
 if errorlevel 1 (
   echo Build FAILED.
   exit /b 1

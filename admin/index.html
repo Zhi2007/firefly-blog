@@ -4,6 +4,8 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>栀海博客 · 管理后台</title>
+		<!-- 面板图标：与站点 favicon 同一枚「栀子花 + 海」标记，内联 data URI（面板服务器没有静态文件路由） -->
+		<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2064%2064'%3E%3Crect%20width%3D'64'%20height%3D'64'%20rx%3D'14'%20fill%3D'%23312E81'%2F%3E%3Cpath%20d%3D'M0%2049c9.3-4%2017.3%203.3%2029%20.5s20.8%202.8%2035-1.2V64H0z'%20fill%3D'%23fff'%20fill-opacity%3D'.12'%2F%3E%3Cg%20fill%3D'%23FFF9EC'%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%2F%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%20transform%3D'rotate(60%2032%2029)'%2F%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%20transform%3D'rotate(120%2032%2029)'%2F%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%20transform%3D'rotate(180%2032%2029)'%2F%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%20transform%3D'rotate(240%2032%2029)'%2F%3E%3Cellipse%20cx%3D'32'%20cy%3D'18.8'%20rx%3D'5.5'%20ry%3D'9.8'%20transform%3D'rotate(300%2032%2029)'%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D'32'%20cy%3D'29'%20r%3D'4.25'%20fill%3D'%23FFC857'%2F%3E%3Ccircle%20cx%3D'32'%20cy%3D'29'%20r%3D'1.9'%20fill%3D'%23F59E0B'%2F%3E%3C%2Fsvg%3E" />
 		<style>
 			:root {
 				--primary: oklch(0.7 0.14 250);
@@ -316,12 +318,10 @@
 				border-radius: 11px;
 				display: grid;
 				place-items: center;
-				font-weight: 700;
-				font-size: 17px;
-				color: #fff;
-				background: linear-gradient(135deg, #6366f1, #8b5cf6);
+				overflow: hidden;
 				box-shadow: 0 6px 16px rgba(99, 102, 241, .35);
 			}
+			.brand-logo svg { display: block; width: 100%; height: 100%; }
 			.brand-text { display: flex; flex-direction: column; line-height: 1.25; }
 			.brand-text strong { font-size: 14px; }
 			.brand-text span { font-size: 11px; color: var(--sidebar-muted); }
@@ -465,7 +465,22 @@
 		<div class="app-shell">
 			<aside class="sidebar">
 				<div class="brand">
-					<div class="brand-logo">栀</div>
+					<div class="brand-logo" aria-hidden="true">
+						<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+							<rect width="64" height="64" rx="14" fill="#312E81" />
+							<path d="M0 49c9.3-4 17.3 3.3 29 .5s20.8 2.8 35-1.2V64H0z" fill="#fff" fill-opacity=".12" />
+							<g fill="#FFF9EC">
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" />
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" transform="rotate(60 32 29)" />
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" transform="rotate(120 32 29)" />
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" transform="rotate(180 32 29)" />
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" transform="rotate(240 32 29)" />
+								<ellipse cx="32" cy="18.8" rx="5.5" ry="9.8" transform="rotate(300 32 29)" />
+							</g>
+							<circle cx="32" cy="29" r="4.25" fill="#FFC857" />
+							<circle cx="32" cy="29" r="1.9" fill="#F59E0B" />
+						</svg>
+					</div>
 					<div class="brand-text">
 						<strong>栀海博客</strong>
 						<span>本地管理面板</span>
