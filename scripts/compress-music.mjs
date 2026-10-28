@@ -33,6 +33,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { extractAudioMeta } = await import(
 	new URL("../admin/audio-meta.mjs", import.meta.url).href
 );
+// 码率探测与 admin/server.mjs 共用一份实现（防漂移）
+import { AUDIO_TARGET_KBPS, probeMp3 } from "../admin/music-guard.mjs";
 
 // 封面显示尺寸（播放器 / 歌单卡片）远小于这个值，600px 已经足够清晰
 const COVER_MAX = 600;
@@ -45,7 +47,7 @@ const doAudio = !args.includes("--covers") || args.includes("--all");
 const doCovers = args.includes("--covers") || args.includes("--all");
 const bitrate = (() => {
 	const i = args.indexOf("--bitrate");
-	return i >= 0 ? args[i + 1] : "128k";
+	return i >= 0 ? args[i + 1] : `${AUDIO_TARGET_KBPS}k`;
 })();
 const dirArg = (() => {
 	const i = args.indexOf("--dir");
@@ -115,52 +117,6 @@ function findFfmpeg() {
 			return false;
 		}
 	});
-}
-
-// ── 读 MP3 首帧，拿到码率 ────────────────────────────────────────────────────
-const BITRATE_TABLE = {
-	1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
-	2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
-};
-const SAMPLE_RATE_TABLE = {
-	1: [44100, 48000, 32000],
-	2: [22050, 24000, 16000],
-	2.5: [11025, 12000, 8000],
-};
-
-export function probeMp3(buffer) {
-	let offset = 0;
-	if (buffer.toString("latin1", 0, 3) === "ID3") {
-		const size =
-			((buffer[6] & 0x7f) << 21) |
-			((buffer[7] & 0x7f) << 14) |
-			((buffer[8] & 0x7f) << 7) |
-			(buffer[9] & 0x7f);
-		offset = 10 + size;
-	}
-	const limit = Math.min(buffer.length - 4, offset + 2_000_000);
-	for (let i = offset; i < limit; i++) {
-		if (buffer[i] !== 0xff || (buffer[i + 1] & 0xe0) !== 0xe0) continue;
-		const versionBits = (buffer[i + 1] >> 3) & 0x03;
-		const layerBits = (buffer[i + 1] >> 1) & 0x03;
-		const bitrateIndex = (buffer[i + 2] >> 4) & 0x0f;
-		const sampleRateIndex = (buffer[i + 2] >> 2) & 0x03;
-		if (
-			versionBits === 1 ||
-			layerBits === 0 ||
-			bitrateIndex === 0 ||
-			bitrateIndex === 15
-		)
-			continue;
-		if (sampleRateIndex === 3) continue;
-		const version = versionBits === 3 ? 1 : versionBits === 2 ? 2 : 2.5;
-		const table = version === 1 ? BITRATE_TABLE[1] : BITRATE_TABLE[2];
-		const rate = table[bitrateIndex];
-		const sampleRate = SAMPLE_RATE_TABLE[version]?.[sampleRateIndex];
-		if (!rate || !sampleRate) continue;
-		return { bitrate: rate, sampleRate, version };
-	}
-	return null;
 }
 
 function human(bytes) {

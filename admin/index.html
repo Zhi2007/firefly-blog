@@ -3539,8 +3539,14 @@
 					body: { dir, filename: file.name, dataBase64 },
 				});
 				toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
+				if (result.warning) toast(result.warning, "err");
 				await loadDiff();
-				scheduleAutoPublish(`chore: 上传 ${result.name}`);
+				if (result.audio?.needsCompress) {
+					// 高码率音频先别自动发布：等「一键压缩」把文件压小，否则原始大文件会永久进 git 历史
+					toast("已跳过自动发布：请先点「一键压缩全部音乐」再发布", "err");
+				} else {
+					scheduleAutoPublish(`chore: 上传 ${result.name}`);
+				}
 				return result;
 			}
 

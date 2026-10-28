@@ -758,7 +758,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 9 | `/api/delete-media` | POST | 是（删除） | **是**（删除不可逆，必留快照） | `resolveInside` 到全部 `MEDIA_DIRS` | `:1826-1845` |
 | 10 | `/api/announcements` | GET 读 / POST 写 | **是** | 是（`writeJsonData` 内） | `body.items` 必须是数组；GET 返回数据文件路径 `file` | `:1846-1866` |
 | 11 | `/api/announcement-draft` | **仅 GET** | 否（只读 git 历史，不碰任何文件） | 否（设计如此：只产草稿） | 未认证 403；`since` 支持「提交 sha / YYYY-MM-DD / 最近天数」，非法一律 400；git 失败降级为 502 并给中文原因；**只生成草稿、不自动发布**；见 9.9 节 | `:1867-1882` |
-| 12 | `/api/playlist` | GET 读 / POST 写 | **是** | 是 | `body.songs` 必须是数组；GET 返回数据文件路径 `file` 与每首歌 `paths:{url,cover,lrc}`（站内路径逐个 `stat` 过） | `:1883-1911` |
+| 12 | `/api/playlist` | GET 读 / POST 写 | **是** | 是 | `body.songs` 必须是数组；GET 返回数据文件路径 `file` 与每首歌 `paths:{url,cover,lrc}`（站内路径逐个 `stat` 过）；**POST 会拒绝重复 url**（见 9.14） | `:1883-1911` |
 | 13 | `/api/save-lyrics` | POST | **是** | **是**（`L6` 补的） | 路径由音频 URL 派生到 `lrc/<base>.lrc` | `:1912-1939` |
 | 14 | `/api/extract-audio` | POST | 是（封面/歌词） | 否（走 `extractAndStoreAudio`） | 只允许 `public/assets/music` 下的音频 | `:1940-1959` |
 | 15 | `/media-file` | GET（非 `/api`） | 否（只读流） | 否 | 只读白名单 `MEDIA_READ_DIRS`（= 5 个媒体目录 + `public/friends`）；Range/206/416；**畸形 Range 曾打死进程**（`C1`） | `:1960-2031` |
@@ -1040,6 +1040,24 @@ published: Expected type `"date"`, received `"string"`
 
 
 
+### 9.14 音乐资源：发布前先压缩，避免 git 历史重复存储
+
+**背景（2026-10-28 实测）**：历史里先提交了两代音乐——旧的 210 MB 高码率 mp3 + 新的 89 MB 128 kbps 版本，两代都可达，于是 `.git` 里各存一份（音乐对象 295 MB，`.git` 总计 323 MB）。做历史去重后只保留当前版本：`.git` 323→112 MB、仓库 425→214 MB。**根因不是压缩脚本，而是「先提交原始大文件、之后再压缩覆盖」这个顺序。**
+
+| 闸门 | 行为 | 代码 |
+| --- | --- | --- |
+| 上传去重 | 同一目录里已有**完全相同内容**（sha256）→ 409，不写入；改名重传也一样拦 | `admin/server.mjs` `/api/upload`；`admin/music-guard.mjs` `findSameContent` |
+| 高码率提示 | 上传的 mp3 > `AUDIO_MAX_KBPS`（160k）或码率读不出且 > 12 MB → 返回 `audio{bitrate,bytes,needsCompress}` + `warning` | `music-guard.mjs` `probeMp3`；前端 `admin/index.html` `uploadTo` |
+| 跳过自动发布 | 上传结果 `audio.needsCompress` 时，前端**不** `scheduleAutoPublish`（避免原始文件被自动提交） | `admin/index.html` `uploadTo` |
+| 发布闸门 | `/api/publish` 在体检之前检查「将被提交的 `public/assets/music/**/*.mp3`」，超限 → `{blocked:true, violations}`；`force:true` 可跳过 | `admin/server.mjs` `musicPublishGuard` |
+| 歌单去重 | `POST /api/playlist` 里两首歌的 `url`（去掉 `?v=` / `#` 后）相同 → 400 | `admin/server.mjs` `/api/playlist` |
+
+**正确顺序**：上传音频 → 面板「音乐」页「一键压缩全部音乐」（`scripts/compress-music.mjs --all`，原地重写并同步歌单里的 `?v=` 内容哈希）→ 再发布。
+
+**为什么不能靠「压缩后覆盖」清历史**：git 是内容寻址的，旧 blob 只要还在历史 commits 里就可达；要真正清掉只能重写历史（`git filter-branch` / `git filter-repo` + force push），代价是所有提交哈希变更。所以策略是**别让原始大文件进历史**。
+
+**已知取舍**：阈值是「>160kbps 才拦」，所以 128/160kbps 的音频可以直接发布；极少数确实要发高码率文件时：调 `/api/publish` 传 `force:true`，或直接 `git commit/push` 绕过面板发布（**面板发布页没有 force 开关**，这是故意的——正常流程就该先压缩）；但那份文件会永久留在历史里。
+
 ---
 
 ## 10. 部署链路（从本地改到线上生效）
@@ -1054,11 +1072,12 @@ published: Expected type `"date"`, received `"string"`
 ① 本地改内容/配置（面板 或 手写 src/config、src/content）
         ↓
 ② 面板「发布」页点「立即发布」（或开自动同步，保存即触发；2.5s 内合并为一次提交）
-   ├─ (a) 先跑体检 runDoctor（10 项，含文章 frontmatter 的 YAML 速查 + 真实构建）
+   ├─ (a) 音乐闸门 musicPublishGuard：将被提交的 mp3 若 >160kbps / >12MB → blocked（force 跳过）  server.mjs 的 musicPublishGuard
+   ├─ (b) 先跑体检 runDoctor（10 项，含文章 frontmatter 的 YAML 速查 + 真实构建）
    │      有 error 级问题 → 直接拦住（不执行任何 git 命令，message 列出「文件 → 字段 → 怎么改」）  server.mjs:1284-1300
-   ├─ (b) stageForPublish：只 git add 白名单内的路径             publish-scope.mjs:67-84
-   ├─ (c) git commit -m "<提交说明>"                            server.mjs:1322
-   └─ (d) git fetch origin → 落后则 pull --rebase --autostash → git push   :893-922
+   ├─ (c) stageForPublish：只 git add 白名单内的路径             publish-scope.mjs:67-84
+   ├─ (d) git commit -m "<提交说明>"                            server.mjs:1322
+   └─ (e) git fetch origin → 落后则 pull --rebase --autostash → git push   :893-922
         ↓
 ③ GitHub Actions 被 push 触发（.github/workflows/deploy.yml:3-7）
    ├─ 若同一分支有更早的 run：cancel-in-progress 取消它（cancelled ≠ 失败）  :15
@@ -1649,6 +1668,8 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 11 | **面板新增展示项 / 接口（只要涉及文件）** | ① **必须复用 `admin/index.html` 的 `filePathBadge()`**（复制 / 已复制反馈 / 打开所在文件夹只有这一份实现，别各页抄一遍）；② 要显示的路径**必须由后端返回**（`fs.readdir` / `git status --porcelain -z` / 实际写入路径 / 快照目录），或按站点约定拼好后**当场 `stat` 核对**，**前端不许自己拼路径**；③ 后端 `stat` 过之后要如实带上 `exists`（不存在就标 ⚠️ 并隐藏「打开文件夹」按钮）；④ 新增 `/api/*` 字段/路由按第 2 行同步（路由数、9.3 表、`POST_BODY_FIELDS`）；⑤ 本文档 9.10 节的覆盖表 + `admin/README.md` 的「路径徽章」一节 | ❌（人工核对；`pnpm check-docs` 只保证路由/页签/配置/字段的数字与清单） |
 | 12 | **新增 / 修改体检项、内容校验规则** | ① **绝对不许另写平行 schema**：字段名与类型的唯一来源是 `src/content.config.ts`；「类型对不对」必须交给**真实构建**（`admin/content-check.mjs` 的 `content-schema`：`node node_modules/astro/bin/astro.mjs build`），YAML 层只允许查「与 schema 无关的通用坑」（引号把值变字符串 / 日期写法 / 列表写法 / YAML 语法）；② 本文档 9.11 节（新检查项要写清「查什么、什么级别、怎么修」）+ 9.3 / 9.4 / 2.3 / 附录 A 第 3 条里的「N 项」计数；③ `admin/README.md` 的「体检（发布前的安全闸）」表 + `README.md` 第 8 章面板表；④ 若有新的写盘产物，必须在 9.3 的「写盘」列如实登记（当前 `content-schema` 写 `.astro/doctor-build/`，**不覆盖 `dist/`**）；⑤ 跑不起来 / 超时必须降级成 `warn`，**既不阻断发布也不静默通过** | ⚠️ 部分（`check-docs` 不数体检项；改写「N 项」的措辞会变成人工核对） |
 | 13 | **新增 / 修改任何「会写文章 frontmatter」的代码**（`/api/save-post`、新建、导入、批量脚本…） | ① **日期字段（`published` / `updated`）必须落盘成不带引号的 `YYYY-MM-DD`** —— 加引号就是 YAML 字符串，而 schema 是 `z.date()`，构建必炸（9.11 / 9.12 / 12.13 记录了这个事故**发生过两次**）；② **不许重写用户没编辑的字段**：值没变的行（注释 / 顺序 / 引号风格 / 块标量 / 块列表 / 面板不认识的字段）必须逐字节保留，「保存一次就丢 `lang`/`comment`/`series`」是旧 bug（9.12）；③ 读（表单回填）与写必须共用 `admin/post-frontmatter.mjs` 的同一套行模型，**不要各写一套 YAML 解析**；④ 加校验要**在写盘之前**失败（400），不要先写坏再让发布时被体检拦住（「拦住坏数据」≠「不再产生坏数据」）；⑤ 同步本文档 9.12 + `admin/README.md` 的「文章编辑器：保存时 frontmatter 怎么处理」；⑥ 改完至少跑：反向用例（`published: "2026-10-11"` 的文件保存后不带引号）+ 「只改正文 → frontmatter 逐字节不变」+ 夹具里真实 `astro build` 成功 | ❌（人工核对；`check-docs` 只保证路由 / 页签 / 配置 / 字段的数字与清单，不检查写入语义） |
+
+| 14 | **新增 / 替换音乐等大体积媒体** | ① **先压缩再发布**：面板「音乐」页「一键压缩全部音乐」；`/api/publish` 会拦截 >160kbps / >12MB 的 mp3（详见 9.14）；② 上传按内容哈希去重，改名重传同内容会被 409；③ 本文档 9.14 节 + `admin/README.md` 的「音乐」「一键压缩」两节；④ 换同名声源后 `?v=` 内容哈希由压缩脚本同步，别手改；⑤ `PUBLISH_SCOPE` 已覆盖 `public/assets` | ❌（人工核对；`check-docs` 不检查媒体体积，也不检查 git 历史是否膨胀） |
 
 > 补充（2026-10-11）：新增 `src/config` 下的**数据文件（JSON）**同样会改变 §4.1 与 §2.3 的文件计数，
 > 必须同步；`pnpm check-docs` 的第 3 组会直接报出来。

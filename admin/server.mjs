@@ -40,7 +40,15 @@ import {
 	restoreSnapshot,
 	writeKeep,
 } from "./backups.mjs";
-import { PUBLISH_SCOPE, parsePorcelainEntriesZ, stageForPublish } from "./publish-scope.mjs";
+import { PUBLISH_SCOPE, parsePorcelainEntriesZ, parsePorcelainZ, stageForPublish } from "./publish-scope.mjs";
+// 音乐资源防重复/防膨胀：纯函数单独放，便于单测（见 docs/PROJECT-CONTEXT.md 9.14）
+import {
+	AUDIO_MAX_BYTES,
+	AUDIO_MAX_KBPS,
+	auditMusicChanges,
+	findSameContent,
+	probeMp3,
+} from "./music-guard.mjs";
 // CI 失败详情：纯逻辑（正则解析 / 步骤提取 / 摘要 / 带缓存请求）都在 ci.mjs 里，这里只接线
 import {
 	CI_CACHE_TTL_MS,
@@ -1322,8 +1330,41 @@ function formatBlockedDetails(errors, limit = 3) {
 	return lines.length ? `\n先去改这些：\n${lines.join("\n")}` : "";
 }
 
+/**
+ * 发布前的音乐闸门：把「还没压缩的大音频」拦在提交之前。
+ *
+ * 为什么必须有：git 是内容寻址的，先提交 320kbps 原始文件、之后压缩成 128kbps 再提交，
+ * 两代文件都会永久留在历史里（2026-10-28 实测：音乐历史 295MB → 只保留当前版本后 89MB）。
+ * force 可跳过（与体检一致：明知道要发原始文件时可以放行）。
+ */
+async function musicPublishGuard() {
+	const status = await git(["status", "--porcelain", "-z", "--untracked-files=all"], { raw: true });
+	if (!status.ok) return { ok: true }; // git 都读不了就让后面的流程去报错
+	const changed = parsePorcelainZ(status.stdout);
+	const violations = auditMusicChanges(REPO_ROOT, changed);
+	if (violations.length === 0) return { ok: true };
+	const shown = violations
+		.slice(0, 3)
+		.map((v) => `${v.path}（${v.kbps ? `${v.kbps}kbps` : `${(v.bytes / 1048576).toFixed(1)}MB`}）`)
+		.join("、");
+	const more = violations.length > 3 ? ` 等 ${violations.length} 个` : "";
+	return {
+		ok: false,
+		violations,
+		message: `有 ${violations.length} 个音乐文件还没压缩${more}：${shown}。请先在「音乐」页点「一键压缩全部音乐」（音频+封面）再发布——原始大文件一旦提交就会永久留在 git 历史里；确认要直接发：手动 git commit/push，或调 /api/publish 时传 force:true。`,
+	};
+}
+
 async function publish(message, options = {}) {
 	const steps = [];
+
+	// 音乐闸门：先拦「还没压缩的大音频」（只读工作区，毫秒级；放在体检前先省时间）
+	if (!options.force) {
+		const guard = await musicPublishGuard();
+		if (!guard.ok) {
+			return { ok: false, blocked: true, steps, violations: guard.violations, message: guard.message };
+		}
+	}
 
 	// 发布前把关：体检发现 error 级问题就先拦住（前端可以带 force 跳过）
 	if (!options.force) {
@@ -1946,6 +1987,15 @@ const server = createServer(async (req, res) => {
 				const target = resolveInside(repoPath, [MEDIA_DIRS[dir]]);
 				await fs.mkdir(path.dirname(target), { recursive: true });
 				const buffer = Buffer.from(dataBase64, "base64");
+				// 防重复存储：同一目录里已经有完全相同内容 → 拒收（音乐 / 封面 / 歌词都适用）。
+				// 按内容而不是文件名判重：同一首歌被拖两次、或改名后再传一遍，都不该在仓库里存两份。
+				const sameContent = findSameContent(path.dirname(target), buffer);
+				if (sameContent) {
+					sendJson(res, 409, {
+						error: `已有相同内容的文件：${sameContent}（为避免重复存储，本次没有写入）`,
+					});
+					return;
+				}
 				// 覆盖同名文件时先把旧文件存进快照；新文件没有旧内容可备份，createSnapshot 会返回 null
 				const snapshot = await snapshotBefore(repoPath, `覆盖上传 ${safeName}`);
 				await fs.writeFile(target, buffer);
@@ -1954,6 +2004,17 @@ const server = createServer(async (req, res) => {
 					dir === "music" && AUDIO_EXT.test(safeName)
 						? await extractAndStoreAudio(buffer, safeName)
 						: {};
+				// 音频码率 / 体积：超过上限就提示「先压缩再发布」（前端会因此跳过自动发布）
+				const audio =
+					dir === "music" && AUDIO_EXT.test(safeName)
+						? (() => {
+							const probe = probeMp3(buffer);
+							const kbps = probe?.bitrate ?? null;
+							const tooBig =
+								kbps === null ? buffer.length > AUDIO_MAX_BYTES : kbps > AUDIO_MAX_KBPS;
+							return { bitrate: kbps, bytes: buffer.length, needsCompress: tooBig };
+						})()
+						: null;
 				sendJson(res, 200, {
 					ok: true,
 					name: safeName,
@@ -1964,6 +2025,12 @@ const server = createServer(async (req, res) => {
 					backup: snapshot?.id ?? null,
 					snapshot,
 					...extracted,
+					...(audio ? { audio } : {}),
+					...(audio?.needsCompress
+						? {
+								warning: `该音频${audio.bitrate ? `是 ${audio.bitrate}kbps` : "体积较大"}（上限 ${AUDIO_MAX_KBPS}kbps / ${Math.round(AUDIO_MAX_BYTES / 1048576)}MB）：请先在「音乐」页点「一键压缩全部音乐」再发布，否则原始大文件会永久留在 git 历史里`,
+							}
+						: {}),
 				});
 				return;
 			}
@@ -2049,6 +2116,21 @@ const server = createServer(async (req, res) => {
 					return;
 				}
 				const songs = sanitizePlaylist(body.songs);
+				// 防重复：同一首歌只允许一条（url 去掉 ?v= / #锚点 后比较）
+				const seenUrl = new Map();
+				for (let i = 0; i < songs.length; i++) {
+					const key = String(songs[i]?.url ?? "")
+						.split(/[?#]/)[0]
+						.trim();
+					if (!key) continue;
+					if (seenUrl.has(key)) {
+						sendJson(res, 400, {
+							error: `歌单里有两首歌指向同一个音频：${key}（第 ${seenUrl.get(key) + 1} 首与第 ${i + 1} 首）`,
+						});
+						return;
+					}
+					seenUrl.set(key, i);
+				}
 				await writeJsonData("playlist", songs);
 				sendJson(res, 200, { ok: true, songs, message: `已保存 ${songs.length} 首歌` });
 				return;
