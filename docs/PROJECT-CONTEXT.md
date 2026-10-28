@@ -1034,6 +1034,7 @@ published: Expected type `"date"`, received `"string"`
 | 自检 | `firefly-admin.exe --selftest`：启动后台 → 校验 `supervised` → 请求重启 → 等新 PID → 写 `logs/admin-selftest.txt`，退出码 0/1；不打开浏览器窗口 |
 | 手动 node | `node admin/server.mjs` 仍可用，但没有启动器托管：`supervised:false`，「重启后台」禁用；后台日志可能为空（stdout 在终端里） |
 | 管理员权限 | **启动器入口直接拦截**：检测到提权就弹窗「请不要以管理员身份运行」并退出。原因：管理员权限下 Chrome/Edge 会拒绝打开面板窗口（表现为「浏览器退出码 0」，还会因为重试多开窗口），explorer.exe 也不允许从提权进程拉起（「打开所在文件夹」必然 `0xC0000142`）；正常双击即可 |
+| 低完整性目录 | 仓库目录若被打上 **Low integrity** 标签（agent 沙箱写过文件后可能出现），仓库里的 `firefly-admin.exe` 会以 Low 运行，节点进程也是 Low → 「打开所在文件夹」必然 `0xC0000142`（cmd 里手动跑 `node admin/server.mjs` 却正常，因为 node 不在该目录）。解法：把 exe 复制到普通目录（`%LOCALAPPDATA%\FireflyAdmin\`）并用 `--root="<仓库>"` 启动（桌面快捷方式），或管理员执行 `icacls <仓库> /setintegritylevel (OI)(CI)Medium /T` 重置后再编译 |
 
 > **为什么浏览器 profile 按浏览器分开**：Chrome 与 Edge 的 profile 目录格式不同；共用一个目录会出现「Chrome 秒退 / Edge 白屏」。2026-10-19 实测踩过。
 
