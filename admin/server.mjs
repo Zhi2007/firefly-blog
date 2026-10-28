@@ -1389,14 +1389,52 @@ async function publish(message, options = {}) {
 	const staged = await git(["diff", "--cached", "--name-only"]);
 	if (!staged.stdout) {
 		const outside = scoped.skipped;
+		const info = await repoInfo();
+		// 工作区没有文件改动，但本地有提交还没推：直接把这批提交推上去。
+		// 为什么：面板顶部「待同步」= ahead + (工作区是否 dirty)；如果这里仍然报
+		// 「没有需要提交的改动」，用户会看到「待同步 1」却永远点不掉（2026-10-28 实际踩到）。
+		if (info.ahead > 0) {
+			steps.push({
+				name: `工作区没有新改动；把本地 ${info.ahead} 个未推送提交推上去`,
+				ok: true,
+				stdout: "",
+				stderr: "",
+			});
+			if (DRY_RUN_PUBLISH) {
+				steps.push({ name: "git push（演练模式，已跳过）", ok: true, stdout: "", stderr: "" });
+				return {
+					ok: true,
+					dryRun: true,
+					steps,
+					files: [],
+					pushedCommits: info.ahead,
+					message: `演练模式：工作区没有新改动，本地有 ${info.ahead} 个提交待推送（未真正推送）`,
+				};
+			}
+			const pushed = await pushToRemote(steps);
+			return {
+				ok: pushed.ok,
+				dryRun: false,
+				steps,
+				files: [],
+				pushedCommits: info.ahead,
+				message: pushed.ok
+					? `工作区没有新改动；已把本地 ${info.ahead} 个未推送提交推送到 GitHub（Actions 会自动构建部署，约 1 分钟）`
+					: pushed.message,
+			};
+		}
+		let message = outside.length
+			? `面板管理范围内没有改动。另有 ${outside.length} 个改动不在面板管理范围，已跳过（不会提交）：${outside.slice(0, 8).join("、")}${outside.length > 8 ? " 等" : ""} —— 需要提交请用 git 命令手动处理`
+			: "没有需要提交的改动";
+		if (info.behind > 0) message += `；远端比本地多 ${info.behind} 个提交，先去「同步」页拉取`;
 		return {
 			ok: false,
 			dryRun: DRY_RUN_PUBLISH,
 			steps,
 			skipped: outside,
-			message: outside.length
-				? `面板管理范围内没有改动。另有 ${outside.length} 个改动不在面板管理范围，已跳过（不会提交）：${outside.slice(0, 8).join("、")}${outside.length > 8 ? " 等" : ""} —— 需要提交请用 git 命令手动处理`
-				: "没有需要提交的改动",
+			ahead: info.ahead,
+			behind: info.behind,
+			message,
 		};
 	}
 	const changedFiles = staged.stdout.split("\n").filter(Boolean);

@@ -765,7 +765,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 16 | `/api/configs` | GET | 否 | 否 | 返回 `CONFIG_FILES`（15 个） | `:2032-2035` |
 | 17 | `/api/config-file` | GET 读 / POST 写 | **是** | 是 | `path` 必须在 `CONFIG_FILES` 白名单内 | `:2036-2057` |
 | 18 | `/api/sync` | GET/POST | 否（git 操作） | 否 | 本地有未提交改动则拒绝 | `:2058-2063` |
-| 19 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检（**10 项**，含文章 frontmatter 的 YAML 速查 + 真实 `astro build`），有 error 拦住（`force: true` 跳过）；被拦住时 `blocked: true`，`message` 直接列出「文件 → 字段 → 怎么改」（见 9.11）；只暂存 `PUBLISH_SCOPE`；返回 `files` / `skipped`（都是真实相对路径） | `:2085-2095` |
+| 19 | `/api/publish` | POST | git commit（+push） | 否 | `message` 必须 string；默认先跑体检（**10 项**，含文章 frontmatter 的 YAML 速查 + 真实 `astro build`），有 error 拦住（`force: true` 跳过）；被拦住时 `blocked: true`，`message` 直接列出「文件 → 字段 → 怎么改」（见 9.11）；只暂存 `PUBLISH_SCOPE`；返回 `files` / `skipped`（都是真实相对路径）；**工作区没有新改动但本地有未推送提交时，不报「没有需要提交的改动」，而是直接 push 这批提交**（不产生空提交，见 10.2） | `:2085-2095` |
 | 20 | `/api/doctor` | GET/POST | 否（唯一的写盘是 `astro build` 的产物 `.astro/doctor-build/`，不碰 `dist/` 与仓库内容） | 否 | **10 项**体检；其中 `content-frontmatter`（YAML 速查）与 `content-schema`（真实构建）专查文章 frontmatter，见 9.11；Git 那一项用 `info.changed` 列出待提交文件 | `:2096-2101` |
 | 21 | `/api/settings` | 非 POST 读 / POST 写 | **是** | 是（每个涉及文件） | `SETTINGS_DEFS` 白名单 + 类型/范围/枚举 + 结构体检 + 回读校验 + 失败回滚；GET 返回 `defs`（含 `file`/`within`/`key`）与 `pageToggle:{file,block}` | `:2081-2107` |
 | 22 | `/api/backups` | GET 读列表 / POST 设置保留份数 | **是**（仅 `admin-backups/keep.json` 保留份数设置） | 否（设置文件本身就在备份目录，无需再备份） | GET 返回 `backups[]` + `keep`；POST `{ keep: N }`，N 必须是**正整数**，保存后立即清理超出份数的旧快照并返回 `removed` | `:2156-2185` |
@@ -1076,6 +1076,7 @@ published: Expected type `"date"`, received `"string"`
    ├─ (b) 先跑体检 runDoctor（10 项，含文章 frontmatter 的 YAML 速查 + 真实构建）
    │      有 error 级问题 → 直接拦住（不执行任何 git 命令，message 列出「文件 → 字段 → 怎么改」）  server.mjs:1284-1300
    ├─ (c) stageForPublish：只 git add 白名单内的路径             publish-scope.mjs:67-84
+   │      没有文件改动但本地 ahead>0 → 跳过 (d) 不造空提交，直接走 (e) push 现有提交  server.mjs 的 publish()
    ├─ (d) git commit -m "<提交说明>"                            server.mjs:1322
    └─ (e) git fetch origin → 落后则 pull --rebase --autostash → git push   :893-922
         ↓
