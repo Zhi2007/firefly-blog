@@ -776,26 +776,46 @@ function revealInExplorer(abs, isDirectory = false) {
 		};
 	}
 	try {
-		// Windows 上 explorer.exe 只是把请求转给已运行的 shell：正常 100ms 左右就退出（退出码常见 1）。
-		// 必须用 spawnSync 才能知道「到底有没有拉起来」——用 spawn 时异步 error 会被吞掉，
-		// 进程根本没起来接口也会返回 ok:true，前端弹「已定位」但什么都不会打开（2026-10-28 踩到）。
+		// Windows 上 explorer.exe 只是把请求转给已运行的 shell：正常 100ms 左右退出，退出码 0/1 都算成功。
+		// 但**不能只判断 error**：0xC0000142（DLL 初始化失败）是进程被系统拒绝的典型表现，
+		// 常见于面板运行在低完整性/受限环境（例如从沙箱终端启动）——这时 explorer 根本起不来，
+		// 必须返回 ok:false，否则前端会弹「已定位」但什么都不会打开（2026-10-28 踩到）。
 		const args = isDirectory ? [abs] : ["/select,", abs];
-		const result = spawnSync("explorer.exe", args, {
-			stdio: "ignore",
-			timeout: 5000,
-		});
+		const t0 = Date.now();
+		const result = spawnSync("explorer.exe", args, { stdio: "ignore", timeout: 5000 });
+		const ms = Date.now() - t0;
 		if (result.error) {
 			const code = result.error.code || result.error.message;
 			console.error(`[reveal] 拉起 explorer.exe 失败：${code}（${abs}）`);
 			return { ok: false, message: `没能拉起资源管理器（${code}）：` };
 		}
-		// 退出码 1 是 explorer.exe 的正常返回值（它把请求转交给 shell 后就退出），不能当失败
+		// explorer 的正常退出码是 0 或 1；其余（如 0xC0000142）表示进程被系统拒绝
+		if (result.status !== 0 && result.status !== 1) {
+			const code = "0x" + (result.status >>> 0).toString(16).toUpperCase();
+			const lowIntegrity = detectLowIntegrity();
+			console.error(`[reveal] explorer.exe 异常退出 status=${code} ms=${ms}（${abs}）${lowIntegrity ? "，当前进程为 Low 完整性" : ""}`);
+			return {
+				ok: false,
+				message: lowIntegrity
+					? `资源管理器打不开：explorer.exe 被系统拒绝（${code}），当前面板运行在低完整性（Low integrity）受限环境。请关闭面板后，从 Windows 资源管理器双击 firefly-admin.exe 重新打开（不要从沙箱/受限终端启动）：`
+					: `资源管理器打不开：explorer.exe 异常退出（${code}）。可尝试重启面板后再点：`,
+			};
+		}
 		return { ok: true };
 	} catch (error) {
 		return { ok: false, message: `没能拉起资源管理器：${error?.message ?? error}` };
 	}
 }
 
+/** 当前进程是否是低完整性（Low integrity）——只在打开失败时查一次，用来给出更准确的中文原因 */
+function detectLowIntegrity() {
+	try {
+		const r = spawnSync("whoami.exe", ["/groups"], { encoding: "utf8", timeout: 3000 });
+		return /Low Mandatory Level|低强制级别/i.test(r.stdout || "");
+	} catch {
+		return false;
+	}
+}
 async function readYamlModule() {
 	try {
 		const mod = await import("yaml");
