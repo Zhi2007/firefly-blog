@@ -25,7 +25,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildContentSchemaCheck, buildFrontmatterCheck } from "./content-check.mjs";
 
-const SKIP_DIRS = new Set(["node_modules", ".git", "dist", ".astro", "admin-backups"]);
+// logs/ 必须跳过：它只留在本机（.gitignore 已忽略），里面除运行日志外还有启动器
+// 的 Chrome profile（logs/admin-browser-profile-chrome），那是 Chromium 自己的数据目录：
+//   · 里面有 JSON Lines 格式的 *.json（如 FirstPartySetsPreloaded/**/sets.json），
+//     JSON.parse 必然失败 → json 项报 error → publish() 直接拦住发布（2026-10-30 实际踩到，
+//     「新增公告/文章后点发布，面板提示体检发现 1 个必须先修的问题」）；
+//   · 还有 30 MB+ 的模型/缓存文件，bigfiles 项会对这些永远不会被提交的文件误报。
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", ".astro", "admin-backups", "logs"]);
 
 /** 递归列出仓库里的文件（跳过依赖/产物目录） */
 function walk(dir, repoRoot, out = [], depth = 0) {
