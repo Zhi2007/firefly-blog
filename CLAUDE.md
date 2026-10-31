@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **动手前先读 [`docs/PROJECT-CONTEXT.md`](docs/PROJECT-CONTEXT.md)**：三类文件、`src/config` 全量、Worker 职责、部署链路、门禁与踩坑史都在那里；面向站长的使用说明见 [`README.md`](README.md)，管理面板用法见 [`admin/README.md`](admin/README.md)。
+
+## Documentation Map
+
+| 文档 | 内容 |
+|---|---|
+| [`docs/PROJECT-CONTEXT.md`](docs/PROJECT-CONTEXT.md) | 项目交接规范：哪些文件能改、怎么部署、为什么这么设计 |
+| [`README.md`](README.md) | 功能一览、快速开始、写文章、配置、部署、FAQ |
+| [`admin/README.md`](admin/README.md) | 管理面板的用法、接口、校验与已知取舍 |
+
 ## Project Overview
 
 Firefly is a feature-rich static blog theme built on **Astro 7** with **Svelte 5** for interactive components. It's a fork of [Fuwari](https://github.com/saicaca/fuwari) extended with extensive features. Primary language is Chinese (Simplified) with i18n for en, zh_TW, ja, ko, ru.
@@ -21,7 +31,16 @@ Firefly is a feature-rich static blog theme built on **Astro 7** with **Svelte 5
 | `pnpm new-dynamic` (`new-d`) | Scaffold a new dynamic (microblog) entry |
 | `pnpm lqips` | Regenerate LQIP data into `src/constants/lqips.json` |
 
-Package manager is **pnpm** (enforced). Node.js >= 22 required.
+Package manager is **pnpm** (enforced). Node.js >= 22.23.0 required（`package.json` 的 `engines`）.
+
+## Pre-commit Checks
+
+| # | 检查 | 命令 | 说明 |
+|---|---|---|---|
+| 1 | 类型 | `pnpm type-check` | 覆盖 `src/` 与 `scripts/` |
+| 2 | 静态检查 | `pnpm exec biome ci ./src ./scripts` | 只查不改；`pnpm lint` 会写盘 |
+| 3 | 构建 | `pnpm build` | 8 步链路，产物在 `dist/`；页数随文章数变化，不是固定验收值 |
+| 4 | 文档同步 | `pnpm check-docs` | = `node scripts/check-docs-sync.mjs`；加功能 / 配置 / 路由 / 页签 / 页面后必跑 |
 
 ## Architecture
 
@@ -55,9 +74,11 @@ Scroll-linked work in `src/utils/` is rAF-throttled and must stay cheap on mobil
 ### Content Collections
 
 Defined in `src/content.config.ts`:
+
 - `posts` — blog posts (`.md`/`.mdx`) with frontmatter: title, published, tags, category, draft, pinned, password, comment, etc.
-- `spec` — special pages (about, guestbook)
+- `spec` — special pages (`about`, `announcement`, `friends`, `guestbook`)
 - `dynamic` — microblog entries (`.md`) with frontmatter: published, pinned, location
+- `projects` — project entries (`.md`/`.mdx`) with frontmatter: title, published
 
 ### Key Directories
 
@@ -94,4 +115,3 @@ LQIP data is generated into `src/constants/lqips.json` and committed — regener
 
 - **Cloudflare Workers**（本仓库修正：实际部署平台，配置见 `wrangler.jsonc`；上游写的 Vercel/`vercel.json` 是本仓库未使用的遗留）
 - Static output to `dist/`
-

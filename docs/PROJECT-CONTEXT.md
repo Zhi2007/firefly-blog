@@ -3,11 +3,40 @@
 > 仓库：`D:\SoftWare\DeepSeek Harness\WorkSpace\Firefly`（2026-10-31 由 `WorkSpace\1\firefly` 迁入独立工作区）
 > 远端：`origin` = `https://github.com/Zhi2007/firefly-blog.git`（分支 `main`），`upstream` = `https://github.com/CuteLeaf/Firefly.git`（上游主题 `master`）
 > 站点：<https://www.zhihaisblog.top>（裸域 <https://zhihaisblog.top> 301 到 www）
-> 文档定位：**给 agent 的施工规范**。用户向说明（功能怎么用、配置怎么写）见仓库根 `README.md`（1059 行 / 13 章）与 `admin/README.md`（463 行），本文不重复它们，重点是**怎么改不出事**。
+> 文档定位：**给 agent 的施工规范**。用户向说明（功能怎么用、配置怎么写）见仓库根 `README.md` 与 `admin/README.md`（两份文档开头都有目录），本文不重复它们，重点是**怎么改不出事**。
 >
 > 阅读顺序建议：第 1 章（速查）→ 第 2 章（哪些文件不能动）→ 第 12 章（为什么这么设计）→ 需要动手时再查对应章节。
 >
-> 事实来源：本仓库工作区文件（逐项读取）、`git log` 的 80 个提交与提交正文（截至本文创建时；2026-10-31 已 140 个）、`%TEMP%\project-evidence.json`（2026-10-11 实测响应头）。**凡是无法从仓库或该证据文件核实的，正文都显式标注「需确认」并说明原因**；没有写「需确认」的地方，都是我在仓库里读出来或有实测数据支撑的。文末列了「我读出来的文档与代码不一致之处」。
+> 事实来源：本仓库工作区文件（逐项读取）、`git log` 的提交与提交正文（截至本文创建时；当前数量用 `git rev-list --count HEAD` 查）、`%TEMP%\project-evidence.json`（2026-10-11 实测响应头）。**凡是无法从仓库或该证据文件核实的，正文都显式标注「需确认」并说明原因**；没有写「需确认」的地方，都是我在仓库里读出来或有实测数据支撑的。文末列了「我读出来的文档与代码不一致之处」。
+
+---
+
+## 目录
+
+> 本目录只是导航，**不改动任何章节编号**（`9.3`、`9.4`、`4.2`、`11.2`、`10.3`、`6.4`、`3.3`、`附录 A` 等编号被 `pnpm check-docs` 用来定位，是稳定的锚点）。
+> 第一次接手按「第 1 章 → 第 2 章 → 第 12 章」读；要动手时按下面的表跳到对应章。
+
+- [0. 使用本文档的三条硬规则](#0-使用本文档的三条硬规则) —— 先立规矩：改文件前先分类、结论要能追到「文件:行号」、不确定就复测
+- [1. 30 秒速查](#1-30-秒速查) —— 一句话定位 + 关键事实表 + 最容易踩的 5 条 + 绝对禁止清单
+- [2. 技术栈与目录地图](#2-技术栈与目录地图) —— 三类文件（能不能改）、带注释目录树、分目录红线
+- [3. 内容与写作](#3-内容与写作) —— 集合 schema、`posts` frontmatter 全字段、URL 规则、图片四种放法、导入
+- [4. 配置地图（`src/config` 全量）](#4-配置地图srcconfig-全量) —— 三个口径（到底有几个文件）、逐文件职责与面板接管情况
+- [5. 运行时架构（Cloudflare Worker）](#5-运行时架构cloudflare-worker) —— Worker 的 6 项职责、`wrangler.jsonc` 字段、改 Worker 的正确姿势
+- [6. Cloudflare 配置（以实测证据为准）](#6-cloudflare-配置以实测证据为准) —— 实测响应头、CSP 全文与逐项放行理由、控制台待确认清单
+- [7. 阿里云相关配置（域名注册侧）](#7-阿里云相关配置域名注册侧) —— 注册商与 DNS 托管方的边界、排查与迁移顺序
+- [8. GitHub 配置](#8-github-配置) —— Actions 步骤、必需的 Secrets、`cancelled` 判读、匿名 API 限流
+- [9. 管理面板（`admin/`）](#9-管理面板admin) —— 认证模型、全部 `/api/*` 路由、页签清单、写入安全链、体检与保存
+- [10. 部署链路（从本地改到线上生效）](#10-部署链路从本地改到线上生效) —— 完整因果链、`PUBLISH_SCOPE`、三条回滚路径
+- [11. 开发工作流、门禁与已知坑](#11-开发工作流门禁与已知坑) —— 三条门禁、`重建依赖.cmd`、可复现构建、本机工具坑
+- [12. 关键决策与踩坑史（WHY）](#12-关键决策与踩坑史why) —— 12 条反直觉写法的原因（**最重要的一章**，别把刻意设计当 bug 修）
+- [13. 审计与安全基线](#13-审计与安全基线) —— 已确认无问题 / 已修缺陷（别重修）/ 仍未覆盖（别当没问题）
+- [附录 A：快问快答（27 条）](#附录-a快问快答27-条) —— 按「我想做什么」反查改哪里
+- [附录 B：「需确认」清单汇总（按章节）](#附录-b需确认清单汇总按章节) —— 无法从仓库核实的事项，别当事实复述
+- [附录 C：交付前自查（本文档的证据）](#附录-c交付前自查本文档的证据) —— 本文档自身的路径与计数证据
+- [附录 D：给下一个 agent 的收尾提醒](#附录-d给下一个-agent-的收尾提醒) —— 6 条收尾动作
+- [附录 E：新增功能时的同步契约（防漂移）](#附录-e新增功能时的同步契约防漂移) —— 「加什么 → 必须同步哪里」+ `pnpm check-docs`
+
+**最常被来回查的几节**：[1.4 最容易踩的 5 条](#14-最容易踩的-5-条背下来) · [1.5 绝对禁止清单](#15-绝对禁止清单浓缩版详见第-24-节) · [2.2 三类文件](#22-三类文件-最重要的一张表) · [2.4 分目录红线](#24-分目录红线) · [3.3 `posts` 全字段](#33-posts-frontmatter-全字段逐个核对-srccontentconfigts64-90) · [4.2 逐文件职责](#42-逐个文件的职责与风险) · [6.4 CSP 全文](#64-csp-全文与逐项放行理由) · [9.3 路由表](#93-全部-api-路由表37-条) · [9.4 页签清单](#94-页签清单11-个实测-adminindexhtml-的-nav-buttondata-tab) · [9.5 写入安全链](#95-写入安全链所有写接口共用) · [10.3 `PUBLISH_SCOPE`](#103--发布只提交-publish_scope必须记住) · [11.2 三条门禁](#112-三条门禁提交前必须全绿) · [12.4 低配模式](#124-低配模式必须移除-backdrop-filter-属性不能把模糊设-0) · [13.3 已修缺陷](#133-已修缺陷清单不要重新修) · [E.4 `pnpm check-docs`](#e4-用法pnpm-check-docs)
 
 ---
 
@@ -86,12 +115,14 @@
 
 回答「这个文件能不能改」。仓库里混着三种来源的文件：**上游主题自带**、**本仓库作者自建**、**内容与配置**。分不清就会踩上游 diff 冲突，或者把该改的地方当成禁区。
 
+> **本章路标**：2.2 三类文件（最重要的那张表）→ 2.3 带注释的目录树 → 2.4 分目录红线 → 2.5 上游 AI 说明的陈旧之处。
+
 ### 2.2 三类文件（⭐ 最重要的一张表）
 
 | 类别 | 判断依据 | 代表路径 | 改动策略 |
 | --- | --- | --- | --- |
 | ① **上游 Firefly/Fuwari 主题文件** | 在初始提交 `862d5c6`（`chore: 基于 Firefly 主题的个人博客（初始提交）`）里就存在，且本仓库后续没有为它建独立模块 | `src/layouts/`、`src/components/`、`src/pages/`、`src/plugins/`、`src/i18n/`、`src/utils/`（大部分）、`src/styles/`（大部分）、`src/types/`（大部分）、`astro.config.mjs`、`biome.json`、`tsconfig.json`、`postcss.config.mjs`、`svelte.config.js`、`vercel.json`、`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING.md`、`_frontmatter.json`、`CREDITS.md`、`LICENSE`、`UPSTREAM-README.md`、`README.en.md` | 尽量别动。必须动时：小步、单一目的、在提交说明里写清「为什么上游实现不够用」。改完必须过第 11 章三条门禁。**`AGENTS.md` / `CLAUDE.md` 是上游文件，内容与现状的出入已在 `AGENTS.md`/`CLAUDE.md` 中就地标注「本仓库修正」（2026-10-11），逐条差异见 2.5 节** |
-| ② **本仓库自建** | 初始提交之后新增（`git log --diff-filter=A 862d5c6..HEAD` 可复现） | `worker/index.mjs`；`admin/`（18 个文件，含 `README.md`）；`admin-launcher/`（单窗口启动器源码，exe 是构建产物）；`scripts/compress-music.mjs`、`scripts/quarantine-bad-posts.mjs`；`public/vendor/giscus-1.6.0.mjs`；`public/friends/`（友链图标）；`public/pio/README.md`；`src/config/perfConfig.ts`；`src/config/{announcements,friends,music-playlist,nav-overrides}.json`；`src/styles/low-spec.css`；`src/types/navOverrides.ts`；`src/utils/announcement-utils.ts`；`重建依赖.cmd`；`启动管理面板.cmd`；`docs/`（本文档所在目录，新建）；`CREDITS.md`、`UPSTREAM-README.md`（作者整理的说明） | 这是本项目的「自有资产」，可以放心改。但仍要守第 11 章门禁、守零依赖约束（`admin/`、`admin-launcher/`） |
+| ② **本仓库自建** | 初始提交之后新增（`git log --diff-filter=A 862d5c6..HEAD` 可复现） | `worker/index.mjs`；`admin/`（19 个文件，含 `README.md`）；`admin-launcher/`（单窗口启动器源码，exe 是构建产物）；`scripts/compress-music.mjs`、`scripts/quarantine-bad-posts.mjs`；`public/vendor/giscus-1.6.0.mjs`；`public/friends/`（友链图标）；`public/pio/README.md`；`src/config/perfConfig.ts`；`src/config/{announcements,friends,music-playlist,nav-overrides}.json`；`src/styles/low-spec.css`；`src/types/navOverrides.ts`；`src/utils/announcement-utils.ts`；`重建依赖.cmd`；`启动管理面板.cmd`；`docs/`（本文档所在目录，新建）；`CREDITS.md`、`UPSTREAM-README.md`（作者整理的说明） | 这是本项目的「自有资产」，可以放心改。但仍要守第 11 章门禁、守零依赖约束（`admin/`、`admin-launcher/`） |
 | ③ **内容与配置（日常改动区）** | 数据/配置类，改动不需要碰逻辑代码 | `src/content/posts/`（文章 + `images/`）、`src/content/spec/`、`src/content/dynamic/`、`src/content/projects/`；`src/config/`（除类型定义外的全部配置）；`public/assets/`（图片/音乐/字体）；`src/assets/`（走 Astro 优化管线的图） | **日常只改这里**。优先用管理面板（第 9 章），它自带快照 + 校验 + 回滚 |
 
 > 复现方式（只读命令）：
@@ -102,10 +133,10 @@
 
 ```text
 firefly/
-├── admin/                      # ② 零依赖本地管理面板（18 个文件，只用 node: 内置模块）
-│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2457 行）
+├── admin/                      # ② 零依赖本地管理面板（19 个文件，只用 node: 内置模块）
+│   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2904 行）
 │   ├── index.html              #    单页 UI（11 个页签，内联 JS/CSS，现代侧边栏外壳）
-│   ├── README.md               #    面板完整用法（617 行）★ 改面板前必读
+│   ├── README.md               #    面板完整用法（开头有目录）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
 │   ├── avatar.mjs              #    站点头像：魔数校验 + 可选缩放 → 写新文件并改 profileConfig.avatar
@@ -120,9 +151,10 @@ firefly/
 │   ├── media-compress.mjs      #    批量转 WebP（只新增，不删原图）
 │   ├── import-doc.mjs          #    .docx/.txt/.md → Markdown
 │   ├── audio-meta.mjs          #    从 mp3/flac/m4a 读封面与歌词
+│   ├── music-guard.mjs         #    音乐闸门：上传去重 / 高码率提示 / 发布前拦截（9.14 节）
 │   └── friends.mjs             #    友链 CRUD + 「从网址抓取」（含 SSRF 防护）
 ├── admin-launcher/            # ② 单窗口桌面启动器（C# 5 / .NET Framework，零第三方依赖）
-│   ├── FireflyAdminLauncher.cs #    隐藏 node + Chrome/Edge --app 窗口 + 日志 + 在线重启（716 行）
+│   ├── FireflyAdminLauncher.cs #    隐藏 node + Chrome/Edge --app 窗口 + 日志 + 在线重启（798 行）
 │   ├── build.cmd              #    csc 编译到根目录 firefly-admin.exe（exe 被 gitignore）
 │   ├── app.ico                #    exe 图标（/win32icon 嵌入）
 │   ├── app.manifest           #    asInvoker + 视觉样式
@@ -141,7 +173,7 @@ firefly/
 ├── src/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
 │   ├── config/                 # ③ 配置区（35 个文件：25 个 *Config.ts + backgroundWallpaper.ts
-│   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
+│   │                           #    + index.ts + README.md + FooterConfig.html + 6 个 JSON）★ 第 4 章
 │   ├── content/                # ③ 内容：posts/（6 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
@@ -153,8 +185,8 @@ firefly/
 ├── scripts/                    # ① 构建脚本 + ② compress-music.mjs / quarantine-bad-posts.mjs
 ├── .github/workflows/deploy.yml # ① CI：push main → build → wrangler deploy ★ 第 8 章
 ├── wrangler.jsonc              # ② Worker 部署配置（27 行）★ 第 5.3 节
-├── README.md                   # ② 用户向文档（1069 行 / 13 章）
-├── AGENTS.md / CLAUDE.md       # ① 上游给 AI 的说明（有陈旧内容，见 2.5）
+├── README.md                   # ② 用户向文档（13 章，开头有目录）
+├── AGENTS.md / CLAUDE.md       # ① 上游给 AI 的说明（本仓库已就地标注「本仓库修正」，差异见 2.5）
 ├── 重建依赖.cmd / 启动管理面板.cmd  # ② Windows 双击脚本（GBK 编码！）
 ├── package.json / pnpm-lock.yaml / pnpm-workspace.yaml / tsconfig.json / biome.json
 ├── pagefind.yml / postcss.config.mjs / svelte.config.js / vercel.json / .npmrc
@@ -204,6 +236,8 @@ firefly/
 ### 3.1 这一章解决什么问题
 
 写文章 / 加图片 / 导入 Word 时，**以哪个文件为准**、字段写错会怎样、为什么不能直接塞 `.docx`。用户向的完整教程见 `README.md` 第 6 章；这里只写 agent 必须知道的约束与坑。
+
+> **本章路标**：3.2 集合与 loader → 3.3 `posts` 全字段 → 3.4 URL 由路径决定 → 3.5 图片四种放法 → 3.6 为什么只能是 md → 3.7 Word/txt 导入 → 3.8 `slug` 坑 → 3.9 高危操作。
 
 ### 3.2 唯一权威：`src/content.config.ts`
 
@@ -332,6 +366,8 @@ firefly/
 
 > `index.ts` 只做统一导出与 `navbarMode` 解析（`src/config/index.ts:8-17`），**没有**导出 `perfConfig`：`perfConfig` 由 `src/layouts/Layout.astro:51` 直接 import。改动 `index.ts` 的导出集合会影响所有 `@/config` 引用点，属于高风险文件。
 
+> **本章路标**：4.1 三个文件口径（先看这张表，别在数字上打架）→ 4.2 逐文件职责与风险（**改配置前必查**）→ 4.3 已知取舍（不然会把「刻意」优化成退化）→ 4.4 已修的面板开关缺陷。
+
 ### 4.2 逐个文件的职责与风险
 
 图例：**面板**栏里 ✅ = 面板可直接改（不用手改 TS）；✏️ = 面板只改其中部分字段/数据；❌ = 只能手改。
@@ -405,6 +441,8 @@ firefly/
 
 线上**真正的入口是 Worker，不是静态资源**。不知道这一点，就会去改 `public/_headers`、`_redirects` 或指望平台自动处理 Range，然后发现「改了没用」。
 
+> **本章路标**：5.2 Worker 的 6 项职责 → 5.3 为什么必须用 Worker（三条不可替代）→ 5.4 `wrangler.jsonc` 逐字段 → 5.5 改 Worker 的正确姿势。
+
 ### 5.2 Worker 的 6 项职责（`worker/index.mjs`，222 行）
 
 | # | 职责 | 实现位置 | 细节 |
@@ -458,6 +496,8 @@ firefly/
 ### 6.1 这一章解决什么问题
 
 线上实际下发了什么头、缓存是什么状态、哪些东西在 Cloudflare 控制台里（仓库看不到、必须人工确认）。所有数字来自 `%TEMP%\project-evidence.json`（采集于 `2026-10-11T08:16:36.918Z`）与仓库文件。
+
+> **本章路标**：6.2 实测证据总览 → 6.3 DNS/NS（待确认）→ 6.4 CSP 全文与逐项放行理由 → 6.5 其余安全头 → 6.6 媒体缓存档位 → 6.7 控制台待确认清单。
 
 ### 6.2 实测证据总览
 
@@ -566,6 +606,8 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 `zhihaisblog.top` 的**注册/续费/实名**在阿里云，**DNS 解析**在 Cloudflare。这两件事分属不同平台，混在一起操作是「站点忽然打不开」的经典成因。这一章划清边界、给出排查顺序。
 
+> **本章路标**：7.2 事实与依据 → 7.3 注册商侧 vs DNS 侧（分清才不背锅）→ 7.4 控制台待确认项 → 7.5 排查与迁移顺序（照顺序做，不要跳步）。
+
 ### 7.2 事实与依据
 
 | 项 | 结论 | 依据 |
@@ -632,6 +674,8 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 ### 8.1 这一章解决什么问题
 
 推送 `main` 之后会发生什么、需要哪些 Secrets、CI 的哪些「红」不是真失败、以及匿名 GitHub API 限流如何影响面板 —— 避免把正常现象当成故障去「修」。
+
+> **本章路标**：8.2 仓库与触发 → 8.3 `deploy.yml` 的 8 个步骤 → 8.4 必需的 Secrets → 8.5 `cancelled` 不算失败 → 8.6 匿名 API 限流与面板降级 → 8.7 其他 GitHub 侧事实与待确认项。
 
 ### 8.2 仓库与触发
 
@@ -712,7 +756,9 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 ### 9.1 这一章解决什么问题
 
-面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（689 行，章节索引在它开头）。
+面板是本项目**唯一的常规写入通道**。要知道：它怎么认证、有哪些接口、每个接口会不会写盘/建快照、有哪些已知边界。用户向用法见 `admin/README.md`（章节索引在它开头）。
+
+> **本章路标**：9.2 认证模型 → 9.3 全部 `/api/*` 路由表 → 9.4 页签清单 → 9.5 写入安全链 → 9.6 CI 状态与失败详情 → 9.7 已知边界（别当 bug 修）→ 9.8 站点头像 → 9.9 更新公告草稿 → 9.10 路径徽章 → 9.11 体检里的 frontmatter 校验 → 9.12 保存时的「外科式改写」→ 9.13 单窗口启动器 → 9.14 音乐资源压缩。
 
 ### 9.2 认证模型
 
@@ -1069,6 +1115,8 @@ published: Expected type `"date"`, received `"string"`
 
 让 agent 清楚「我改了文件 → 线上什么时候变」的完整因果链，以及**发布按钮不会提交什么**（这是最容易误解的一点）。
 
+> **本章路标**：10.2 完整链路（正常路径）→ 10.3 发布只提交 `PUBLISH_SCOPE`（**必须记住**）→ 10.4 三条回滚路径 → 10.5 不走 CI 的本地手动部署 → 10.6 发布链路上的「需确认」。
+
 ### 10.2 完整链路（正常路径）
 
 ```text
@@ -1154,6 +1202,8 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 
 提交前必须跑什么、跑不过时先查什么、以及在**本机环境**下有哪些工具层面的坑（npx 被执行策略挡、PowerShell 读编码、端口占用）。
 
+> **本章路标**：11.2 三条门禁 → 11.3 `重建依赖.cmd` → 11.4 构建可复现性 → 11.5 本机工具坑 → 11.6 开发服务器与常用脚本。
+
 ### 11.2 三条门禁（提交前必须全绿）
 
 | # | 门禁 | 命令 | 本次实测（2026-10-11，本机 Node v26.7.0） |
@@ -1235,6 +1285,8 @@ pnpm build
 ### 12.1 这一章解决什么问题
 
 **这一章最重要。** 下面每一条都是真实发生过的「现象 → 原因 → 处理」，来源是 `git log` 的提交正文与代码注释。知道 WHY，才不会把刻意的设计当成 bug「修回去」。**看到反直觉的写法（比如一个 `min()` 被换成了静态值、`lowSpec: true` 而不是把 blur 设 0），先来这里找原因。**
+
+> **本章路标**：12.2–12.13 每节独立成篇，统一是「现象 → 原因 → 处理 → 给 agent 的警告」；按现象查标题即可，各节末尾的警告是「别改回去」的硬约束。
 
 ### 12.2 远程随机壁纸与背景视频被移除
 
@@ -1373,6 +1425,8 @@ pnpm build
 
 告诉下一个 agent：**哪些东西已经被审计过、别再重复怀疑**；哪些是**已修缺陷**（不要「重新发现」再修一遍）；以及**哪些还没测**（别把「没测」说成「没问题」）。
 
+> **本章路标**：13.2 已确认没有问题的清单 → 13.3 已修缺陷（**不要重新修**）→ 13.4 仍未覆盖（**别把「没测」当「没问题」**）→ 13.5 审计脚本与断言数量核对 → 13.6 文档/历史与代码不一致汇总。
+
 ### 13.2 已确认没有问题的清单
 
 | 项 | 结论 | 证据来源 | 本次是否复核 |
@@ -1460,6 +1514,8 @@ pnpm build
 
 ## 附录 A：快问快答（27 条）
 
+> 用法：按「我想做什么」找问题；答案里同时给面板入口与手工等价位置。带 ⚠️ 的是容易改坏的地方 —— 原因写在对应章节，这里只给最短路径。
+
 | # | 问题 | 答案（含位置） |
 | --- | --- | --- |
 | 1 | **想加一个友链，改哪？** | 优先：面板「友链」页 → 新增（写 `src/config/friends.json`，`admin/friends.mjs`）。手工：直接编辑 `src/config/friends.json`，字段见 `friendsConfig.ts:9` 与 `admin/README.md:535-544`（`title` ≤60 字、`siteurl` 只允许 http(s)、`imgurl` 必填、`weight` -999~999）。图标要放进 `public/friends/` 再填路径（**面板不能上传到这个目录**） |
@@ -1514,6 +1570,8 @@ pnpm build
 ---
 
 ## 附录 C：交付前自查（本文档的证据）
+
+> 本附录是本文档自身的证据：路径是否真实存在、路由 / 字段 / 配置的计数口径、以及「只改了文档」的自证。每节的复核方式都写在节内；其中的数字是写作时的实测快照，会随代码漂移，**当前值以 `pnpm check-docs` 的输出为准**。
 
 ### C.1 文档里的路径是否真实存在（抽查 ≥20 个）
 

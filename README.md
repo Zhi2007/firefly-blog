@@ -7,7 +7,33 @@
 - 旧的 `*.workers.dev` 地址仍然可用（`wrangler.jsonc` 注释里记着它）
 - 关于我：<https://www.zhihaisblog.top/about/>；源码：<https://github.com/Zhi2007/firefly-blog>
 
+## 目录
+
+> 按「想做什么」选章节；第一次来建议按 1 → 2 → 3 顺序读。
+
+| 章节 | 内容 |
+| --- | --- |
+| [1. 项目简介](#1-项目简介) | 技术栈与版本（取自 `package.json`） |
+| [2. 特性一览](#2-特性一览) | 每个功能由哪个配置控制 |
+| [3. 快速开始](#3-快速开始) | Node / pnpm 要求、从 clone 到本地预览 |
+| [4. 常用命令](#4-常用命令) | `package.json` 的 scripts 与 8 步构建链路 |
+| [5. 目录结构](#5-目录结构) | 仓库树与各目录职责 |
+| [6. 写一篇文章](#6-写一篇文章) | frontmatter 全字段、完整示例、Word / txt 导入 |
+| [7. 配置指南](#7-配置指南) | 15 个配置文件逐项说明 |
+| [8. 管理面板](#8-管理面板) | 三种启动方式、认证、11 个页签 |
+| [9. 音乐系统](#9-音乐系统) | 歌单结构、`.lrc` 歌词、一键压缩 |
+| [10. 部署到 Cloudflare](#10-部署到-cloudflare) | Actions、`wrangler.jsonc`、Worker、DNS |
+| [11. 常见问题 FAQ](#11-常见问题-faq) | 现象 → 原因 → 解决 |
+| [12. 安全](#12-安全) | 站点侧措施、面板安全模型、密钥 |
+| [13. 署名与许可](#13-署名与许可) | 上游项目与 MIT |
+
+**常查小节**：[从 clone 到本地预览](#从-clone-到本地预览) · [`pnpm build` 的完整链路](#pnpm-build-的完整链路) · [6.1 frontmatter 字段表](#61-frontmatter-字段表) · [6.3 Word / txt 导入](#63-用-word--txt-写再用面板导入) · [7.1 `siteConfig.ts`](#71-siteconfigts) · [8.3 十一个页签](#83-十一个页签能做什么) · [10.2 `wrangler.jsonc` 部署事实](#102-wranglerjsonc-里的部署事实)
+
+**相关文档**：管理面板的完整用法见 [`admin/README.md`](./admin/README.md)；给 AI agent 的施工规范（哪些文件不能改、部署链路、踩坑史）见 [`docs/PROJECT-CONTEXT.md`](./docs/PROJECT-CONTEXT.md)。
+
 ## 1. 项目简介
+
+这一章交代站点由什么组成、各组件版本从哪查——升级依赖前先看这里。
 
 | 层 | 技术 | 版本（取自 `package.json`） | 干什么 |
 | --- | --- | --- | --- |
@@ -67,6 +93,8 @@
 > 关闭某项功能最省事的入口：管理面板的「站点设置 / 配置」页（详见 `admin/README.md`），或者直接改上表对应的配置文件后重新构建。
 
 ## 3. 快速开始
+
+从零把仓库跑起来：前置要求 → 安装依赖 → 本地预览。
 
 ### 前置要求
 
@@ -168,6 +196,8 @@ Indexed 9 pages
 > 上例是**格式示意**：本机沙箱环境跑 `astro build` 时会因为本地 `node_modules` 与 lockfile 不一致而报 `require is not defined`（picomatch），所以这里给出的不是本次实跑日志；页数 30 与 `dist/` 的实际 `.html` 数量一致。修复办法见 FAQ。
 
 ## 5. 目录结构
+
+仓库根目录每一层是干什么的；新增文件前先确认该放哪。
 
 ```text
 firefly/
@@ -882,6 +912,8 @@ export const tabTitleConfig: TabTitleConfig = {
 
 ## 9. 音乐系统
 
+播放器、歌单、歌词与压缩脚本之间的关系；改歌单前先看 9.2 的记录结构。
+
 ### 9.1 数据在哪
 
 | 文件 / 目录 | 内容 |
@@ -957,6 +989,8 @@ node scripts/compress-music.mjs --dir <路径>
 需要 **ffmpeg**：脚本依次尝试 `FFMPEG_PATH` 环境变量 → `PATH` → 常见安装位置（`C:\ffmpeg\bin\ffmpeg.exe`、winget Links、scoop shims、`/usr/bin/ffmpeg`、`/usr/local/bin/ffmpeg`、`/opt/homebrew/bin/ffmpeg`）；找不到会直接报错退出并提示 `winget install Gyan.FFmpeg`。面板里的「一键压缩」走的是同一个脚本，参数由服务端白名单拼接（`--dry-run` / `--covers` / `--all`），**不会**误触发"不带参数"的破坏性行为。
 
 ## 10. 部署到 Cloudflare
+
+从 `git push` 到线上生效的完整链路，以及 `wrangler.jsonc` 里写死的部署事实。
 
 ### 10.1 自动化流程（GitHub Actions）
 
@@ -1044,6 +1078,8 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 
 ## 11. 常见问题 FAQ
 
+把常见报错按「现象 → 原因 → 解决」列出来；先查表再动手。
+
 | 现象 | 原因 | 解决 |
 | --- | --- | --- |
 | 本地 `pnpm build`（或 `pnpm dev`）报 `require is not defined`，栈里出现 `picomatch` | 本地 `node_modules` 与 `pnpm-lock.yaml` 不一致，`.pnpm` 里残留了旧版 vite（本次实测报错位置就是 `node_modules/.pnpm/picomatch@4.0.7/.../index.js` + `vite@8.3.4` 的 module-runner） | 双击根目录的 `重建依赖.cmd`：它会自动探测仓库（判定 `package.json` + `wrangler.jsonc` + `src\config`）、删掉 `node_modules`、跑 `pnpm install --frozen-lockfile`，全过程写日志到 `logs/`（已 gitignore）。等价的手工命令是 `rm -rf node_modules && pnpm install --frozen-lockfile` |
@@ -1060,6 +1096,8 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 | 音频/封面很大，部署包也变大 | 单曲建议 ≤ 10 MB（Cloudflare 单个静态资源上限 25 MiB） | 用 `pnpm compress-music`（或面板「音乐」页的压缩按钮）压到 128kbps，封面转 JPEG 并限制 600px |
 
 ## 12. 安全
+
+已启用的安全措施与面板认证模型；提交前别把密钥带进仓库。
 
 ### 12.1 站点侧已启用的措施
 
