@@ -4,7 +4,7 @@ published: 2026-10-30
 description: 从 ISO 启动到 BIOS 引导 GRUB 的完整安装记录：VMware 设置、分区、pacstrap、chroot 配置、4G swapfile、GRUB 安装，以及 linux-firmware 变包名、mirrorlist 被写坏、umount busy 等真实踩坑。
 tags: [Arch Linux, VMware, 虚拟机, Linux, 教程]
 category: 教程
-image: ./images/arch-linux-cover.png
+image: ./images/install-archlinux-in-vmware/arch-linux-cover.png
 ---
 
 # 在 VMware 虚拟机中安装 Arch Linux
@@ -39,7 +39,7 @@ Arch 是「装完只有基础系统」的发行版：不预装桌面、不预装
 Arch Linux install medium (x86_64, BIOS)
 ```
 
-![Arch Linux ISO 启动菜单](./images/arch-install-01-boot-menu.png)
+![Arch Linux ISO 启动菜单](./images/install-archlinux-in-vmware/arch-install-01-boot-menu.png)
 
 进入 Live 环境后自动以 `root` 登录，提示符是 `root@archiso ~ #`。先确认自己处于 BIOS 还是 UEFI 模式：
 
@@ -60,7 +60,7 @@ ping -c 3 archlinux.org
 timedatectl set-ntp true
 ```
 
-![reflector 换源警告与 ip a 结果](./images/arch-install-02-network.png)
+![reflector 换源警告与 ip a 结果](./images/install-archlinux-in-vmware/arch-install-02-network.png)
 
 ### 关于 reflector 换源
 
@@ -104,7 +104,7 @@ lsblk
 fdisk /dev/sda
 ```
 
-![lsblk 确认磁盘与 fdisk 分区表](./images/arch-install-03-fdisk.png)
+![lsblk 确认磁盘与 fdisk 分区表](./images/install-archlinux-in-vmware/arch-install-03-fdisk.png)
 
 按下面顺序输入（每行一个按键）：
 
@@ -130,7 +130,7 @@ mount /dev/sda1 /mnt
 findmnt /mnt
 ```
 
-![mkfs.ext4 与挂载结果](./images/arch-install-04-mkfs-mount.png)
+![mkfs.ext4 与挂载结果](./images/install-archlinux-in-vmware/arch-install-04-mkfs-mount.png)
 
 **为什么用「单分区 + swapfile」而不是单独分 swap 分区？**
 虚拟机磁盘小，单分区结构简单、不易分错；swap 用文件实现，随时可改大小、可 `swapoff` 删除，灵活性更高。
@@ -153,7 +153,7 @@ error: target not found: linux-firmware
 ERROR: Failed to install packages to new root
 ```
 
-![pacstrap 因 linux-firmware 报错中止](./images/arch-install-06-pacstrap-error.png)
+![pacstrap 因 linux-firmware 报错中止](./images/install-archlinux-in-vmware/arch-install-06-pacstrap-error.png)
 
 原因是新版 Arch 已把 `linux-firmware` 拆成按厂商的子包（`linux-firmware-xxx`），单包名不再存在；pacman 遇到不存在的目标会**整单中止**，所以 `/mnt` 里一个包都没装上。
 
@@ -170,7 +170,7 @@ ls /mnt/boot
 ls /mnt/usr/bin | wc -l
 ```
 
-![基础包安装成功后的验证](./images/arch-install-07-verify-base.png)
+![基础包安装成功后的验证](./images/install-archlinux-in-vmware/arch-install-07-verify-base.png)
 
 应看到 `vmlinuz-linux`、`initramfs-linux.img`，且 `/usr/bin` 里有一千多个程序。
 
@@ -236,7 +236,7 @@ echo '/swapfile none swap defaults 0 0' >> /etc/fstab
 swapon --show
 ```
 
-![创建并启用 4G swapfile](./images/arch-install-08-swapfile.png)
+![创建并启用 4G swapfile](./images/install-archlinux-in-vmware/arch-install-08-swapfile.png)
 
 最后一行应看到 `/swapfile file 4G`。`PRI` 显示 `-1` 是手动 `swapon` 的默认优先级，正常。
 
@@ -272,7 +272,7 @@ cat /etc/pacman.d/mirrorlist
 >
 > 更早还出现过 `directive 'server' ... not recognized` 的警告——某行 `Server` 大小写不对，整行被 pacman 忽略：
 
-![mirrorlist 格式坏行导致 pacman 警告](./images/arch-install-05-mirror-warning.png)
+![mirrorlist 格式坏行导致 pacman 警告](./images/install-archlinux-in-vmware/arch-install-05-mirror-warning.png)
 
 **教训**：长命令在虚拟机控制台里很不可靠，宁可拆成多条短命令，写完用 `cat` 检查内容。
 
@@ -283,7 +283,7 @@ pacman -S --noconfirm open-vm-tools
 systemctl enable vmtoolsd
 ```
 
-![安装并启用 open-vm-tools](./images/arch-install-11-vmtools.png)
+![安装并启用 open-vm-tools](./images/install-archlinux-in-vmware/arch-install-11-vmtools.png)
 
 装好后宿主机与虚拟机可以**互相复制粘贴**、窗口自适应分辨率、时间同步。若提示 `is up to date -- reinstalling`，说明之前已装，不影响。
 
@@ -294,7 +294,7 @@ grub-install --target=i386-pc /dev/sda
 grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
-![grub-install 与生成的 fstab](./images/arch-install-09-grub-fstab.png)
+![grub-install 与生成的 fstab](./images/install-archlinux-in-vmware/arch-install-09-grub-fstab.png)
 
 预期输出：
 

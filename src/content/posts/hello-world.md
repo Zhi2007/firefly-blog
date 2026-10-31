@@ -4,7 +4,7 @@ published: 2026-10-09
 description: 这个博客的技术选型和第一篇介绍——Astro 静态生成、Firefly 主题、Cloudflare Workers 托管，一年成本只有域名钱。
 tags: [公告, Astro, Cloudflare]
 category: 公告
-image: ./images/cover-demo.png
+image: ./images/hello-world/cover-demo.png
 ---
 
 欢迎来到栀海的博客。

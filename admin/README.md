@@ -113,7 +113,7 @@ admin-launcher\build.cmd
 {
 	"ok": true,
 	"kind": "docx",
-	"markdown": "## 第一节\n\n这里是正文。\n\n![my-first-post-img1](./images/my-first-post-img1.png)\n",
+	"markdown": "## 第一节\n\n这里是正文。\n\n![my-first-post-img1](./images/my-first-post/my-first-post-img1.png)\n",
 	"suggested": {
 		"title": "我的文章",
 		"description": "这里是正文。"
@@ -121,8 +121,8 @@ admin-launcher\build.cmd
 	"images": [
 		{
 			"name": "my-first-post-img1.png",
-			"repoPath": "src/content/posts/images/my-first-post-img1.png",
-			"url": "./images/my-first-post-img1.png"
+			"repoPath": "src/content/posts/images/my-first-post/my-first-post-img1.png",
+			"url": "./images/my-first-post/my-first-post-img1.png"
 		}
 	],
 	"warnings": ["跳过了 2 处不支持的内容（文本框 / 嵌入对象 / 公式等）"]
@@ -138,7 +138,7 @@ admin-launcher\build.cmd
 | 字段 | 含义 |
 | --- | --- |
 | `kind` | `"docx"` / `"txt"` / `"md"`，来自扩展名判定 |
-| `markdown` | 转换后的 Markdown 正文（图片已替换成 `./images/<slug>-imgN.ext` 的引用） |
+| `markdown` | 转换后的 Markdown 正文（图片已替换成 `./images/<文章名>/<slug>-imgN.ext` 的引用） |
 | `suggested.title` | 建议标题：优先取文档里第一个一级标题（`Title` / `Heading1` 样式），没有就用文件名（`-`/`_` 换成空格、压掉多余空白） |
 | `suggested.description` | 建议摘要：正文里第一段纯文本截断到 100 字 |
 | `images[]` | 落盘的图片：`name`（实际文件名）、`repoPath`（仓库相对路径）、`url`（正文里用的引用） |
@@ -161,15 +161,15 @@ admin-launcher\build.cmd
 
 ### 图片去哪了
 
-`.docx` 里的图片**必须落盘**（否则 Markdown 引用不到），所以它们会被写进：
+`.docx` 里的图片**必须落盘**（否则 Markdown 引用不到），所以它们会被写进「当前文章的图片子目录」：
 
 ```
-src/content/posts/images/<slug>-img1.png     ← slug 取自编辑器里的文件名，缺省用 "import"
-src/content/posts/images/<slug>-img2.jpg
+src/content/posts/images/<文章名>/<slug>-img1.png     ← 文章名取编辑器里的文件名，缺省用 "import"
+src/content/posts/images/<文章名>/<slug>-img2.jpg
 ```
 
 - 命名按文档里出现的顺序递增；**同名文件已存在就往后加序号，绝不覆盖**。
-- 后端会先校验目标目录必须是 `src/content/posts/images`（解析后的绝对路径比较，挡住 `../` 越界）。
+- 后端会先校验目标目录落在 `src/content/posts/images` 之内（解析后的绝对路径比较，挡住 `../` 越界）；编辑器里的文件名为空或非法时退回 `images` 根目录。
 - `.txt` / `.md` 不产生图片（`images` 为空数组）。
 - 数据库里找不到对应图片、或形如文本框/图表/公式的图形无法抽取时，会计入 `warnings`。
 
@@ -267,10 +267,10 @@ published: Expected type `"date"`, received `"string"`
 | 当前页面 | 拖入的文件会去 | 额外行为 |
 | --- | --- | --- |
 | **音乐** | `public/assets/music/` | 音频自动提取封面/歌词（ID3 / FLAC / MP4 标签），并**直接加进歌单**；图片进 `cover/`、`.lrc` 进 `lrc/`；**同一目录已有完全相同内容会被拒收（409）** |
-| **媒体** | 当前下拉框选中的目录 | 支持多选批量上传 |
-| 其它页面 | `src/content/posts/images/` | 若文章编辑器正开着，单张图片会顺手填成封面 |
+| **媒体** | 当前下拉框选中的目录 | 支持多选批量上传；文章图片可在「归属文章」里填子目录 |
+| 其它页面 | `src/content/posts/images/<当前文章>/` | 编辑器没开时进 `src/content/posts/images/` 根目录；单张图片会顺手填成封面 |
 
-拖动过程中页面中央会显示提示（"上传到：…"）；把文件拖到「上传封面…」按钮上则会强制进文章图片目录。
+拖动过程中页面中央会显示提示（"上传到：…"）；把文件拖到「上传封面…」按钮上则会强制进当前文章的图片子目录。
 
 ## 从音频自动提取封面与歌词
 
@@ -736,7 +736,7 @@ admin-backups/<时间戳>-<随机>/          ← 已写进 .gitignore，不会�
 | 页签 / 位置 | 显示什么路径 | 来源接口的字段 |
 | --- | --- | --- |
 | 文章列表 | `src/content/posts/<文件名>`（`.md` / `.mdx` 原样）+ 该文 URL | `/api/posts` → `posts[].file` |
-| 文章编辑器 | 当前文件、`src/content/posts/images`、正文 `./images/…` 引用到的图片（逐个核对过） | `/api/post` → `file` / `imagesDir` / `images[]` |
+| 文章编辑器 | 当前文件、`src/content/posts/images/<文章名>/`、正文 `./images/…` 引用到的图片（逐个核对过） | `/api/post` → `file` / `imagesDir` / `images[]` |
 | 文章编辑器（新建） | 「保存后将写入 `src/content/posts/<slug>.md`（尚未创建）」 | `/api/posts` → `dir` + 输入框里的 slug |
 | 媒体 | 当前目录 + 每个文件的 `public/assets/...`、体积、可引用的站内 URL | `/api/media` → `dirs` / `files[].repoPath` |
 | 公告 | `src/config/announcements.json`（列表卡片与编辑器各一处） | `/api/announcements` → `file` |

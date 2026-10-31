@@ -267,7 +267,7 @@ firefly/
 | --- | --- | --- | --- | --- |
 | ① `public/`（站点级） | `/assets/images/foo.webp`（**以 `/` 开头**） | ❌ 不优化，原样拷贝 | `profileConfig.ts:6`、`siteConfig.ts:102`，`public/` 会整体进 `dist/` | 头像、logo、打赏码、分享图、动图（GIF/动态 WebP 必须走这里，见 ② 的注意） |
 | ② `src/assets/`（走管线） | `assets/images/foo.avif`（**不以 `/` 开头**） | ✅ 自动转 WebP（`siteConfig.imageOptimization.formats: "webp"`，质量 85） | `profileConfig.ts:7`、`siteConfig.ts:103,327-344` | 文章封面、内容配图（体积敏感） |
-| ③ 文章自己的 `images/` 目录 | `./images/foo.png`（**相对文章文件**） | ❌ | `admin/server.mjs:140`（`MEDIA_URL_PREFIX["post-images"] = "./images/"`）、`admin/README.md:130-133` | 面板上传的图片、Word 导入抽出的图片 |
+| ③ 文章自己的 `images/<文章名>/` 目录 | `./images/<文章名>/foo.png`（**相对文章文件**，`<文章名>` = md 文件名去掉扩展名；平铺的 `./images/foo.png` 仍兼容） | ❌ | `admin/server.mjs` 的 `postImageDir()` / `MEDIA_URL_PREFIX["post-images"] = "./images/"`、`admin/README.md` 的「图片去哪了」 | 面板上传的图片、Word 导入抽出的图片（按当前文章自动进子目录） |
 | ④ 远程 URL | `https://.../foo.jpg` | ❌ | `siteConfig.ts:104` | 防盗链站点（已在 `noReferrerDomains` 里列了 `*.hdslb.com` 等，`siteConfig.ts:338-343`） |
 
 ⚠️ **动图红线**：`profileConfig.ts:9-10` 写明「动图必须放在 `public/` 并用 `/` 开头的路径，走 `src` 的优化管线会被转成静态图、动画就没了」。当前头像就是 `public/assets/images/avatar-zhi.webp`（动态 WebP）。
@@ -293,7 +293,7 @@ firefly/
 | 不支持 | 旧版 `.doc`（二进制）、其它扩展名 | 同上 |
 | 体积上限 | **25 MB**（前端拦一次，后端 `MAX_IMPORT_BYTES` 再拦一次，`admin/import-doc.mjs:17`、`server.mjs:2219-2230`） | 实测 |
 | 编码 | UTF-8 严格模式 → 失败或含 `\uFFFD` 时退回 **GBK**，并写 `warnings` | `admin/README.md:123` |
-| 图片落盘 | `src/content/posts/images/<slug>-imgN.ext`，同名往后加序号，**绝不覆盖**；后端先校验目录必须是 `src/content/posts/images` | `server.mjs:2233-2242` |
+| 图片落盘 | `src/content/posts/images/<文章名>/<slug>-imgN.ext`（按文章分组），同名往后加序号，**绝不覆盖**；后端先校验目录落在 `src/content/posts/images` 之内；slug 非法/为空时退回 `images` 根目录 | `server.mjs` 的 `/api/import-document` 分支 |
 | 是否自动保存 | **不自动保存**。接口只做「转 Markdown + 图片落盘」，正文回填编辑器由人确认后再点保存 | `server.mjs:2203-2209`、`admin/README.md:151-159` |
 | 认证 | 与其它接口一致（Cookie / `X-Admin-Token` / `?token=` 任一），非 POST 返回 405 | `server.mjs:2206-2209` |
 
@@ -751,11 +751,11 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | — | `/api/health` | **仅 GET**（否则 405） | 否 | 否 | 启动器就绪探针专用：只回 `{ok,ready,pid,port,supervised,startedAt}`，**不跑 git、不联网、不 spawn 子进程**（毫秒级）；`POST_BODY_FIELDS` 登记空数组；见 9.13 节 | `admin/server.mjs` 的 `/api/health` 分支 |
 | 2 | `/api/status` | GET 读状态；**POST `{action:"restart"}`**（仅启动器托管时） | 否 | 否 | 仓库信息 + 最近 Actions + pnpm 探测；`changed[]` 是结构化的待提交文件（`{code,path,origin}`）；`server{pid,port,supervised,startedAt,uptimeMs,logFile}`；`?log=1` 额外返回后台日志尾部（最多 128KB，`log{text,size,truncated,missing}`）；POST restart 先回 `{ok:true}` 再退出，由启动器以同端口/令牌重新拉起；未托管返回 **409**；`POST_BODY_FIELDS` 放行 `action` | `admin/server.mjs` 的 `/api/status` 分支 |
 | 3 | `/api/posts` | GET | 否 | 否 | 文章列表；另返回 `dir` / `imagesDir` / `imagesUrlPrefix`（面板显示「文章存在哪、图片放哪」） | `:1681-1691` |
-| 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir` / `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
+| 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir`（= `images/<slug>/`）/ `imagesUrlPrefix`（= `./images/<slug>/`）/ `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
 | 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`）；**frontmatter 外科式改写**：日期落盘为不带引号的 `YYYY-MM-DD`、非法日期或空 `title` 一律 400（不落盘）、没编辑的行逐字节保留（**9.12 节**）；返回 `file` / `notes[]`（本次顺手规整了哪一行日期） | `:1745-1780` |
 | 6 | `/api/delete-post` | POST | 是（删除） | 是 | slug 正则 + `resolveInside([POSTS_DIR])` | `:1762-1778` |
 | 7 | `/api/media` | GET | 否 | 否 | 返回目录表（`dirs`）与文件列表（每项含 `repoPath` 仓库相对路径） | `:1779-1782` |
-| 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；音频额外抽封面/歌词；返回 `repoPath` | `:1783-1825` |
+| 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；`dir=post-images` 时可带 `postSlug` → 落 `images/<文章名>/` 并返回 `./images/<文章名>/<文件名>`（不带则落 `images/` 根目录）；音频额外抽封面/歌词；返回 `repoPath` / `dir` / `path` | `:1783-1825` |
 | 9 | `/api/delete-media` | POST | 是（删除） | **是**（删除不可逆，必留快照） | `resolveInside` 到全部 `MEDIA_DIRS` | `:1826-1845` |
 | 10 | `/api/announcements` | GET 读 / POST 写 | **是** | 是（`writeJsonData` 内） | `body.items` 必须是数组；GET 返回数据文件路径 `file` | `:1846-1866` |
 | 11 | `/api/announcement-draft` | **仅 GET** | 否（只读 git 历史，不碰任何文件） | 否（设计如此：只产草稿） | 未认证 403；`since` 支持「提交 sha / YYYY-MM-DD / 最近天数」，非法一律 400；git 失败降级为 502 并给中文原因；**只生成草稿、不自动发布**；见 9.9 节 | `:1867-1882` |
@@ -934,7 +934,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 页签 / 位置 | 显示什么路径 | 数据来源 |
 | --- | --- | --- |
 | 文章列表（每篇） | `src/content/posts/<真实文件名>`（`.md` / `.mdx` 原样）+ 该文的 URL | `/api/posts` 的 `posts[].file`（`fs.readdir`） |
-| 文章编辑器 | 当前文件、`src/content/posts/images`、正文 `./images/…` 引用到的图片（逐个 `stat`） | `/api/post` 的 `file` / `imagesDir` / `images[]` |
+| 文章编辑器 | 当前文件、`src/content/posts/images/<文章名>/`、正文 `./images/…` 引用到的图片（逐个 `stat`） | `/api/post` 的 `file` / `imagesDir` / `images[]` |
 | 文章编辑器（新建） | 「保存后将写入 `src/content/posts/<slug>.md`（尚未创建）」 | `postsMeta.dir`（`/api/posts`）+ 输入框里的 slug |
 | 媒体页 | 当前目录 + 每个文件的 `public/assets/...`（+ 体积、可引用的站内 URL） | `/api/media` 的 `dirs` / `files[].repoPath` |
 | 公告 | `src/config/announcements.json` | `/api/announcements` 的 `file` |
@@ -1471,7 +1471,7 @@ pnpm build
 | 7 | **想新增一个导航菜单项？** | **只能改 `src/config/navBarConfig.ts`**（面板不支持新增，`admin/nav.mjs:99`）。在 `getDynamicNavBarConfig()` 里加项，**必须写显式 `id`**，否则面板读不到它（`navBarConfig.ts:17-130`）。加完可以再用面板做隐藏/改名/排序 |
 | 8 | **想改站点标题 / 副标题 / 主题色？** | 面板「站点设置」：`site.title`、`site.subtitle`、`site.description`、`site.keywords`、`navbar.title`、`theme.hue`、`theme.defaultMode`（`admin/settings.mjs:26-37`）。等价位置 `siteConfig.ts:45-66,114` |
 | 9 | **文章链接 404 / 我换了文件名？** | URL 由文件路径决定（3.4 节）。重命名 = 旧链接失效；Worker 只处理 `/blog/*` 的历史跳转（`worker/index.mjs:84-90`），不会自动给任意旧 URL 兜底。要保留旧链接就在 `worker/index.mjs` 的 `legacyRedirect()` 里加规则 |
-| 10 | **想给文章配图，放哪？** | 三种都行（3.5 节）：放进 `src/content/posts/images/` 然后正文写 `./images/xxx.png`（面板上传走这里）；封面可放 `src/assets/...`（走优化）；站点级图片放 `public/assets/images/` 并用 `/assets/images/...` 引用。**动图必须放 `public/`** |
+| 10 | **想给文章配图，放哪？** | 三种都行（3.5 节）：放进 `src/content/posts/images/<文章名>/` 然后正文写 `./images/<文章名>/xxx.png`（面板上传/Word 导入会自动进当前文章的子目录；老的平铺 `./images/xxx.png` 仍兼容）；封面可放 `src/assets/...`（走优化）；站点级图片放 `public/assets/images/` 并用 `/assets/images/...` 引用。**动图必须放 `public/`** |
 | 11 | **想改主页横幅文字？** | 面板「站点设置」：`wallpaper.title`（主标题）、`banner.subtitles`（副标题，每行一条）。等价位置 `backgroundWallpaper.ts:75,79-84`。打字机开关在 `:87-98` |
 | 12 | **想开/关某个页面（相册、动态、打赏…）？** | 面板「站点设置 → 页面开关」（`pages.*`，从 `siteConfig.ts:10-46` 的 `resolvePageToggles` 动态读取）。等价位置 `siteConfig.ts:14-40`；也可用环境变量 `PUBLIC_PAGES_<KEY>`（`page-toggle-utils.ts:18-44`）。**关掉页面会同时隐藏对应导航项并返回 404**（`siteConfig.ts:9` 注释） |
 | 13 | **想改 CSP 放行一个新域名？** | 改 `worker/index.mjs:31`（**唯一生效处**），并**同步**改 `public/_headers:32` 保持一致；在旁边的注释里写清为什么放行（`public/_headers:13-23` 就是先例）。改完建议先临时改成 `Content-Security-Policy-Report-Only` 观察，再正式生效 |

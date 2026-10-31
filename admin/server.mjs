@@ -172,6 +172,19 @@ function mediaUrl(dirKey, name) {
 	return `${MEDIA_URL_PREFIX[dirKey] ?? "/"}${name}`;
 }
 
+// 文章图片按文章分组：每篇文章一个子目录，图片仍全部集中在 src/content/posts/images 下。
+//   落盘：src/content/posts/images/<slug>/<文件名>
+//   引用：./images/<slug>/<文件名>（正文与 frontmatter.image 都相对文章文件）
+// slug 必须先过 POST_SLUG_RE；拼出来的目录仍然落在 MEDIA_DIRS["post-images"] 里，
+// resolveInside(...) 的白名单校验不会因为多一层目录而失效。
+function postImageDir(slug) {
+	return path.posix.join(MEDIA_DIRS["post-images"], slug);
+}
+
+function postImagePrefix(slug) {
+	return `${MEDIA_URL_PREFIX["post-images"]}${slug}/`;
+}
+
 const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
 
 // 上传类型白名单：只允许真正的图片/音频/歌词，避免把 .html / .svg（可带脚本）传进站点目录
@@ -893,9 +906,12 @@ function dateNormalizeNotes(before, after) {
 /**
  * 从文章正文里找出它引用的**本地图片**，并逐个核对真实文件。
  *
- * 只认 `./images/<文件名>` 这一种写法 —— 面板把「文章图片」的引用前缀固定成了
+ * 只认 `./images/…` 这一种写法 —— 面板把「文章图片」的引用前缀固定成了
  * `MEDIA_URL_PREFIX["post-images"]`（见该常量的注释），正文里就该这么写。
- * 其它写法（远程 URL、`/assets/...`、子目录、`../`）一律**不猜**：猜出来的路径只会让作者去找一个不存在的位置。
+ * 支持两种形态：`./images/<文件名>`（老的平铺写法）和 `./images/<文章名>/<文件名>`
+ * （按文章分组的写法，面板上传默认走这个）。
+ * 其它写法（远程 URL、`/assets/...`、`../`、`.hidden/x`、两层以上子目录）一律**不猜**：
+ * 猜出来的路径只会让作者去找一个不存在的位置。
  *
  * 正则刻意带一个「后面必须紧跟收尾符」的断言（`)` / 引号 / `>`，中间可以有一个
  * Markdown 标题 `"…"`）：文件名里出现空格时 markdown 本身就已经坏了，这时**宁可不列出**，
@@ -921,9 +937,11 @@ async function postImages(markdown) {
 	);
 	for (const match of String(markdown ?? "").matchAll(pattern)) {
 		const raw = match[1];
-		// 只允许「images 目录下的一个文件名」：带 / 或 ? 或 # 的写法不认（可能是子目录或查询串）
-		if (!/^[^/\\?#]+$/.test(raw)) continue;
-		const repoPath = path.posix.join(dir, raw);
+		// 允许「文件名」或「一个子目录 + 文件名」；每段都不能为空、不能是 . / ..、不能带查询串
+		const segments = raw.split("/");
+		if (segments.length > 2) continue;
+		if (segments.some((seg) => !seg || seg === "." || seg === ".." || /[\\?#]/.test(seg))) continue;
+		const repoPath = path.posix.join(dir, ...segments);
 		if (seen.has(repoPath)) continue;
 		seen.add(repoPath);
 		let existsLocal = false;
@@ -995,28 +1013,50 @@ async function taxonomy() {
 async function listMedia() {
 	const result = {};
 	for (const [key, dir] of Object.entries(MEDIA_DIRS)) {
-		const abs = safeResolve(dir);
-		if (!(await exists(abs))) {
-			result[key] = [];
-			continue;
-		}
-		const entries = await fs.readdir(abs, { withFileTypes: true });
-		const files = [];
-		for (const entry of entries) {
-			if (!entry.isFile()) continue;
-			const stat = await fs.stat(path.join(abs, entry.name));
-			files.push({
-				name: entry.name,
-				path: mediaUrl(key, entry.name),
-				repoPath: path.posix.join(dir, entry.name),
-				size: stat.size,
-				updatedAt: stat.mtime.toISOString(),
-			});
-		}
-		files.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-		result[key] = files;
+		result[key] = await listMediaDir(key, dir);
 	}
 	return result;
+}
+
+/**
+ * 列出一个媒体目录里的文件。
+ * 文章图片（post-images）按文章分了子目录（images/<文章名>/），所以这里要往下走一层：
+ * 子目录里的文件以「文章名/文件名」显示，引用路径也带上子目录，删除仍按完整 repoPath。
+ */
+async function listMediaDir(key, dir) {
+	const abs = safeResolve(dir);
+	if (!(await exists(abs))) return [];
+	const entries = await fs.readdir(abs, { withFileTypes: true });
+	const files = [];
+	const add = async (repoPath, displayName, urlPath) => {
+		const stat = await fs.stat(safeResolve(repoPath)).catch(() => null);
+		if (!stat?.isFile()) return;
+		files.push({
+			name: displayName,
+			path: urlPath,
+			repoPath,
+			size: stat.size,
+			updatedAt: stat.mtime.toISOString(),
+		});
+	};
+	for (const entry of entries) {
+		if (entry.isFile()) {
+			const repoPath = path.posix.join(dir, entry.name);
+			await add(repoPath, entry.name, mediaUrl(key, entry.name));
+			continue;
+		}
+		// 只有文章图片有「按文章分组」的子目录；其它媒体目录保持扁平
+		if (key !== "post-images" || !entry.isDirectory()) continue;
+		const subAbs = path.join(abs, entry.name);
+		const subEntries = await fs.readdir(subAbs, { withFileTypes: true }).catch(() => []);
+		for (const sub of subEntries) {
+			if (!sub.isFile()) continue;
+			const repoPath = path.posix.join(dir, entry.name, sub.name);
+			await add(repoPath, `${entry.name}/${sub.name}`, `${MEDIA_URL_PREFIX[key]}${entry.name}/${sub.name}`);
+		}
+	}
+	files.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	return files;
 }
 
 async function repoInfo() {
@@ -1734,7 +1774,7 @@ function publicErrorText(error) {
 const POST_BODY_FIELDS = {
 	"/api/save-post": ["slug", "originalSlug", "frontmatter", "body"],
 	"/api/delete-post": ["slug"],
-	"/api/upload": ["dir", "filename", "dataBase64"],
+	"/api/upload": ["dir", "filename", "dataBase64", "postSlug"],
 	"/api/delete-media": ["repoPath"],
 	"/api/announcements": ["items"],
 	// 草稿是 GET-only：登记空数组不是为了接收字段，而是让「往只读接口 POST 带字段」也走 400 而不是静默执行
@@ -1962,8 +2002,9 @@ const server = createServer(async (req, res) => {
 					slug,
 					file,
 					dir: POSTS_DIR,
-					imagesDir: MEDIA_DIRS["post-images"],
-					imagesUrlPrefix: MEDIA_URL_PREFIX["post-images"],
+					// 图片按文章分组：这篇的图片目录是 images/<slug>/，正文引用前缀 ./images/<slug>/
+					imagesDir: postImageDir(slug),
+					imagesUrlPrefix: postImagePrefix(slug),
 					images,
 					frontmatter,
 					body: md,
@@ -2031,7 +2072,7 @@ const server = createServer(async (req, res) => {
 				return;
 
 			case "/api/upload": {
-				const { dir, filename, dataBase64 } = body;
+				const { dir, filename, dataBase64, postSlug } = body;
 				if (!(dir in MEDIA_DIRS)) {
 					sendJson(res, 400, { error: `未知目录: ${dir}` });
 					return;
@@ -2047,7 +2088,24 @@ const server = createServer(async (req, res) => {
 					});
 					return;
 				}
-				const repoPath = path.posix.join(MEDIA_DIRS[dir], safeName);
+				// 文章图片按文章分组：带 postSlug 时落到 images/<文章名>/，
+				// 引用前缀随之变成 ./images/<文章名>/；不带则仍放到 images 根目录（兼容老写法）。
+				let dirRel = MEDIA_DIRS[dir];
+				let urlPrefix = MEDIA_URL_PREFIX[dir];
+				if (dir === "post-images") {
+					const folder = typeof postSlug === "string" ? postSlug.trim() : "";
+					if (folder) {
+						if (!POST_SLUG_RE.test(folder)) {
+							sendJson(res, 400, {
+								error: "文章名（图片子目录）只能包含字母、数字、点、下划线和连字符",
+							});
+							return;
+						}
+						dirRel = postImageDir(folder);
+						urlPrefix = postImagePrefix(folder);
+					}
+				}
+				const repoPath = path.posix.join(dirRel, safeName);
 				const target = resolveInside(repoPath, [MEDIA_DIRS[dir]]);
 				await fs.mkdir(path.dirname(target), { recursive: true });
 				const buffer = Buffer.from(dataBase64, "base64");
@@ -2083,8 +2141,9 @@ const server = createServer(async (req, res) => {
 					ok: true,
 					name: safeName,
 					bytes: buffer.length,
-					path: mediaUrl(dir, safeName),
+					path: `${urlPrefix}${safeName}`,
 					repoPath,
+					dir: dirRel,
 					// 旧文件被替换过 ⇒ 告诉前端快照在哪，方便"传错了想还原"
 					backup: snapshot?.id ?? null,
 					snapshot,
@@ -2552,16 +2611,23 @@ const server = createServer(async (req, res) => {
 					});
 					return;
 				}
-				// 图片目录固定落在 post-images 里，并且必须通过仓库根 + 白名单前缀校验
-				const imageDir = resolveInside(MEDIA_DIRS["post-images"], [MEDIA_DIRS["post-images"]]);
+				// 图片按文章分组：写进 posts/images/<文章名>/（slug 非法或空 → 仍落到 images 根目录）。
+				// 两种落点都仍然必须通过仓库根 + 白名单前缀校验。
+				const importSlug =
+					typeof slug === "string" && POST_SLUG_RE.test(slug.trim()) ? slug.trim() : "";
+				const imageRelDir = importSlug ? postImageDir(importSlug) : MEDIA_DIRS["post-images"];
+				const imageUrlPrefix = importSlug
+					? postImagePrefix(importSlug)
+					: MEDIA_URL_PREFIX["post-images"];
+				const imageDir = resolveInside(imageRelDir, [MEDIA_DIRS["post-images"]]);
 				await fs.mkdir(imageDir, { recursive: true });
 				const result = await convertToMarkdown({
 					filename: path.basename(filename),
 					buffer,
 					repoRoot: REPO_ROOT,
 					imageDir,
-					slug,
-					imageUrlPrefix: MEDIA_URL_PREFIX["post-images"],
+					slug: importSlug || slug,
+					imageUrlPrefix,
 				});
 				sendJson(res, result.ok ? 200 : 400, result);
 				return;

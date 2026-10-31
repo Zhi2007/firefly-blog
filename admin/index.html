@@ -869,6 +869,10 @@
 								<option value="avatar">头像/站点图片 public/assets/images</option>
 							</select>
 						</div>
+						<div id="mediaPostFolderWrap" style="min-width:280px;display:none">
+							<label>归属文章（子目录）</label>
+							<input id="mediaPostFolder" placeholder="留空 = images 根目录；填文章名 = images/<文章名>/" />
+						</div>
 						<span style="flex:1"></span>
 						<label for="mediaUpload" class="action" style="cursor:pointer;margin:0">上传文件…</label>
 						<input type="file" id="mediaUpload" multiple style="display:none" />
@@ -1635,7 +1639,9 @@
 				$("postsDirHint").innerHTML = postsMeta.dir
 					? filePathBadge(postsMeta.dir, {
 							label: "文章目录：",
-							note: postsMeta.imagesUrlPrefix ? `（正文引用图片写 ${postsMeta.imagesUrlPrefix}）` : "",
+							note: postsMeta.imagesUrlPrefix
+								? `（图片按文章分组：正文引用写 ${postsMeta.imagesUrlPrefix}<文章名>/文件名）`
+								: "",
 						})
 					: "";
 				const posts = postsCache;
@@ -1694,13 +1700,21 @@
 				if (!box) return;
 				const bits = [];
 				const slug = $("fSlug").value.trim();
-				const imagesDir = editorData ? editorData.imagesDir : postsMeta.imagesDir;
+				const slugValid = /^[A-Za-z0-9._-]+$/.test(slug);
+				let imagesDir = editorData ? editorData.imagesDir : postsMeta.imagesDir;
+				let imagesPrefix = editorData?.imagesUrlPrefix || postsMeta.imagesUrlPrefix || "";
+				// 新建 / 还没保存的文章：按文件名推出它自己的图片子目录（images/<文章名>/），
+				// 保存后 /api/post 会返回同样的路径，前后一致。
+				if (!editorData && slugValid && postsMeta.imagesDir) {
+					imagesDir = `${postsMeta.imagesDir}/${slug}`;
+					imagesPrefix = `${postsMeta.imagesUrlPrefix}${slug}/`;
+				}
 				if (imagesDir) {
-					const prefix = editorData?.imagesUrlPrefix || postsMeta.imagesUrlPrefix || "";
 					bits.push(
 						filePathBadge(imagesDir, {
 							label: "文章图片目录：",
-							title: prefix ? `${imagesDir}（正文里用 ${prefix} 引用）` : imagesDir,
+							note: imagesPrefix ? `（正文 / 封面用 ${imagesPrefix} 引用）` : "",
+							title: imagesPrefix ? `${imagesDir}（正文里用 ${imagesPrefix} 引用）` : imagesDir,
 						}),
 					);
 				}
@@ -1877,7 +1891,15 @@
 				);
 			}
 
-			async function uploadFiles(files, dir) {
+			/** 当前正在编辑的文章文件名（slug）；编辑器没开或文件名不合法时返回空串 */
+			function currentEditorPostSlug() {
+				if ($("editorCard").style.display === "none") return "";
+				const slug = $("fSlug").value.trim();
+				return /^[A-Za-z0-9._-]+$/.test(slug) ? slug : "";
+			}
+
+			async function uploadFiles(files, dir, postSlug) {
+				const results = [];
 				for (const file of files) {
 					const dataBase64 = await new Promise((resolve, reject) => {
 						const reader = new FileReader();
@@ -1888,15 +1910,24 @@
 					try {
 						const result = await api("/api/upload", {
 							method: "POST",
-							body: { dir, filename: file.name, dataBase64 },
+							body: {
+								dir,
+								filename: file.name,
+								dataBase64,
+								// 文章图片按文章分组：带上当前文章名，后端会落到 images/<文章名>/
+								...(dir === "post-images" && postSlug ? { postSlug } : {}),
+							},
 						});
+						results.push(result);
 						toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
 					} catch (error) {
+						results.push(null);
 						toast(`${file.name} 上传失败：${error.message}`, "err");
 					}
 				}
 				await loadMedia();
 				await loadDiff();
+				return results;
 			}
 
 			// ── 配置 ───────────────────────────────────────────────────────
@@ -3179,18 +3210,31 @@
 			$("coverUpload").addEventListener("change", async (e) => {
 				const files = Array.from(e.target.files || []);
 				if (!files.length) return;
-				await uploadFiles(files, "post-images");
-				const last = files[files.length - 1].name;
-				$("fImage").value = `./images/${last}`;
+				// 封面也按文章分组：落到 images/<当前文章>/，封面字段直接填后端返回的 ./images/<文章名>/文件名
+				const results = await uploadFiles(files, "post-images", currentEditorPostSlug());
+				const last = [...results].reverse().find(Boolean);
+				if (last?.path) $("fImage").value = last.path;
 				e.target.value = "";
 			});
 
-			$("mediaDir").addEventListener("change", loadMedia);
+			/** 「归属文章」输入框只在「文章图片」目录下显示 */
+			function syncMediaPostFolder() {
+				const wrap = $("mediaPostFolderWrap");
+				if (wrap) wrap.style.display = $("mediaDir").value === "post-images" ? "" : "none";
+			}
+
+			$("mediaDir").addEventListener("change", () => {
+				syncMediaPostFolder();
+				loadMedia();
+			});
 			$("mediaUpload").addEventListener("change", async (e) => {
 				const files = Array.from(e.target.files || []);
-				if (files.length) await uploadFiles(files, $("mediaDir").value);
+				const dir = $("mediaDir").value;
+				const folder = dir === "post-images" ? $("mediaPostFolder").value.trim() : "";
+				if (files.length) await uploadFiles(files, dir, folder);
 				e.target.value = "";
 			});
+			syncMediaPostFolder();
 
 			$("configSelect").addEventListener("change", loadConfigFile);
 			$("btnSaveConfig").addEventListener("click", async () => {
@@ -3527,7 +3571,7 @@
 					: "上传音频后这里可以直接试听（保存并发布后线上才生效）";
 			}
 
-			async function uploadTo(dir, file) {
+			async function uploadTo(dir, file, postSlug) {
 				const dataBase64 = await new Promise((resolve, reject) => {
 					const reader = new FileReader();
 					reader.onload = () => resolve(String(reader.result).split(",")[1]);
@@ -3536,7 +3580,12 @@
 				});
 				const result = await api("/api/upload", {
 					method: "POST",
-					body: { dir, filename: file.name, dataBase64 },
+					body: {
+						dir,
+						filename: file.name,
+						dataBase64,
+						...(dir === "post-images" && postSlug ? { postSlug } : {}),
+					},
 				});
 				toast(`已上传 ${result.name}（${humanSize(result.bytes)}）`, "ok");
 				if (result.warning) toast(result.warning, "err");
@@ -3757,7 +3806,7 @@
 			function dropTargetLabel(dir) {
 				return (
 					{
-						"post-images": "文章图片（src/content/posts/images）",
+						"post-images": "文章图片（src/content/posts/images/<文章名>/）",
 						music: "音乐（public/assets/music）",
 						"music-cover": "音乐封面",
 						"music-lrc": "歌词",
@@ -3777,7 +3826,7 @@
 			function updateDropHint(dir) {
 				let extra = "";
 				if (dir === "music") extra = "（音频会自动提取封面/歌词并加入歌单）";
-				else if (dir === "post-images") extra = "（文章封面 / 插图）";
+				else if (dir === "post-images") extra = "（文章封面 / 插图；编辑器开着时进 images/<当前文章>/）";
 				$("dropHint").textContent = `上传到：${dropTargetLabel(dir)}${extra}`;
 			}
 
@@ -3833,10 +3882,14 @@
 					await dropIntoPlaylist(files);
 					return;
 				}
+				// 文章图片按文章分组：编辑器开着就落到 images/<当前文章>/
+				const postSlug = dir === "post-images" ? currentEditorPostSlug() : "";
 				let ok = 0;
+				let lastResult = null;
 				for (const file of files) {
 					try {
-						await uploadTo(dir, file);
+						const result = await uploadTo(dir, file, postSlug);
+						lastResult = result;
 						ok += 1;
 					} catch (error) {
 						toast(`${file.name} 上传失败：${error.message}`, "err");
@@ -3846,11 +3899,12 @@
 				// 正开着文章编辑器时，拖一张图顺便填成封面
 				if (
 					dir === "post-images" &&
+					lastResult?.path &&
 					files.length === 1 &&
 					$("editorCard").style.display !== "none" &&
 					/\.(png|jpe?g|webp|avif|gif)$/i.test(files[0].name)
 				) {
-					$("fImage").value = `./images/${files[0].name}`;
+					$("fImage").value = lastResult.path;
 					toast("已顺手填入文章封面路径", "ok");
 				}
 				await loadMedia();

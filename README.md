@@ -248,7 +248,7 @@ firefly/
 | `updated` | date | 否 | — | 更新日期，配合 `siteConfig.post.showLastModified` 显示"上次编辑" | `updated: 2026-10-20` |
 | `draft` | boolean | 否 | `false` | 草稿标记 | `draft: true` |
 | `description` | string | 否 | `""` | 摘要，出现在列表、搜索结果、OG 卡片 | `description: 记录一次部署踩坑` |
-| `image` | string | 否 | `""` | 封面图路径；填 `"api"` 会用随机封面 API（需 `coverImageConfig.randomCoverImage.enable: true`） | `image: ./images/cover.png` |
+| `image` | string | 否 | `""` | 封面图路径（相对文章文件；按文章分组时写 `./images/<文章名>/cover.png`）；填 `"api"` 会用随机封面 API（需 `coverImageConfig.randomCoverImage.enable: true`） | `image: ./images/my-first-post/cover.png` |
 | `tags` | string[] | 否 | `[]` | 标签数组 | `tags: [Cloudflare, 折腾]` |
 | `category` | string \| null | 否 | `""` | 分类 | `category: 折腾` |
 | `lang` | string | 否 | `""` | 该篇语言覆盖（站点默认 `zh_CN`） | `lang: en` |
@@ -281,7 +281,7 @@ published: 2026-10-11
 description: 用示例把标题、列表、代码块、表格、图片、公式和 Mermaid 都过一遍。
 tags: [随笔, 示例]
 category: 随笔
-image: ./images/my-first-post-cover.png
+image: ./images/my-first-post/cover.png
 pinned: false
 draft: false
 comment: true
@@ -331,9 +331,9 @@ export function greet(name: string): string {
 
 ## 图片
 
-文章自带图片放在 `src/content/posts/images/`，用相对路径引用：
+文章自带图片按文章分组放在 `src/content/posts/images/<文章名>/`（`<文章名>` = 文章文件名去掉 `.md`），用相对路径引用：
 
-![封面示例](./images/my-first-post-cover.png)
+![封面示例](./images/my-first-post/cover.png)
 
 站点级图片放在 `public/`，用绝对路径引用：
 
@@ -360,7 +360,7 @@ flowchart LR
 ````
 
 > 关于图片的两种放法（都有仓库依据）：
-> - **文章自带图片** → `src/content/posts/images/`，正文里用 `./images/xxx.png`、frontmatter 的 `image` 也这么写（现有文章 `src/content/posts/hello-world.md` 用的就是 `image: ./images/cover-demo.png`）。管理面板把"文章图片"的引用前缀固定成 `./images/`（`admin/server.mjs` 的 `MEDIA_URL_PREFIX["post-images"]`）。
+> - **文章自带图片** → `src/content/posts/images/<文章名>/`（每篇文章一个子文件夹），正文里用 `./images/<文章名>/xxx.png`、frontmatter 的 `image` 也这么写（现有文章 `src/content/posts/hello-world.md` 用的就是 `image: ./images/hello-world/cover-demo.png`）。管理面板会上传/导入到「当前文章」的子目录（`admin/server.mjs` 的 `postImageDir`）；老的平铺写法 `./images/xxx.png` 仍然兼容。
 > - **站点级图片** → `public/`，用 `/` 开头的路径引用（如 `profileConfig.avatar: "/assets/images/avatar-zhi.webp"`、`siteConfig.favicon` 的 `/favicon/firefly-32.png`）。
 > - 需要 Astro 自动优化（WebP/AVIF、响应式）的图片才放 `src/assets/`，用 `import` 引用；`public/` 与远程 URL 不经过优化管线（`backgroundWallpaper.ts` 与 `profileConfig.ts` 注释都写明了这点）。
 
@@ -374,7 +374,7 @@ flowchart LR
 | 不支持 | 旧版 `.doc`（二进制格式），会提示"请在 Word 里另存为 .docx" |
 | 体积上限 | 25 MB（前端与后端都拦，`MAX_IMPORT_BYTES`） |
 | 编码 | 自适应：先按 UTF-8 严格解码，失败或出现替换字符就按 **GBK** 解码（记事本另存的 txt 常见），并给出一条警告 |
-| 图片 | `.docx` 里的图片会被抽出来写进 `src/content/posts/images/`，文件名形如 `<slug>-img1.png`，正文里自动替换成 `./images/<slug>-img1.png` |
+| 图片 | `.docx` 里的图片会被抽出来写进 `src/content/posts/images/<文章名>/`，文件名形如 `<slug>-img1.png`，正文里自动替换成 `./images/<文章名>/<slug>-img1.png` |
 | 已知取舍 | 列表**统一渲染成无序列表**（`- `），有序列表的编号会丢；下划线、字体颜色、删除线等内联样式不保留；文本框/嵌入对象/公式会被跳过，跳过数量汇总成警告 |
 | 设计取舍 | 导入**只填编辑器和图片**，**不会自动保存文章**，需要你自己检查后点「保存」（格式转换一定有误差，必须过一眼） |
 
@@ -834,7 +834,7 @@ export const tabTitleConfig: TabTitleConfig = {
 | **发布** | 同步状态（待推送/落后远端/最后提交时间/最近部署结果）、自动同步开关、一键 `commit + push`、从 GitHub 拉取同步、查看部署状态与完整日志；**推送前自动体检，有 error 会拦住**；工作区干净但本地有未推送提交时，点「立即发布」会直接推送这批提交（不造空提交）—— 文章 frontmatter 写错（例如日期被引号包住 `published: "2026-10-11"`，会让 CI 报 `Expected type "date", received "string"`）现在会在发布前被拦下，并直接告诉你「改哪个文件、哪个字段、怎么改」 |
 | **后台** | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；实时后台日志（2 秒自动刷新、复制、📂 打开日志文件）；「重启后台」（仅 `firefly-admin.exe` 托管时可用，保留端口和登录状态，页面自动重连）；「刷新界面」 |
 
-拖拽上传的落点按当前页签判断（音乐页 → `public/assets/music/`；媒体页 → 下拉框选中的目录；其它页 → `src/content/posts/images/`）。
+拖拽上传的落点按当前页签判断（音乐页 → `public/assets/music/`；媒体页 → 下拉框选中的目录，文章图片可在「归属文章」里填子目录；其它页 → `src/content/posts/images/<当前文章>/`，编辑器没开时进 `src/content/posts/images/`）。
 
 **面板会写明文件存在哪（路径徽章）**：文章列表显示 `src/content/posts/<文件名>`（文件名同时决定 URL `/posts/<文件名>/`），编辑器显示当前文件与它引用的图片，媒体页显示 `public/assets/...`，公告 / 歌单 / 友链 / 导航 / 站点设置 / 头像 / 备份 / 发布页各自显示自己的数据文件与「写进哪个文件的哪个块」；每条路径都能**一键复制**（复制后按钮显示 2 秒「已复制」），Windows 上还可以点 📂「打开所在文件夹」直接定位到文件。这些路径都来自后端真实读取（`fs.readdir` / `git status` / 实际写入路径），文件不存在时会明确标 ⚠️，不会给出一个编造的位置。约定见 [`admin/README.md`](./admin/README.md) 的「路径徽章」一节与 `docs/PROJECT-CONTEXT.md` 第 9.10 节。
 
@@ -845,7 +845,7 @@ export const tabTitleConfig: TabTitleConfig = {
 1. 双击 `启动管理面板.cmd`，浏览器里打开自动弹出的地址（带 `?token=`）。
 2. 进「文章」页 → 点「新建文章」。
 3. 填「文件名（slug）」，例如 `my-first-post`（它决定 `src/content/posts/my-first-post.md`，也就决定 URL `/posts/my-first-post/`）。
-4. 点「上传封面…」选图片：文件会进 `src/content/posts/images/`，封面字段自动填成 `./images/xxx`（若已有正文，单张图片也会顺手填成封面）。
+4. 点「上传封面…」选图片：文件会进 `src/content/posts/images/<文章名>/`，封面字段自动填成 `./images/<文章名>/xxx`（若已有正文，单张图片也会顺手填成封面）。
 5. 填标题、日期、摘要；标签与分类用带候选下拉的输入框（可以直接新增一个）。
 6. 在编辑器里写 Markdown，右侧实时预览、下方实时字数。
 7. 点「保存」——写入文章文件，**保存前会自动把原文件快照到 `admin-backups/`**。

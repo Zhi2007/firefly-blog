@@ -599,7 +599,7 @@ export function buildFrontmatterCheck(repoRoot, files) {
 							"error",
 							rel,
 							"image",
-							`封面图不存在：${image}（按文章所在目录解析成 ${target}）；请把图片放进 src/content/posts/images/ 并改成 ./images/文件名。`,
+							`封面图不存在：${image}（按文章所在目录解析成 ${target}）；请把图片放进 src/content/posts/images/<文章名>/ 并改成 ./images/<文章名>/文件名（或留在 images 根目录用 ./images/文件名）。`,
 						),
 					);
 				}
