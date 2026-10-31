@@ -7,7 +7,7 @@
 >
 > 阅读顺序建议：第 1 章（速查）→ 第 2 章（哪些文件不能动）→ 第 12 章（为什么这么设计）→ 需要动手时再查对应章节。
 >
-> 事实来源：本仓库工作区文件（逐项读取）、`git log` 的 80 个提交与提交正文、`%TEMP%\project-evidence.json`（2026-10-11 实测响应头）。**凡是无法从仓库或该证据文件核实的，正文都显式标注「需确认」并说明原因**；没有写「需确认」的地方，都是我在仓库里读出来或有实测数据支撑的。文末列了「我读出来的文档与代码不一致之处」。
+> 事实来源：本仓库工作区文件（逐项读取）、`git log` 的 80 个提交与提交正文（截至本文创建时；2026-10-31 已 140 个）、`%TEMP%\project-evidence.json`（2026-10-11 实测响应头）。**凡是无法从仓库或该证据文件核实的，正文都显式标注「需确认」并说明原因**；没有写「需确认」的地方，都是我在仓库里读出来或有实测数据支撑的。文末列了「我读出来的文档与代码不一致之处」。
 
 ---
 
@@ -43,10 +43,10 @@
 | Tailwind CSS | `^4.3.3`（`@tailwindcss/vite`） | `package.json:91,103` |
 | TypeScript | `^6.0.3` | `package.json:94` |
 | Biome | `2.5.12` | `package.json:100`；本地实测版本一致 |
-| Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.7.0 |
+| Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.12.1 |
 | 包管理器 | `pnpm@11.22.0`（`preinstall` 强制 pnpm） | `package.json:8,24` |
 | 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
-| 构建产物页数 | **30 个 HTML** | `dist/` 实测 30（2026-10-19 新增 1 篇文章后；此前为 29 / 28）；提交 `704baad`/`bc3f0b2` 等历史上以「astro build 28 页」为验收，页数随文章数变化 |
+| 构建产物页数 | **33 个 HTML** | `dist/` 实测 33（2026-10-31 迁入独立工作区后重新构建；2026-10-30 新增 1 篇文章，此前为 30 / 29 / 28）；提交 `704baad`/`bc3f0b2` 等历史上以「astro build 28 页」为验收，页数随文章数变化 |
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:1263-1324`、`.github/workflows/deploy.yml:58-63` |
 | 上线耗时 | 约 1 分钟 | `admin/README.md:174`、`admin/server.mjs:1321` |
@@ -54,7 +54,7 @@
 | 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
 | `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
-| 已发布文章 | 5 篇 | `src/content/posts/*.md` 实测 |
+| 已发布文章 | 6 篇 | `src/content/posts/*.md` 实测（2026-10-31 核对） |
 
 ### 1.4 最容易踩的 5 条（背下来）
 
@@ -142,7 +142,7 @@ firefly/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
 │   ├── config/                 # ③ 配置区（35 个文件：25 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 4 个 JSON）★ 第 4 章
-│   ├── content/                # ③ 内容：posts/（5 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
+│   ├── content/                # ③ 内容：posts/（6 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
 │   ├── pages/                  # ① 文件路由（34 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
@@ -216,7 +216,7 @@ firefly/
 | `dynamic` | `src/content/dynamic` | **只认 `.md`**（`content.config.ts:100`） | `published` |
 | `projects` | `src/content/projects` | `.md` / `.mdx` | `title`、`published` |
 
-当前内容实况（实测）：`posts/` 5 篇（`deploy-to-cloudflare.md`、`hello-world.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`、`common-file-formats.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
+当前内容实况（实测）：`posts/` 6 篇（`deploy-to-cloudflare.md`、`hello-world.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`、`common-file-formats.md`、`install-archlinux-in-vmware.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
 
 ### 3.3 `posts` frontmatter 全字段（逐个核对 `src/content.config.ts:64-90`）
 
@@ -1382,7 +1382,7 @@ pnpm build
 | 路径穿越 | 父会话记录「**32 组载荷全挡**」 | 同上脚本第 11 节 | ⚠️ 该脚本里实际是 **15 组**穿越读取 × 2 条断言 = 30 条；「32 组」可能来自其它测试文件（`ff-cc*.mjs`，本次未逐一清点）→ **需确认** |
 | 上传扩展名白名单 | 成立 | `admin/server.mjs:154-160`（实测：5 个目录各自的 `UPLOAD_EXT` 正则，仅图片/音频/`.lrc`） | ✅ |
 | 头像上传的**魔数校验** | 成立（新增能力，本次实测） | `admin/avatar.mjs` 的 `sniffImageFormat`：把文本/PHP 改名成 `.png`（含 `a.php.png`）一律 400 且不落盘；落盘扩展名取真实格式。38 条模块级断言 + 21 条 HTTP 断言全绿（夹具仓库，未碰真实头像） | ✅ |
-| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 30 个 HTML（2026-10-19 新增文章后）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
+| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 33 个 HTML（2026-10-31 重新构建后）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
 | CSP 两份一致 | 成立 | 实测：`worker/index.mjs:31` 与 `public/_headers:32` 都是 **407 字符**且逐字节相同；两份都不含 `esm.sh`、都含 `giscus.app` | ✅ |
 | 面板只监听 127.0.0.1 | 成立 | `admin/server.mjs:2495` | ✅ |
 | 备份/日志/产物不入库 | 成立 | `.gitignore:2,5,8,20,23`（`dist/`、`public/vndb-covers/`、`.astro/`、`logs/`、`admin-backups/`） | ✅ |
