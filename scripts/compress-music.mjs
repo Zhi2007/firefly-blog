@@ -33,6 +33,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { extractAudioMeta } = await import(
 	new URL("../admin/audio-meta.mjs", import.meta.url).href
 );
+
 // 码率探测与 admin/server.mjs 共用一份实现（防漂移）
 import { AUDIO_TARGET_KBPS, probeMp3 } from "../admin/music-guard.mjs";
 
