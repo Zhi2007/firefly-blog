@@ -1,6 +1,6 @@
 # 项目交接文档（给 AI agent / 新对话）
 
-> 仓库：`D:\SoftWare\DeepSeek Harness\WorkSpace\Firefly`（2026-10-31 由 `WorkSpace\1\firefly` 迁入独立工作区）
+> 仓库：`E:\WorkSpace\FireFly`（2026-11-05 重装系统后迁到 E 盘；此前 2026-10-31 由 `WorkSpace\1\firefly` 迁入独立工作区，原路径 `D:\SoftWare\DeepSeek Harness\WorkSpace\Firefly` 已废弃）
 > 远端：`origin` = `https://github.com/Zhi2007/firefly-blog.git`（分支 `main`），`upstream` = `https://github.com/CuteLeaf/Firefly.git`（上游主题 `master`）
 > 站点：<https://www.zhihaisblog.top>（裸域 <https://zhihaisblog.top> 301 到 www）
 > 文档定位：**给 agent 的施工规范**。用户向说明（功能怎么用、配置怎么写）见仓库根 `README.md` 与 `admin/README.md`（两份文档开头都有目录），本文不重复它们，重点是**怎么改不出事**。
