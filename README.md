@@ -820,7 +820,9 @@ export const tabTitleConfig: TabTitleConfig = {
 - **页面开关**是 `siteConfig.pages.tools`（默认 `true`）；设为 `false` 时 `/tools/` 返回 404，导航项自动隐藏。
 - 页面模板在 `src/pages/tools.astro`，样式在 `src/styles/pages/tools.css`；移动端单列、宽屏两列，长介绍按 1.85 行高排版。
 - 加新工具时建议顺手检查：链接是否可访问、是否开源、许可证是否允许分享；有风险的在 `note` 里写清楚。
-- **站内托管版**：在工具条目里加 `"localUrl": "/tools/<name>/"`，把该工具的静态文件放到 `public/tools/<name>/`（`public/tools` 已在 `PUBLISH_SCOPE` 里），卡片就会出现「站内打开」按钮；官网不可访问时仍能用。首个示例是 Abracadabra（`public/tools/abracadabra/`，约 3.9 MB，AIPL-1.2 许可、版权归原作者，见该目录的 `ATTRIBUTION.md`）。
+- **站内托管版**：在工具条目里加 `"localUrl": "/tools/<name>/"`，把该工具的静态文件放到 `public/tools/<name>/`（`public/tools` 已在 `PUBLISH_SCOPE` 里），卡片就会出现「站内打开」按钮；官网不可访问时仍能用。示例：Abracadabra（`public/tools/abracadabra/`，约 3.9 MB，AIPL-1.2 许可）、搞机工具箱 Web（`public/tools/gjgjxweb/`，约 0.5 MB，GPL-3.0 许可，各自目录里有 `ATTRIBUTION.md`）。
+- **需要 WebUSB 的站内工具要多改一处**：本站默认下发 `Permissions-Policy: usb=()`，会把 `navigator.usb` 关掉（浏览器不报 CSP 错，只让 `requestDevice()` 抛 `SecurityError`）。搞机工具箱因此由 `worker/index.mjs` 的 `USB_TOOL_PREFIX` 单独放开 `usb=(self)`；再加同类工具时照抄那条判断，别放开整站。
+- **「站内打开」按钮带 `data-no-swup`**：`public/tools/` 里的镜像页没有 Swup 容器，若交给 Swup 客户端路由去处理，会先 fetch 再因容器缺失回退成整页跳转（控制台报 `Container mismatch`）。标记后由浏览器直接整页导航，行为确定。
 
 ## 8. 管理面板
 
@@ -1110,7 +1112,7 @@ pnpm exec wrangler deploy     # 首次会打开浏览器授权登录 Cloudflare
 | `X-Content-Type-Options` | `nosniff` | 防 MIME 嗅探 |
 | `X-Frame-Options` | `SAMEORIGIN` | 防点击劫持（CSP 的 `frame-ancestors 'self'` 是同一件事的现代写法） |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | 跨站只发 origin，避免内链泄漏路径 |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()` | 一律禁用不需要的浏览器能力 |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()` | 一律禁用不需要的浏览器能力。**唯一例外**：站内托管的「搞机工具箱」`/tools/gjgjxweb/` 下发 `usb=(self)`（那条路径需要 WebUSB 连手机），见 7.15 |
 | `X-XSS-Protection` | `0` | 关掉已废弃的旧 XSS 过滤器（避免它自己引入问题） |
 
 另外：`worker/index.mjs` 的兜底 503 只回一句纯文本"服务暂时不可用，请稍后重试。"，**不回显内部错误细节**。

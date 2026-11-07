@@ -162,7 +162,14 @@ const description = toolsPageConfig.description || "";
 
                   <div class="tool-actions">
                     {tool.localUrl && (
-                      <a class="tool-btn tool-btn-primary" href={tool.localUrl}>
+                      // data-no-swup：站内托管版是 public/tools/ 下的独立静态页，没有 Swup 容器。
+                      // 不标记的话 Swup 会去 fetch 它、找不到容器再回退成整页跳转（控制台报 Container mismatch）；
+                      // 标记后由浏览器直接整页导航，行为确定。
+                      <a
+                        class="tool-btn tool-btn-primary"
+                        href={tool.localUrl}
+                        data-no-swup
+                      >
                         <Icon
                           name="material-symbols:rocket-launch-rounded"
                           aria-hidden="true"

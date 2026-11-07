@@ -19,13 +19,21 @@ const MEDIA_PREFIX = "/assets/music/";
 const AUDIO_RE = /\.(mp3|m4a|flac|ogg|oga|wav|aac)$/i;
 const COVER_RE = /\/cover\//i;
 
+// 站内托管的「搞机工具箱」（WebADB）靠 WebUSB 连手机。全局的 usb=() 会把这项能力直接关掉，
+// 浏览器不会报 CSP 错，只会让 navigator.usb.requestDevice() 抛 SecurityError，表现为「连接按钮点了没反应」。
+// 所以只对这一个工具的路径把 usb=() 换成 usb=(self)，其余路径、其余指令（含 CSP）完全不变。
+// 新增别的需要 WebUSB 的站内工具时，照着这里再加一条前缀常量与判断，不要放开整站。
+const USB_TOOL_PREFIX = "/tools/gjgjxweb/";
+const PERMISSIONS_POLICY =
+	"camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()";
+
 // 与 public/_headers 保持一致（该文件不作用于 Worker 响应，这里才是实际生效的地方）
 const SECURITY_HEADERS = {
 	"strict-transport-security": "max-age=15552000; includeSubDomains",
 	"x-content-type-options": "nosniff",
 	"referrer-policy": "strict-origin-when-cross-origin",
 	"x-frame-options": "SAMEORIGIN",
-	"permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+	"permissions-policy": PERMISSIONS_POLICY,
 	"x-xss-protection": "0",
 	"content-security-policy":
 		"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'",
@@ -119,6 +127,13 @@ async function serveAsset(request, env) {
 	const response = await env.ASSETS.fetch(request);
 	const headers = applySecurityHeaders(response.headers);
 	const { pathname } = new URL(request.url);
+	if (pathname.startsWith(USB_TOOL_PREFIX)) {
+		// usb=(self)：同源顶层文档可用 WebUSB；工具页与它的 js/css 都在这条前缀下
+		headers.set(
+			"permissions-policy",
+			PERMISSIONS_POLICY.replace("usb=()", "usb=(self)"),
+		);
+	}
 	if (pathname.startsWith("/_astro/")) {
 		headers.set("cache-control", "public, max-age=31536000, immutable");
 	} else if (pathname.startsWith("/vendor/")) {

@@ -1,6 +1,6 @@
 # 项目交接文档（给 AI agent / 新对话）
 
-> 仓库：`E:\WorkSpace\FireFly`（2026-11-05 重装系统后迁到 E 盘；此前 2026-10-31 由 `WorkSpace\1\firefly` 迁入独立工作区，原路径 `D:\SoftWare\DeepSeek Harness\WorkSpace\Firefly` 已废弃）
+> 仓库：`E:\WorkSpace\FireFly\firefly`（2026-11-08 下移到 `FireFly\firefly` 子目录；此前 2026-11-05 重装系统后迁到 E 盘，更早路径 `D:\SoftWare\DeepSeek Harness\WorkSpace\Firefly` 已废弃）
 > 远端：`origin` = `https://github.com/Zhi2007/firefly-blog.git`（分支 `main`），`upstream` = `https://github.com/CuteLeaf/Firefly.git`（上游主题 `master`）
 > 站点：<https://www.zhihaisblog.top>（裸域 <https://zhihaisblog.top> 301 到 www）
 > 文档定位：**给 agent 的施工规范**。用户向说明（功能怎么用、配置怎么写）见仓库根 `README.md` 与 `admin/README.md`（两份文档开头都有目录），本文不重复它们，重点是**怎么改不出事**。
@@ -63,7 +63,7 @@
 | 项目 | 值 | 依据 |
 | --- | --- | --- |
 | 站点主域 | `https://www.zhihaisblog.top` | `src/config/siteConfig.ts:51`；`%TEMP%\project-evidence.json` 实测 200 |
-| 裸域行为 | 301 → `https://www.zhihaisblog.top/` | `worker/index.mjs:40-47`；实测 301 + `location` |
+| 裸域行为 | 301 → `https://www.zhihaisblog.top/` | `worker/index.mjs:48-55`；实测 301 + `location` |
 | GitHub 仓库 | `Zhi2007/firefly-blog`，分支 `main` | `git remote -v` |
 | 上游主题 | `CuteLeaf/Firefly`（本地 ref `upstream/master`） | `git remote -v`、`git branch -r` |
 | 主题版本号 | `firefly@6.16.8` | `package.json:4` |
@@ -75,7 +75,7 @@
 | Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.12.1 |
 | 包管理器 | `pnpm@11.22.0`（`preinstall` 强制 pnpm） | `package.json:8,24` |
 | 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
-| 构建产物页数 | **33 个 HTML** | `dist/` 实测 33（2026-10-31 迁入独立工作区后重新构建；2026-10-30 新增 1 篇文章，此前为 30 / 29 / 28）；提交 `704baad`/`bc3f0b2` 等历史上以「astro build 28 页」为验收，页数随文章数变化 |
+| 构建产物页数 | **34 个 HTML** | `dist/` 实测 34（2026-11-08 构建；比 2026-10-31 的 33 多一个，来自站内工具镜像 `public/tools/gjgjxweb/index.html`）；此前 33 / 30 / 29 / 28 都出现过，页数随文章与 `public/` 下的静态页变化，**不是固定验收值** |
 | Worker 名称 | `my-blog` | `wrangler.jsonc:2` |
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:1263-1324`、`.github/workflows/deploy.yml:58-63` |
 | 上线耗时 | 约 1 分钟 | `admin/README.md:174`、`admin/server.mjs:1321` |
@@ -92,7 +92,7 @@
 | 1 | 用 `git add -A` 或 `git add .` 提交 | 会把「改到一半的在制品」一起推上去，GitHub Actions 构建失败 → 线上部署挂掉。历史上真发生过：`09b0634` 的 4 个 `chore:` 提交里混进了半成品 `admin/ci.mjs`（284 行）和约 20 个 webp | 只用面板「发布」按钮（内部按 `PUBLISH_SCOPE` 白名单暂存，`admin/publish-scope.mjs:14-21`）；手工提交时**逐个列出路径** |
 | 2 | 手工改 `src/config/*.ts` 里的 JSON 数据，或直接编辑面板管辖的 JSON | TS 源码改坏一个引号 = 整站构建失败；JSON 结构改坏 = 面板读取报错 | 数据类改 `src/config/{announcements,friends,music-playlist}.json`（面板会校验+快照）；站点设置走面板「站点设置」页（白名单 + 回读校验 + 回滚） |
 | 3 | 手改 `src/constants/lqips.json`、`src/constants/icons-data.json`、`dist/`、`public/vndb-covers/` | 前两个是生成物（`lqips.json` 由 `pnpm lqips` 生成，`icons-data.json` 被 Biome 显式忽略），`dist/` 与 `public/vndb-covers/`、`admin-backups/`、`logs/` 都在 `.gitignore` 里 | 跑 `pnpm lqips` 重新生成；产物一律不手改 |
-| 4 | 改 `public/vendor/giscus-*.mjs`、或改 `Giscus.astro` 里的 import 路径但不换文件名 | 该文件名带版本号并配了 1 年 `immutable` 缓存，改内容不换名 = 老访客永远拿旧文件 | 升级流程：下载新版本 → 存成 `giscus-<新版本>.mjs` → 同步改 `src/components/comment/Giscus.astro:68` 的 import 路径（`public/_headers:38-40`、`worker/index.mjs:124-126` 的缓存规则不用改） |
+| 4 | 改 `public/vendor/giscus-*.mjs`、或改 `Giscus.astro` 里的 import 路径但不换文件名 | 该文件名带版本号并配了 1 年 `immutable` 缓存，改内容不换名 = 老访客永远拿旧文件 | 升级流程：下载新版本 → 存成 `giscus-<新版本>.mjs` → 同步改 `src/components/comment/Giscus.astro:68` 的 import 路径（`public/_headers:41-43`、`worker/index.mjs:139-141` 的缓存规则不用改） |
 | 5 | 在 `admin/` 里 `import` 第三方包 / 加依赖 | 面板的设计前提是**零依赖**（只用 `node:` 内置模块），加依赖会让「双击 `启动管理面板.cmd` 就能用」失效，也会和 pnpm 严格依赖树冲突 | 面板代码只用 `node:fs`/`node:path`/`node:http`/`node:crypto`/`node:child_process` 等内置模块；需要复杂能力就调用仓库已有脚本（如 `scripts/compress-music.mjs`） |
 
 ### 1.5 绝对禁止清单（浓缩版，详见第 2.4 节）
@@ -102,7 +102,7 @@
 - 不要动 `public/vendor/giscus-1.6.0.mjs`（除非按第 1.4 节第 4 条的升级流程整包替换）。
 - 不要在 `admin/` 里加依赖。
 - 不要用 `git add -A` / `git add .` / `git commit -a`。
-- 不要改 `public/_headers` 或 `public/_redirects` 并期待它生效 —— `run_worker_first: true` 之后它们**不作用于 Worker 处理的响应**（`public/_headers:3-5` 自己就这么写）。真正生效的是 `worker/index.mjs:23-32`。
+- 不要改 `public/_headers` 或 `public/_redirects` 并期待它生效 —— `run_worker_first: true` 之后它们**不作用于 Worker 处理的响应**（`public/_headers:3-5` 自己就这么写）。真正生效的是 `worker/index.mjs:31-40`。
 - 不要在 `worker/index.mjs` 里改 CSP 之外的地方而不读第 5 章（301、Range、安全头是一个整体，改动顺序有依赖）。
 
 > 🔴 **新增 / 删除网站功能前，先读 [附录 E「新增功能时的同步契约（防漂移）」](#附录-e新增功能时的同步契约防漂移)**：任何新功能都可能要同时改**代码 / 管理面板 / 文档**三处，附录 E 有「加什么 → 必须同步哪里」对照表。改完跑 `pnpm check-docs`（= `node scripts/check-docs-sync.mjs`，零依赖、只读），它会用代码里的事实核对文档里的数字与清单；对不上就退出码 1。
@@ -160,7 +160,7 @@ firefly/
 │   ├── app.manifest           #    asInvoker + 视觉样式
 │   └── README.md              #    使用 / 构建 / 自检 / 排查
 ├── worker/
-│   └── index.mjs               # ② Cloudflare Worker 入口（222 行，6 项职责）★ 第 5 章
+│   └── index.mjs               # ② Cloudflare Worker 入口（237 行，6 项职责）★ 第 5 章
 ├── public/                     # 原样拷贝进 dist/ 的静态文件
 │   ├── _headers                # ① 上游文件 + 作者注释：run_worker_first 后**已不生效**，只是文档
 │   ├── _redirects              # ① 同上，已不生效
@@ -388,7 +388,7 @@ firefly/
 | `friendsConfig.ts` | 友链数据 + 友链页配置 | `friendsConfig`（`:9`，`import` 自 JSON）、`friendsPageConfig`（`:12-27`）、`getEnabledFriends()`（`:30-38`） | `randomizeSort: true` 会让构建时随机排序、忽略 `weight`（`:25`） | ✏️ 数据由「友链」页写 `friends.json` |
 | `fontConfig.ts` | Astro Font API 字体定义 + 选择 + 本地字体子集化 | `fontsList`（`:29-84`，含 `fontsource` 与一个 `local` 示例）、`fontConfig.selected: ["system"]`（`:92`）、`bannerTitleFont`（`:97`）、`codeFont`（`:103`）、`subsetFonts`（`:107-112`） | 加字体 = 加构建时间与下载体积；`subsetFonts` 的 key 必须与 `cssVariable` 一致，否则 `scripts/subset-fonts.ts` 不处理 | ❌ |
 | `coverImageConfig.ts` | 文章页封面显示方式 + 随机封面 API | `enableInPost: true`（`:22`）、`enableInPostOverlay: false`（`:25`）、`showLoading`（`:28`）、`randomCoverImage.enable: false`（`:32`）、`apis[3]`（`:34-38`，仍含 `t.alcy.cc` 等外链但**未启用**） | 打开随机封面会引入外部请求（受 CSP `img-src https:` 允许，但会拖慢首屏且不稳定） | ❌ |
-| `analyticsConfig.ts` | GA / Clarity / Umami / 51la / **Cloudflare Web Analytics** | 前四个 ID 全为空；`cloudflareWebAnalytics.token: "67aa…"`（`:52`） | 这个 token 与 CSP 里的 `static.cloudflareinsights.com` 是配套的（`worker/index.mjs:31`） | ❌ |
+| `analyticsConfig.ts` | GA / Clarity / Umami / 51la / **Cloudflare Web Analytics** | 前四个 ID 全为空；`cloudflareWebAnalytics.token: "67aa…"`（`:52`） | 这个 token 与 CSP 里的 `static.cloudflareinsights.com` 是配套的（`worker/index.mjs:38`） | ❌ |
 | `pioConfig.ts`（187 行） | 看板娘：Spine 与 Live2D | `spineModelConfig.enable: false`（`:6`）、`live2dWidgetConfig.enable: false`（`:88`） | 两者都关 = `scripts/prune-pio-assets.ts` 会从 `dist/` 删掉整个 `pio`（约 15 MiB，`CLAUDE.md:91`）。打开 Live2D 会重新引入 651 KB 脚本 + 常驻动画（第 12 章） | ⚠️ 见 4.4 |
 | `effectsConfig.ts` | 樱花、侧栏时间进度、标签页标题轮播 | `sakuraConfig.enable: false`（`:11`）、`timeProgressConfig.enable: true`（`:64`）、`tabTitleConfig.enable: true`（`:77`） | 樱花是 Web Worker + 无限动画（CSP `worker-src 'self' blob:` 就是为它放的） | ✏️ 樱花开关在设置面板里对访客可见（`displaySettingsConfig.sakuraSwitchable`） |
 | `expressiveCodeConfig.ts` | 代码块主题、折叠、语言徽章/Logo | `darkTheme: "one-dark-pro"`（`:11`）、`lightTheme: "one-light"`（`:14`）、`pluginCollapsible`（`:20-25`）、`pluginLanguageBadge.enable: true`（`:30`）、`pluginLanguageLogo.enable: false`（`:36`） | 改主题要重启 dev server（`:6` 注释）；`pluginLanguageLogo` 打开会显著加 CSS | ❌ |
@@ -398,7 +398,7 @@ firefly/
 | `galleryConfig.ts` | 相册列表 + 瀑布流列宽 | `albums[2]`（`:6-37`，含一个密码相册 `123456`）、`columnWidth: 240`（`:41`） | 相册页由 `pages.gallery` 开关控制，当前为 `false`（`siteConfig.ts:25`），页面不生成 | ❌ |
 | `dynamicConfig.ts` | 动态页标题/评论/每页条数/数据源 | `itemsPerPage: 20`（`:17`）、`apiUrl: "/api/dynamic.json"`（`:23`）、`memos.enable: false`（`:30`） | 页面开关 `pages.dynamic: false`（`siteConfig.ts:21`），当前不生成页面 | ❌ |
 | `booknavConfig.ts`（156 行） | 书签导航分组与条目 + favicon 接口 | `booknavPageConfig.favicon.api`（`:20`）、`booknavConfig[]`（`:26-155`） | 页面开关 `pages.booknav: false`（`siteConfig.ts:27`）；favicon 走第三方 `a.favicon.im`（受 CSP `img-src https:`） | ❌ |
-| `toolsConfig.ts`（13 行） | 工具箱页面（`/tools/`）的页面文案 + 分类 / 工具数据（数据在 `tools.json`） | `toolsPageConfig.title`（`:7`）、`toolsPageConfig.description`（`:8-9`）、`toolsCategories`（`:13`，`import` 自 JSON） | 加工具 / 分类只改 `tools.json`；工具可写 `localUrl` 指定站内托管版（如 `/tools/abracadabra/`，镜像放 `public/tools/`）；页面开关 `pages.tools`（`:45`） | ✏️ 直接改 `tools.json`（暂无面板入口） |
+| `toolsConfig.ts`（13 行） | 工具箱页面（`/tools/`）的页面文案 + 分类 / 工具数据（数据在 `tools.json`） | `toolsPageConfig.title`（`:7`）、`toolsPageConfig.description`（`:8-9`）、`toolsCategories`（`:13`，`import` 自 JSON） | 加工具 / 分类只改 `tools.json`；工具可写 `localUrl` 指定站内托管版（现有两个镜像：`/tools/abracadabra/`、`/tools/gjgjxweb/`，静态文件放 `public/tools/`）；页面开关 `pages.tools`（`:45`）。**需要 WebUSB 的工具（gjgjxweb）还要在 `worker/index.mjs` 的 `USB_TOOL_PREFIX` 里单独放开 `usb=(self)`**，见 5.2 职责 4 与 README 7.15 | ✏️ 直接改 `tools.json`（暂无面板入口） |
 | `sponsorConfig.ts` | 打赏方式与打赏者列表 | `showButtonInPost: false`（`:21`）、四种 `enabled: false`（`:32,40,48,56`）、`sponsors[]` 示例数据（`:61-78`） | 页面开关 `pages.sponsor: false`（`siteConfig.ts:40`） | ❌ |
 | `index.ts` | 统一导出 + `navbarMode` 解析 | `resolveNavbarMode`（`:8-14`）、`navbarMode`（`:17`）、类型导出（`:20-57`）、配置导出（`:58-89`） | 增删导出会影响所有 `@/config` 引用点 | ❌ |
 
@@ -443,16 +443,16 @@ firefly/
 
 > **本章路标**：5.2 Worker 的 6 项职责 → 5.3 为什么必须用 Worker（三条不可替代）→ 5.4 `wrangler.jsonc` 逐字段 → 5.5 改 Worker 的正确姿势。
 
-### 5.2 Worker 的 6 项职责（`worker/index.mjs`，222 行）
+### 5.2 Worker 的 6 项职责（`worker/index.mjs`，237 行）
 
 | # | 职责 | 实现位置 | 细节 |
 | --- | --- | --- | --- |
-| 1 | **裸域 301 → 主域** | `worker/index.mjs:40-47` | `url.hostname === APEX_HOST`（`zhihaisblog.top`）时 301 到 `CANONICAL_HOST`（`www.zhihaisblog.top`），**保留路径与查询串**，并强制 `https:`；返回值也过 `withSecurityHeaders`（301 一样要带 HSTS/CSP） |
-| 2 | **legacy `/blog/*` 301（大小写不敏感）** | `worker/index.mjs:50-56, 84-90` | `/blog`、`/blog/` → `/archive/`；`/blog/<slug>` → `/posts/<slug>`（slug 保留原始大小写）。`legacyRedirect()` 先 `toLowerCase()` 再判断，所以 `/Blog/x`、`/BLOG/x` 也能跳（这是 `L1` 修的） |
-| 3 | **`/assets/music/*` 的 Range/206/304/HEAD/416/405** | `worker/index.mjs:59-61, 137-222` | 先不带 Range 取全量（`env.ASSETS.fetch`）→ 自己切片。`parseRange()`（`:199-222`）只接受单段 `bytes=`；语法非法 → 忽略该头返回 200；语法合法但越界 → `416` + `Content-Range: bytes */<total>`。ETag 命中 `If-None-Match` → `304`。非 GET/HEAD → `405` + `Allow: GET, HEAD` |
-| 4 | **给所有响应补安全头** | `worker/index.mjs:23-32, 97-115` | `applySecurityHeaders()` 用 **`headers.set()` 覆盖**（不是 `append`）：上游若带了宽松 CSP，必须被换掉，绝不能出现两份同名头。`withSecurityHeaders()` 是所有出口的统一收口 |
-| 5 | **缓存策略** | `worker/index.mjs:118-135, 158-161` | `/_astro/*` → `max-age=31536000, immutable`；`/vendor/*` → 同左；`/pagefind/*` → `max-age=604800`；媒体：音频 `86400` / 封面（路径含 `/cover/`）`604800` / 其它（歌词）`3600` |
-| 6 | **异常兜底** | `worker/index.mjs:65-75` | `catch` 里先 `env.ASSETS.fetch(request)` 再补头；**再失败**才返回 `503` 纯文本「服务暂时不可用，请稍后重试。」（不回显内部错误）；`1940c1c` 起 503 不再泄漏内部细节 |
+| 1 | **裸域 301 → 主域** | `worker/index.mjs:48-55` | `url.hostname === APEX_HOST`（`zhihaisblog.top`）时 301 到 `CANONICAL_HOST`（`www.zhihaisblog.top`），**保留路径与查询串**，并强制 `https:`；返回值也过 `withSecurityHeaders`（301 一样要带 HSTS/CSP） |
+| 2 | **legacy `/blog/*` 301（大小写不敏感）** | `worker/index.mjs:58-64, 92-98` | `/blog`、`/blog/` → `/archive/`；`/blog/<slug>` → `/posts/<slug>`（slug 保留原始大小写）。`legacyRedirect()` 先 `toLowerCase()` 再判断，所以 `/Blog/x`、`/BLOG/x` 也能跳（这是 `L1` 修的） |
+| 3 | **`/assets/music/*` 的 Range/206/304/HEAD/416/405** | `worker/index.mjs:67-69, 152-237` | 先不带 Range 取全量（`env.ASSETS.fetch`）→ 自己切片。`parseRange()`（`:214-237`）只接受单段 `bytes=`；语法非法 → 忽略该头返回 200；语法合法但越界 → `416` + `Content-Range: bytes */<total>`。ETag 命中 `If-None-Match` → `304`。非 GET/HEAD → `405` + `Allow: GET, HEAD` |
+| 4 | **给所有响应补安全头** | `worker/index.mjs:31-40, 105-123` | `applySecurityHeaders()` 用 **`headers.set()` 覆盖**（不是 `append`）：上游若带了宽松 CSP，必须被换掉，绝不能出现两份同名头。`withSecurityHeaders()` 是所有出口的统一收口。**唯一按路径的例外**：`serveAsset()` 对 `/tools/gjgjxweb/`（`USB_TOOL_PREFIX`，`:22-28`）把 `permissions-policy` 的 `usb=()` 换成 `usb=(self)`（`:130-136`）—— 站内托管的 WebADB 工具要 WebUSB，全局 `usb=()` 会让 `requestDevice()` 抛 `SecurityError`；其余头与其余路径不变 |
+| 5 | **缓存策略** | `worker/index.mjs:126-150, 173-176` | `/_astro/*` → `max-age=31536000, immutable`；`/vendor/*` → 同左；`/pagefind/*` → `max-age=604800`；媒体：音频 `86400` / 封面（路径含 `/cover/`）`604800` / 其它（歌词）`3600` |
+| 6 | **异常兜底** | `worker/index.mjs:73-83` | `catch` 里先 `env.ASSETS.fetch(request)` 再补头；**再失败**才返回 `503` 纯文本「服务暂时不可用，请稍后重试。」（不回显内部错误）；`1940c1c` 起 503 不再泄漏内部细节 |
 
 附带：`AUDIO_RE`（`:19`）与 `COVER_RE`（`:20`）决定媒体缓存档位；`MEDIA_PREFIX = "/assets/music/"`（`:18`）。
 
@@ -464,7 +464,7 @@ firefly/
 | 裸域按域名 301 | `_redirects` **不支持按域名匹配**（DOMAIN 级跳转） | 提交 `749ffb5` 正文；`worker/index.mjs:5` |
 | 所有响应补安全头 | `_headers` / `_redirects` **不作用于 Worker 处理的响应**；而 `run_worker_first: true` 之后所有响应都经 Worker | `public/_headers:3-5`（文件自己声明「本文件目前只是文档」）、`wrangler.jsonc:9-10` 注释 |
 
-> 直接后果：`public/_headers` 与 `public/_redirects` **保留但无效**。改安全头只改 `worker/index.mjs:23-32`；两份 CSP 目前**逐字节一致**（实测都是 407 字符，见 6.4 节），但**只有 worker 那份生效**。
+> 直接后果：`public/_headers` 与 `public/_redirects` **保留但无效**。改安全头只改 `worker/index.mjs:31-40`；两份 CSP 目前**逐字节一致**（实测都是 407 字符，见 6.4 节），但**只有 worker 那份生效**。
 
 ### 5.4 `wrangler.jsonc` 每个字段（27 行）
 
@@ -475,7 +475,7 @@ firefly/
 | `:4` | `compatibility_date` | `"2025-01-01"` | 运行时兼容性基线。**不要随意前移**：会改变 Workers 运行时行为（`nodejs_compat` 语义、`Response` 行为等），必须整套复测 |
 | `:5` | `compatibility_flags` | `["nodejs_compat"]` | 提供 Node 兼容 API。当前 worker 代码只用标准 Web API，但**不要删**（删了会影响 `wrangler` 的构建校验预期） |
 | `:7` | `assets.directory` | `"./dist"` | 把 `pnpm build` 产物作为静态资源上传 |
-| `:8` | `assets.binding` | `"ASSETS"` | Worker 里通过 `env.ASSETS.fetch(...)` 取资源（`worker/index.mjs:68,119,146` 都在用这个名字） |
+| `:8` | `assets.binding` | `"ASSETS"` | Worker 里通过 `env.ASSETS.fetch(...)` 取资源（`worker/index.mjs:76,127,161` 都在用这个名字） |
 | `:11` | `assets.run_worker_first` | `true` | **所有请求先过 Worker**（不是只过 `/assets/music/*`）。这是 301、安全头、缓存策略能生效的前提 |
 | `:13` | `assets.not_found_handling` | `"404-page"` | 未知路径交给 `dist/404.html`；改回默认值会退回 Cloudflare 纯文本 404（`1940c1c` 加的） |
 | `:17-21` | `routes[0]` | `zhihaisblog.top` + `custom_domain: true` | 裸域绑定；部署时自动建 DNS 记录并签发证书 |
@@ -484,9 +484,9 @@ firefly/
 
 ### 5.5 改 Worker 的正确姿势
 
-1. 只改 `SECURITY_HEADERS`（`:23-32`）时：**必须同步改 `public/_headers:26-32`** 保持一致（虽然不生效，但两份不一致会让下一个 agent 误判哪份是真的）。改完用 6.4 节的办法比对两份字符串是否仍相同。
+1. 只改 `SECURITY_HEADERS`（`:31-40`）时：**必须同步改 `public/_headers:29-35`** 保持一致（虽然不生效，但两份不一致会让下一个 agent 误判哪份是真的）。改完用 6.4 节的办法比对两份字符串是否仍相同。
 2. 加新的响应出口（新的 `return`）时：**必须经过 `withSecurityHeaders()`**，否则那条路径会裸奔 —— 这正是 `H1` 修的 4 条路径（裸域 301 / legacy 301 / 媒体非 2xx / 异常兜底）。
-3. 改 `parseRange` 的语义前先读 `:79-83` 的注释：**刻意选择**「语法非法 → 忽略头返回 200」「语法合法但越界 → 416」，不是 bug。
+3. 改 `parseRange` 的语义前先读 `:87-91` 的注释：**刻意选择**「语法非法 → 忽略头返回 200」「语法合法但越界 → 416」，不是 bug。
 4. 本地验证优先用 `pnpm exec wrangler dev`（需 `dist/` 已构建）；**不要**为了试 Worker 而提交 `dist/`。
 
 ---
@@ -504,10 +504,10 @@ firefly/
 | 请求 | 结果 | 与仓库是否一致 |
 | --- | --- | --- |
 | `https://www.zhihaisblog.top/` | `200`，`server: cloudflare`，`cf-cache-status: HIT`，HTML 头齐全 | ✅ |
-| 裸域 | `301`，`location: https://www.zhihaisblog.top/` | ✅ 与 `worker/index.mjs:40-47` 一致 |
-| 旧地址 | `301`，`location: https://www.zhihaisblog.top/posts/hello` | ✅ 与 `worker/index.mjs:84-90` 一致（`/blog/<slug>` → `/posts/<slug>`） |
+| 裸域 | `301`，`location: https://www.zhihaisblog.top/` | ✅ 与 `worker/index.mjs:48-55` 一致 |
+| 旧地址 | `301`，`location: https://www.zhihaisblog.top/posts/hello` | ✅ 与 `worker/index.mjs:92-98` 一致（`/blog/<slug>` → `/posts/<slug>`） |
 | 不存在的路径 | `404`，`cf-cache-status: MISS`，HTML 头齐全 | ✅ 与 `not_found_handling: "404-page"` 一致（返回 HTML 而非纯文本） |
-| `/assets/music/all-eyes-on-me.mp3` + Range | `206`，`content-range: bytes 0-1023/3666939`，`accept-ranges: bytes`，`content-length: 1024`，`cache-control: public, max-age=86400`，`content-type: audio/mpeg` | ✅ 与 `worker/index.mjs:137-192,158-161` 一致；且仓库里该文件字节数**恰好也是 3666939**（实测 `Get-Item`），可交叉验证是同一个文件 |
+| `/assets/music/all-eyes-on-me.mp3` + Range | `206`，`content-range: bytes 0-1023/3666939`，`accept-ranges: bytes`，`content-length: 1024`，`cache-control: public, max-age=86400`，`content-type: audio/mpeg` | ✅ 与 `worker/index.mjs:152-207,173-176` 一致；且仓库里该文件字节数**恰好也是 3666939**（实测 `Get-Item`），可交叉验证是同一个文件 |
 
 **HTML 的 `cache-control`**：实测是 `public, max-age=0, must-revalidate`。`worker/index.mjs` **没有**设置 HTML 的 cache-control（只设 `/_astro/`、`/vendor/`、`/pagefind/`），所以这个值是 Cloudflare 静态资源默认行为产生的。即便如此首页仍 `cf-cache-status: HIT`，说明边缘确实缓存了 HTML 但要求每次回源校验。
 
@@ -521,7 +521,7 @@ firefly/
 
 ### 6.4 CSP 全文与逐项放行理由
 
-当前生效值（`worker/index.mjs:31`；`public/_headers:32` 与之**完全一致**，实测两者都是 407 字符）：
+当前生效值（`worker/index.mjs:38`；`public/_headers:35` 与之**完全一致**，实测两者都是 407 字符）：
 
 ```text
 default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://giscus.app https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https:; frame-src https://giscus.app; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
@@ -531,7 +531,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 | 指令 | 放行内容 | 为什么必须放行 | 依据 |
 | --- | --- | --- | --- |
-| `default-src` | `'self'` | 白名单基线：默认只允许同源 | `public/_headers:32` |
+| `default-src` | `'self'` | 白名单基线：默认只允许同源 | `public/_headers:35` |
 | `script-src` | `'self'` | 本站脚本 | — |
 | | `'unsafe-inline'` | 站点大量使用内联脚本/样式（Firefly 的内联初始化、Swup 钩子） | `public/_headers:14` |
 | | `'wasm-unsafe-eval'` | **Pagefind 站内搜索用 WebAssembly**（缺了搜索直接不可用） | `public/_headers:15`、`eb2e64e` 正文 |
@@ -564,25 +564,25 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 
 | 头 | 实测值 | 来源 |
 | --- | --- | --- |
-| `strict-transport-security` | `max-age=15552000; includeSubDomains`（= 180 天） | `worker/index.mjs:24`（**代码下发**，不需要控制台开 HSTS） |
-| `x-content-type-options` | `nosniff` | `:25` |
-| `referrer-policy` | `strict-origin-when-cross-origin` | `:26` |
-| `x-frame-options` | `SAMEORIGIN` | `:27` |
-| `permissions-policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()` | `:28` |
-| `x-xss-protection` | `0` | `:29`（刻意设为 0，交给 CSP） |
-| `content-security-policy` | 见 6.4 | `:31` |
+| `strict-transport-security` | `max-age=15552000; includeSubDomains`（= 180 天） | `worker/index.mjs:32`（**代码下发**，不需要控制台开 HSTS） |
+| `x-content-type-options` | `nosniff` | `:33` |
+| `referrer-policy` | `strict-origin-when-cross-origin` | `:34` |
+| `x-frame-options` | `SAMEORIGIN` | `:35` |
+| `permissions-policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()` | `:36`（值来自 `:27-28` 的 `PERMISSIONS_POLICY`）。**唯一例外**：`/tools/gjgjxweb/` 下发 `usb=(self)`（`:130-136`），见 5.2 职责 4 与 README 7.15 |
+| `x-xss-protection` | `0` | `:37`（刻意设为 0，交给 CSP） |
+| `content-security-policy` | 见 6.4 | `:38` |
 
-> 实测四类响应（200 HTML / 404 HTML / 206 音频 / 301 跳转）都带齐了这些头 —— 与 `H1` 修复后的设计一致。**301 也带头**（`worker/index.mjs:44-46` 的注释点明了这点）。
+> 实测四类响应（200 HTML / 404 HTML / 206 音频 / 301 跳转）都带齐了这些头 —— 与 `H1` 修复后的设计一致。**301 也带头**（`worker/index.mjs:52-54` 的注释点明了这点）。
 
 ### 6.6 媒体长缓存与 Range 的配合
 
 | 路径 | `cache-control` | 依据 | 注意 |
 | --- | --- | --- | --- |
-| `/assets/music/*.mp3`（`AUDIO_RE`） | `public, max-age=86400`（1 天） | `worker/index.mjs:19,160` | 音频 URL 在歌单里带 `?v=<内容哈希>`（实测样例 `"/assets/music/all-eyes-on-me.mp3?v=54166e81"`），换歌后哈希会变 |
+| `/assets/music/*.mp3`（`AUDIO_RE`） | `public, max-age=86400`（1 天） | `worker/index.mjs:19,175` | 音频 URL 在歌单里带 `?v=<内容哈希>`（实测样例 `"/assets/music/all-eyes-on-me.mp3?v=54166e81"`），换歌后哈希会变 |
 | `/assets/music/cover/*`（`COVER_RE` 命中 `/cover/`） | `public, max-age=604800`（7 天） | `:20,160` | 同上 |
-| 其它 `/assets/music/*`（歌词） | `public, max-age=3600`（1 小时） | `:160` | 歌词可能随时补 |
-| `/_astro/*`、`/vendor/*` | `public, max-age=31536000, immutable` | `:122-126` | 文件名带内容哈希/版本号 |
-| `/pagefind/*` | `public, max-age=604800` | `:127-129` | 搜索索引 |
+| 其它 `/assets/music/*`（歌词） | `public, max-age=3600`（1 小时） | `:175` | 歌词可能随时补 |
+| `/_astro/*`、`/vendor/*` | `public, max-age=31536000, immutable` | `:137-141` | 文件名带内容哈希/版本号 |
+| `/pagefind/*` | `public, max-age=604800` | `:142-144` | 搜索索引 |
 
 ### 6.7 需要在 Cloudflare 控制台确认的清单（仓库里查不到 → 全部「需确认」）
 
@@ -901,7 +901,7 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | **友链图标不能通过面板上传** | `public/friends/` **不在**上传/删除白名单（只是**只读**可访问，`MEDIA_READ_DIRS` 额外加了它）。站点头像则是**可以**通过面板换的：走「站点设置 → 站点头像」的 `/api/avatar`（只写 `public/assets/images/` 并同时改 `profileConfig.avatar`，见 9.8 节），「媒体」页里的 `avatar` 目录仍然只能传文件、不关联配置 | `admin/server.mjs:124-134`、`admin/README.md:575-575`、9.8 节 |
 | 换头像不动友链页那张图 | 友链页自己的头像硬编码在 `src/content/spec/friends.mdx`（站点绝对 URL，属内容文件），换站点头像不会连带改它；旧文件不删，所以不会 404 | `src/content/spec/friends.mdx:14`、`admin/README.md` 站点头像一节 |
 | 头像只认平铺路径 | `avatar` 被手工写成远程 URL / `src` 相对路径 / 子目录时，卡片只显示路径文本（`repoPath: null`），不会去猜文件 | `admin/avatar.mjs` 的 `describeAvatar` |
-| 媒体 404 也走统一收口 | 媒体非 2xx 会经 `withSecurityHeaders` 返回，避免漏安全头 | `worker/index.mjs:147-148`、`H1` |
+| 媒体 404 也走统一收口 | 媒体非 2xx 会经 `withSecurityHeaders` 返回，避免漏安全头 | `worker/index.mjs:162-163`、`H1` |
 | 面板不新增导航项 | 见 4.3 节 | `admin/nav.mjs:99` |
 | `/api/import-document` 不建快照 | 它不写文章（没有旧版本可备份），只转 Markdown + 落图片 | `admin/server.mjs:2203-2209` |
 | `compress-media` 只新增 `.webp` | 不删也不覆盖原图；默认先试算 | `admin/README.md:585` |
@@ -1373,7 +1373,7 @@ pnpm build
 | 处理（`bc3f0b2`） | 新增 `parseByteRange()`（`server.mjs:1446-1467`）与 `streamFile()`（`:1475-1486`）：非法/越界 → `416` + `Content-Range: bytes */<size>`；start/end 一律夹到 `[0, size-1]`；`stream.on("error")` 兜底 `res.destroy()`；`sendJson` 与最外层 `catch` **先判 `headersSent`**；`res.on("close")` 销毁流避免 fd 泄漏 |
 | 同时修掉 | **M3**：`bytes=0-99999999999999` 曾返回 `206` + `Content-Length` 谎报 100 TB 却给 0 字节；以及既有 bug：`bytes=-N` 应返回**最后 N 字节** |
 | 现状（实测） | 修复后同组用例：`bytes=0-100` → `206` + 101 字节；`bytes=abc` → 忽略该头返回 `200` 全量；面板存活 |
-| ⚠️ 给 agent 的警告 | `parseRange` 的「非法 → 忽略头返回 200」是**刻意的**（`worker/index.mjs:194-198` 同样如此）；`/media-file` 的 416 分支（`server.mjs:2009-2020`）注释解释了为什么不能把 start/end 直接丢给 `createReadStream`；不要为了「简洁」把这两层兜底删掉 |
+| ⚠️ 给 agent 的警告 | `parseRange` 的「非法 → 忽略头返回 200」是**刻意的**（`worker/index.mjs:209-213` 同样如此）；`/media-file` 的 416 分支（`server.mjs:2009-2020`）注释解释了为什么不能把 start/end 直接丢给 `createReadStream`；不要为了「简洁」把这两层兜底删掉 |
 
 ### 12.10 `/api/save-post` 的 `originalSlug` 越界，真的删掉了 `README.md`（M2）
 
@@ -1436,8 +1436,8 @@ pnpm build
 | 路径穿越 | 父会话记录「**32 组载荷全挡**」 | 同上脚本第 11 节 | ⚠️ 该脚本里实际是 **15 组**穿越读取 × 2 条断言 = 30 条；「32 组」可能来自其它测试文件（`ff-cc*.mjs`，本次未逐一清点）→ **需确认** |
 | 上传扩展名白名单 | 成立 | `admin/server.mjs:154-160`（实测：5 个目录各自的 `UPLOAD_EXT` 正则，仅图片/音频/`.lrc`） | ✅ |
 | 头像上传的**魔数校验** | 成立（新增能力，本次实测） | `admin/avatar.mjs` 的 `sniffImageFormat`：把文本/PHP 改名成 `.png`（含 `a.php.png`）一律 400 且不落盘；落盘扩展名取真实格式。38 条模块级断言 + 21 条 HTTP 断言全绿（夹具仓库，未碰真实头像） | ✅ |
-| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 33 个 HTML（2026-10-31 重新构建后）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
-| CSP 两份一致 | 成立 | 实测：`worker/index.mjs:31` 与 `public/_headers:32` 都是 **407 字符**且逐字节相同；两份都不含 `esm.sh`、都含 `giscus.app` | ✅ |
+| 产物内链 / 图片 / 图标零缺失 | 父会话记录 | `%TEMP%\ff-dist-check.mjs` | ⚠️ 部分复核：`dist/` 34 个 HTML（2026-11-08 构建，含站内工具镜像）、`dist/404.html`、`dist/vendor/giscus-1.6.0.mjs` 都在；**未跑完整内链扫描** |
+| CSP 两份一致 | 成立 | 实测：`worker/index.mjs:38` 与 `public/_headers:35` 都是 **407 字符**且逐字节相同；两份都不含 `esm.sh`、都含 `giscus.app` | ✅ |
 | 面板只监听 127.0.0.1 | 成立 | `admin/server.mjs:2495` | ✅ |
 | 备份/日志/产物不入库 | 成立 | `.gitignore:2,5,8,20,23`（`dist/`、`public/vndb-covers/`、`.astro/`、`logs/`、`admin-backups/`） | ✅ |
 | 门禁全绿 | `tsc --noEmit --isolatedDeclarations` exit 0；`biome ci src` 320 文件 0 问题（2026-10-11 复跑；此前记录 315） | 本次实测 | ✅（2026-10-11 复跑：`tsc` exit 0、`biome ci src` 0、`astro build` 28 页、`node scripts/check-docs-sync.mjs` exit 0；`admin/announcement-draft.mjs` 另跑 `biome check` 0 finding） |
@@ -1452,14 +1452,14 @@ pnpm build
 | --- | --- | --- | --- |
 | **C1** | Critical | `/media-file` 畸形 Range 打死面板进程 | `parseByteRange` + `streamFile` + 所有出口判 `headersSent`（12.9 节） |
 | **M3** | 中危 | `bytes=0-99999999999999` 返回 206 + 谎报 100 TB `Content-Length` | 同 C1：一律夹到 `[0, size-1]` |
-| **H1** | High | Worker 4 条响应路径丢失**全部**安全头（裸域 301 / legacy 301 / 媒体非 2xx / 异常兜底），与「等价于 `_headers`」的声明不符 | 新增 `withSecurityHeaders()` 收口所有出口（`worker/index.mjs:97-115`） |
+| **H1** | High | Worker 4 条响应路径丢失**全部**安全头（裸域 301 / legacy 301 / 媒体非 2xx / 异常兜底），与「等价于 `_headers`」的声明不符 | 新增 `withSecurityHeaders()` 收口所有出口（`worker/index.mjs:105-123`） |
 | **H2** | High | **25 个 POST 路由**坏 body 一律 500 且回显内部异常（`Cannot read properties of null…`） | `httpError()` + `publicErrorText()` + `readBody` 抛 400 + `POST_BODY_FIELDS` 字段白名单 |
 | **M1** | 中危 | `/api/post` 的 slug 未校验 → 500 且回显内部路径 | 400 + slug 正则 |
 | **M2** | 中危 | `/api/save-post` 的 `originalSlug` 未校验 → 可删仓库内任意 `.md`（**真的删过 `README.md`**） | 同 slug 正则（12.10 节） |
 | **M4** | 中危 | 构建不可复现（`Math.random()` id + 构建时间戳 → 每次 18 个文件不同） | 稳定哈希 / 固定 id + `SOURCE_DATE_EPOCH`（11.4 节） |
 | **M5** | 中危 | `/api/ci` 每次发约 10 个 GitHub 请求打爆匿名配额，且限流被显示成 `pending` | 1 次 `actions/runs` 按 `head_sha` 归并 + 识别 403/429 与 `x-ratelimit-remaining` → `rateLimited`（8.6 节） |
 | **M6** | 中危 | 预览的 Markdown 链接未过滤协议（`javascript:` 存活） | 新增 `safeMarkdownUrl()` |
-| **L1** | 低危 | legacy 跳转大小写敏感 | 改大小写不敏感（`worker/index.mjs:84-90`） |
+| **L1** | 低危 | legacy 跳转大小写敏感 | 改大小写不敏感（`worker/index.mjs:92-98`） |
 | **L4** | 低危 | friends 抓取的**模块级** meta 缓存串页 | 改为每请求独立 |
 | **L5** | 低危 | 图标重定向用 `follow`，会把请求打到内网 | 改 `manual` 并**每跳**重新校验（`admin/friends.mjs`） |
 | **L6** | 低危 | `save-lyrics` 没有快照（唯一漏掉的一处） | 补 `snapshotBefore`（`server.mjs:1928`） |
@@ -1522,15 +1522,15 @@ pnpm build
 | 2 | **想调页面宽度 / 内容宽度，改哪？** | 面板「站点设置」：`site.pageWidth`（rem，50-200）、`site.contentWidth`（px，600-2400）、`site.contentWidthVw`（%，60-100）。手工等价位置：`siteConfig.ts:71,73,74`。⚠️ **不要动 `variables.styl:170` 的 1280px 静态兜底**（12.3 节） |
 | 3 | **构建失败先查什么？** | ① 本地 `node_modules` 是否与 lockfile 一致 → 跑 `重建依赖.cmd`（11.3）；② 面板「体检」页看 10 项检查（JSON 合法性、歌单/文章引用、**文章 frontmatter（YAML 速查 + 真实构建）**、站内链接、密钥、大文件、配置矛盾、git 状态，`admin/doctor.mjs:79-345`、9.11 节）；③ 看你改的是不是 `src/config/*.ts` 这种一改就可能破语法的地方；④ 跑三条门禁（11.2）定位是类型、lint 还是构建 |
 | 4 | **面板起不来？** | 先看是不是 `EADDRINUSE`（提示已写在 `server.mjs:2468-2470`）：① 用已经开着的那个窗口；② 结束任务管理器里的 `node.exe`；③ 换端口 `node admin/server.mjs --port=8800`。注意默认端口是 **8799**（`server.mjs:72`），别名里写的 8899 只是示例 |
-| 5 | **评论区空白？** | 按 12.6 节的排查顺序：① 浏览器控制台有没有 **CSP 报错**（要改就改 `worker/index.mjs:31`，改 `_headers` 无效）；② `public/vendor/giscus-1.6.0.mjs` 是否真的部署上去了（`Giscus.astro:68` 的 import 是否 200）；③ `commentConfig.ts:57,59,63` 的 `repo` / `repoId` / `categoryId` 是否与 GitHub Discussions 配置一致；④ Swup 换页后重新初始化是否还在（`Giscus.astro:85-91`） |
+| 5 | **评论区空白？** | 按 12.6 节的排查顺序：① 浏览器控制台有没有 **CSP 报错**（要改就改 `worker/index.mjs:38`，改 `_headers` 无效）；② `public/vendor/giscus-1.6.0.mjs` 是否真的部署上去了（`Giscus.astro:68` 的 import 是否 200）；③ `commentConfig.ts:57,59,63` 的 `repo` / `repoId` / `categoryId` 是否与 GitHub Discussions 配置一致；④ Swup 换页后重新初始化是否还在（`Giscus.astro:85-91`） |
 | 6 | **音乐不能拖进度条 / 不能边下边播？** | 这是 Workers 静态资源不处理 `Range` 的固有问题，必须靠 Worker：确认 `wrangler.jsonc:11` 的 `run_worker_first: true` 还在、`worker/index.mjs:59-61` 的 `/assets/music/` 分支还在。`README.md:988` 有同样的问答 |
 | 7 | **想新增一个导航菜单项？** | **只能改 `src/config/navBarConfig.ts`**（面板不支持新增，`admin/nav.mjs:99`）。在 `getDynamicNavBarConfig()` 里加项，**必须写显式 `id`**，否则面板读不到它（`navBarConfig.ts:17-130`）。加完可以再用面板做隐藏/改名/排序 |
 | 8 | **想改站点标题 / 副标题 / 主题色？** | 面板「站点设置」：`site.title`、`site.subtitle`、`site.description`、`site.keywords`、`navbar.title`、`theme.hue`、`theme.defaultMode`（`admin/settings.mjs:26-37`）。等价位置 `siteConfig.ts:45-66,114` |
-| 9 | **文章链接 404 / 我换了文件名？** | URL 由文件路径决定（3.4 节）。重命名 = 旧链接失效；Worker 只处理 `/blog/*` 的历史跳转（`worker/index.mjs:84-90`），不会自动给任意旧 URL 兜底。要保留旧链接就在 `worker/index.mjs` 的 `legacyRedirect()` 里加规则 |
+| 9 | **文章链接 404 / 我换了文件名？** | URL 由文件路径决定（3.4 节）。重命名 = 旧链接失效；Worker 只处理 `/blog/*` 的历史跳转（`worker/index.mjs:92-98`），不会自动给任意旧 URL 兜底。要保留旧链接就在 `worker/index.mjs` 的 `legacyRedirect()` 里加规则 |
 | 10 | **想给文章配图，放哪？** | 三种都行（3.5 节）：放进 `src/content/posts/images/<文章名>/` 然后正文写 `./images/<文章名>/xxx.png`（面板上传/Word 导入会自动进当前文章的子目录；老的平铺 `./images/xxx.png` 仍兼容）；封面可放 `src/assets/...`（走优化）；站点级图片放 `public/assets/images/` 并用 `/assets/images/...` 引用。**动图必须放 `public/`** |
 | 11 | **想改主页横幅文字？** | 面板「站点设置」：`wallpaper.title`（主标题）、`banner.subtitles`（副标题，每行一条）。等价位置 `backgroundWallpaper.ts:75,79-84`。打字机开关在 `:87-98` |
 | 12 | **想开/关某个页面（相册、动态、打赏…）？** | 面板「站点设置 → 页面开关」（`pages.*`，从 `siteConfig.ts:10-46` 的 `resolvePageToggles` 动态读取）。等价位置 `siteConfig.ts:14-40`；也可用环境变量 `PUBLIC_PAGES_<KEY>`（`page-toggle-utils.ts:18-44`）。**关掉页面会同时隐藏对应导航项并返回 404**（`siteConfig.ts:9` 注释） |
-| 13 | **想改 CSP 放行一个新域名？** | 改 `worker/index.mjs:31`（**唯一生效处**），并**同步**改 `public/_headers:32` 保持一致；在旁边的注释里写清为什么放行（`public/_headers:13-23` 就是先例）。改完建议先临时改成 `Content-Security-Policy-Report-Only` 观察，再正式生效 |
+| 13 | **想改 CSP 放行一个新域名？** | 改 `worker/index.mjs:38`（**唯一生效处**），并**同步**改 `public/_headers:35` 保持一致；在旁边的注释里写清为什么放行（`public/_headers:13-26` 就是先例）。改完建议先临时改成 `Content-Security-Policy-Report-Only` 观察，再正式生效 |
 | 14 | **换了域名要改哪几处？** | 四处：`siteConfig.ts:51`、`wrangler.jsonc:17-26`、`worker/index.mjs:16-17`、`public/.well-known/security.txt`（7.5 场景 B） |
 | 15 | **面板点了「发布」，线上没变？** | ① 看返回的 message 里有没有「**已跳过**」——你改的文件可能在 `PUBLISH_SCOPE` 之外（10.3）；② 看 Actions 是否成功（面板 CI 横幅）；③ 等约 1 分钟；④ 确认 `git push` 真的成功（面板会提示「已推送到 GitHub」）；⑤ 若是 HTML 缓存问题，确认没有在 Cloudflare 加了「Cache Everything」类规则（6.7 第 4 条） |
 | 16 | **面板红条说 CI 失败？** | 点击展开看「是哪个 job 的哪个 step 挂了」（9.6）。若结论是 `cancelled`，那是并发取消、**不是失败**（12.7）；红条本应自动消失（`e861438` 之后）——若仍挂着，检查 `admin/ci.mjs:39` 的失败集合与 `ciStatus()` 的「失败 vs 成功谁更新」逻辑有没有被改回去 |
@@ -1724,8 +1724,8 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-46` + `:369`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
 | 6 | **新增构建步骤（`package.json` 的 `build`）** | ① 本文档 11.2 的 8 步链路与「8 步」说法（§1.3 也有一处）；② `CLAUDE.md` / `AGENTS.md` 里的构建说明（上游文件，改动要就地标注「本仓库修正」） | ✅（步骤序列逐条比对 + 三处「N 步」声明，含 `CLAUDE.md`） |
-| 7 | **新增 `public/vendor/` 类自托管资源** | ① 缓存规则：`worker/index.mjs:122-129` 与 `public/_headers:38-45`（两边都要写）；② CSP（自托管一般不用放行，除非是 worker / iframe / wasm）；③ 本文档第 5 / 6 章 | ⚠️ 部分（只保证 CSP 三处一致；缓存规则要人看） |
-| 8 | **新增第三方脚本 / 样式来源** | ① `worker/index.mjs:31` 的 CSP（**唯一生效处**）；② `public/_headers:32` 必须与它**逐字节一致**；③ 本文档 6.4 的 CSP 全文 + 逐条放行说明（写清为什么放行）；④ 按来源选指令：`script-src` / `style-src` / `connect-src` / `frame-src` / `img-src` | ✅（三处 CSP 逐字节一致 + 文档声明的字符数） |
+| 7 | **新增 `public/vendor/` 类自托管资源**（含 `public/tools/` 的站内工具镜像） | ① 缓存规则：`worker/index.mjs:137-144` 与 `public/_headers:41-47`（两边都要写）；② CSP（自托管一般不用放行，除非是 worker / iframe / wasm）；③ **需要浏览器能力的工具**（如 `/tools/gjgjxweb/` 要 WebUSB）还要在 `USB_TOOL_PREFIX`（`worker/index.mjs:22-28`）里按路径放开 `usb=(self)`，并把这条例外补进 5.2 职责 4 / 6.5；④ 本文档第 5 / 6 章 + 工具目录里的 `ATTRIBUTION.md`（来源、许可证、是否原样镜像） | ⚠️ 部分（只保证 CSP 三处一致；缓存规则与 `permissions-policy` 要人看） |
+| 8 | **新增第三方脚本 / 样式来源** | ① `worker/index.mjs:38` 的 CSP（**唯一生效处**）；② `public/_headers:35` 必须与它**逐字节一致**；③ 本文档 6.4 的 CSP 全文 + 逐条放行说明（写清为什么放行）；④ 按来源选指令：`script-src` / `style-src` / `connect-src` / `frame-src` / `img-src`；⑤ 若它还需要浏览器能力（WebUSB、摄像头…），改 `permissions-policy` 时**只按路径放开**，别放开整站（先例：`/tools/gjgjxweb/` 的 `usb=(self)`） | ✅（三处 CSP 逐字节一致 + 文档声明的字符数） |
 | 9 | **面板新增会写盘的能力** | ① `admin/README.md`（接口说明 + 安全链）；② 本文档第 9 章（9.3 表格的「写盘 / 写前快照」列、9.5 写入安全链）；③ `PUBLISH_SCOPE`（`admin/publish-scope.mjs`）—— 若它写的是**提交范围之外**的路径（`worker/`、`admin/`、`src/styles/`…），要么把路径纳入 `PUBLISH_SCOPE`，要么在 10.3 明说「面板发布不会提交它」 | ⚠️ 部分（`PUBLISH_SCOPE` 逐条 ↔ 10.3；「写盘 / 快照」列不检查） |
 | 10 | **删除功能（必须反向清理）** | 按 1–9 反向删：文档段落、面板入口（`index.html` 的页签 / 按钮）、`SETTINGS_DEFS` 条目、`CONFIG_FILES` 白名单、CSP 放行、缓存规则、构建步骤、`navBarConfig.ts` 菜单项、`PUBLISH_SCOPE` 前缀。删完跑 `pnpm check-docs`，数字 / 清单对不上就会报 ❌ | ⚠️ 部分（「该删的忘了删」会被数字抓到；「不该删的删错了」抓不到） |
 | 11 | **面板新增展示项 / 接口（只要涉及文件）** | ① **必须复用 `admin/index.html` 的 `filePathBadge()`**（复制 / 已复制反馈 / 打开所在文件夹只有这一份实现，别各页抄一遍）；② 要显示的路径**必须由后端返回**（`fs.readdir` / `git status --porcelain -z` / 实际写入路径 / 快照目录），或按站点约定拼好后**当场 `stat` 核对**，**前端不许自己拼路径**；③ 后端 `stat` 过之后要如实带上 `exists`（不存在就标 ⚠️ 并隐藏「打开文件夹」按钮）；④ 新增 `/api/*` 字段/路由按第 2 行同步（路由数、9.3 表、`POST_BODY_FIELDS`）；⑤ 本文档 9.10 节的覆盖表 + `admin/README.md` 的「路径徽章」一节 | ❌（人工核对；`pnpm check-docs` 只保证路由/页签/配置/字段的数字与清单） |

@@ -19,6 +19,9 @@
 #   script-src static.cloudflareinsights.com → Cloudflare 统计
 #   worker-src 'self' blob: → 樱花特效的 Web Worker
 #   media-src 'self' blob: → 音乐播放器；背景视频已删除，不再放行远程媒体
+#   Permissions-Policy usb=() → 默认关掉 WebUSB；唯一例外是站内托管的「搞机工具箱」
+#                               （/tools/gjgjxweb/，worker/index.mjs 对那条路径换成 usb=(self)），
+#                               否则 navigator.usb.requestDevice() 会直接抛 SecurityError
 # 如果以后某个功能被 CSP 挡住（浏览器控制台会有 CSP 报错），
 # 把下面这行改回 Content-Security-Policy-Report-Only: 即可先观察不拦截。
 

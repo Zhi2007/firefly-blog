@@ -56,3 +56,6 @@ package/
 
 # admin launcher build output (rebuild with admin-launcher/build.cmd)
 firefly-admin.exe
+
+# 本地视觉验证截图（pnpm dev/preview 时手动截的，不入库）
+.preview/

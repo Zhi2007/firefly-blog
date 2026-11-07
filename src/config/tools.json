@@ -26,6 +26,33 @@
 					"note": "站内版镜像自官方静态站点（版权归 SheepChef，AIPL-1.2 许可）；本页只做整理与介绍，不代管任何内容。"
 				}
 			]
+		},
+		{
+			"id": "android",
+			"name": "安卓玩机",
+			"icon": "material-symbols:phone-android",
+			"description": "把手机用 USB 连到浏览器，改分辨率、停用系统软件、跑 ADB 命令；不用装客户端，也不用本地服务。",
+			"tools": [
+				{
+					"id": "gjgjxweb",
+					"name": "搞机工具箱 Web（WebADB）",
+					"url": "https://czjam.github.io/gjgjxweb/",
+					"localUrl": "/tools/gjgjxweb/",
+					"sourceUrl": "https://github.com/CzJam/gjgjxweb",
+					"tagline": "用浏览器直接连安卓手机，图形化跑 ADB 命令的免安装工具箱",
+					"description": "《搞机工具箱》的网页移植版：借助 Tango（ya-webadb）走 WebUSB 直连手机，电脑上不用装 ADB 客户端，也不用跑本地服务。可以查看设备与系统信息、管理软件包、改分辨率与显示密度、模拟按键、截屏、调字体与动画倍率、做电池统计，还内置 ADB 终端和能解释部分 BAT 语法的控机脚本。功能是否生效取决于机型的 Android 版本、ROM 与 ADB Shell 权限。",
+					"badges": ["源码公开", "免费", "免安装", "站内可用"],
+					"features": [
+						"浏览器直连手机：WebUSB + Tango，不用装客户端、不用本地 ADB 服务",
+						"软件管理：启用 / 禁用 / 强行停止 / 保留数据卸载 / 提取安装包",
+						"显示与调节：分辨率、DPI、按键模拟、截屏、字体与动画倍率",
+						"内置 ADB 终端与 BAT 脚本解释器，重复操作可以写成脚本跑",
+						"官网打不开也能用：本站镜像了一份静态版，点「站内打开」直接使用"
+					],
+					"tags": ["安卓", "ADB", "WebUSB", "玩机"],
+					"note": "站内版镜像自官方仓库（GPL-3.0，版权归 晨钟酱Official，许可证全文随目录保留）；需要 Chrome / Edge 等 Chromium 内核浏览器，手机要开启 USB 调试并在弹窗里授权；本站已对 /tools/gjgjxweb/ 单独放开 WebUSB 权限。"
+				}
+			]
 		}
 	]
 }
