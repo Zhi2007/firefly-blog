@@ -72,7 +72,7 @@
 | Tailwind CSS | `^4.3.3`（`@tailwindcss/vite`） | `package.json:91,103` |
 | TypeScript | `^6.0.3` | `package.json:94` |
 | Biome | `2.5.12` | `package.json:100`；本地实测版本一致 |
-| Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.12.1 |
+| Node 要求 | `>=22.23.0` | `package.json:6`；CI 用 node 24（`.github/workflows/deploy.yml:33`）；本机 v26.13.0（2026-11-08 实测，`pnpm build` 全 8 步可跑通） |
 | 包管理器 | `pnpm@11.22.0`（`preinstall` 强制 pnpm） | `package.json:8,24` |
 | 构建命令 | `pnpm build` → 8 步流水线 | `package.json:13` |
 | 构建产物页数 | **34 个 HTML** | `dist/` 实测 34（2026-11-08 构建；比 2026-10-31 的 33 多一个，来自站内工具镜像 `public/tools/gjgjxweb/index.html`）；此前 33 / 30 / 29 / 28 都出现过，页数随文章与 `public/` 下的静态页变化，**不是固定验收值** |
@@ -166,6 +166,7 @@ firefly/
 │   ├── _redirects              # ① 同上，已不生效
 │   ├── vendor/giscus-1.6.0.mjs # ② 自托管 giscus（25 KB，文件名带版本号 → 1 年 immutable）
 │   ├── friends/                # ② 友链图标（24 个站点的图标，自托管）
+│   ├── tools/{abracadabra,gjgjxweb}/         # ② 站内托管工具镜像（各带 ATTRIBUTION.md + 许可证；gjgjxweb 需要 WebUSB）
 │   ├── assets/{images,music,fonts,css,js}/   # ③ 站点图片 / 音乐 / 字体
 │   ├── assets/music/{cover,lrc}/             # ③ 封面（48 个）与歌词（20 个）
 │   ├── favicon/、gallery/、pio/、.well-known/security.txt

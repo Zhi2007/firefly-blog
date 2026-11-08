@@ -76,7 +76,7 @@
 | **主页功能导览**（首页中间栏顶部，可翻页；**当前已关闭**） | 5 页 / 19 条功能，新访客一进站就知道本站有什么；其中 14 条带 `href`，渲染成可 Tab 聚焦的真链接，直接跳到真的能演示它的页面或锚点（`/search/`、`/friends/`、`/announcement/`、`/rss.xml`、`/sitemap-index.xml`，以及文章页目录/评论区锚点），其余 5 条当前没有产物可演示，保持为普通文本、不做成假链接；上一页/下一页/圆点、←/→ 键盘、触摸滑动（滑动那一下不会误触发链接）；默认不自动轮播。数据 `src/config/feature-tour.json`（可在面板「配置」页编辑），开关 `src/config/featureTourConfig.ts`。**当前 `feature-tour.json` 的 `enable` 为 `false`，首页不渲染这个部件**（代码与数据保留，改回 `true` 即可恢复） |
 | 歌词逐行高亮 | `musicConfig.ts` → `showLyrics: true`；每首歌的 `lrc` 指向 `public/assets/music/lrc/*.lrc`（带时间戳才逐行高亮） |
 | 音频边下边播 / 拖动进度条 | `worker/index.mjs` 为 `/assets/music/*` 实现 `206` / `ETag` / `HEAD` / `416`（Workers 静态资源本身不处理 Range） |
-| 看板娘（Live2D） | `src/config/pioConfig.ts` → `live2dWidgetConfig.enable: true`，模型 `/pio/models/live2d/snow_miku/model.json`；Spine 是 `spineModelConfig.enable: false` |
+| 看板娘（Live2D） | `src/config/pioConfig.ts` → `live2dWidgetConfig.enable: false`（**当前关闭**）；模型仍在 `public/pio/models/live2d/snow_miku/`，打开后会随构建产物下发。**两个开关都关时，`prune-pio-assets` 会把整个 `dist/pio` 删掉**（约 15 MiB），所以现在线上没有看板娘资源。Spine 同样是 `spineModelConfig.enable: false` |
 | 站内搜索（Pagefind） | `navBarConfig.ts` → `navBarSearchConfig.method: NavBarSearchMethod.PageFind`；索引由 `scripts/run-pagefind.ts` 生成，排除规则 `pagefind.yml` |
 | 文章内搜索 | 文章正文上方的搜索栏（`src/components/features/PostSearch.svelte`，挂在文章页正文前）：输入关键字高亮全部匹配，Enter 跳到第一个/下一个，Shift+Enter 上一个，Esc 清除；用 CSS Custom Highlight API，**不修改文章 DOM**（不会破坏 Shiki / KaTeX）；旧浏览器退化为「当前匹配外框」但仍可计数与跳转；加密文章暂不显示 |
 | Giscus 评论（基于 GitHub Discussions） | `src/config/commentConfig.ts` → `type: "giscus"`，`repo: "Zhi2007/my-blog"`、`mapping: "pathname"` |
@@ -169,14 +169,14 @@ pnpm preview
 | 2 | `scripts/generate-lqips.ts` | 用 sharp 给图片算极小模糊占位图，写进 `src/constants/lqips.json`（跳过 `public/favicon/**`、`public/pio/**`、`public/assets/images/effects/**`、`public/assets/music/**` 等目录） |
 | 3 | `scripts/generate-vndb-covers.ts` | 下载 VNDB 封面到 `public/vndb-covers/`（已 gitignore、已存在则跳过）。本站 `siteConfig.vndb.downloadCovers: false`，所以这一步是空转 |
 | 4 | `astro build` | 渲染全部页面到 `dist/`，同时把 `public/` 原样拷进去 |
-| 5 | `scripts/prune-pio-assets.ts` | 按开关删掉 `dist/` 里用不到的看板娘资源。Astro 会把整个 `public/` 原样拷进 `dist/`，所以这里按 `live2dWidgetConfig.enable` / `spineModelConfig.enable` 清理：本站 Spine 关着 → 删 `dist/pio/models/spine` 与 `dist/pio/static`（Live2D 是开的，`dist/pio/models/live2d` 保留）；Live2D 也关掉时还会删 `dist/pio/models/live2d` 与没人引用的客户端 chunk `_astro/Live2DWidget.astro_astro_type_script*`；两个都关则整个 `dist/pio` 被删除（约 15 MiB） |
+| 5 | `scripts/prune-pio-assets.ts` | 按开关删掉 `dist/` 里用不到的看板娘资源。Astro 会把整个 `public/` 原样拷进 `dist/`，所以这里按 `live2dWidgetConfig.enable` / `spineModelConfig.enable` 清理：本站**两个开关都是 `false`** → 整个 `dist/pio` 被删除（约 15 MiB，所以构建产物里没有 `pio/`）；只开 Live2D 时保留 `dist/pio/models/live2d`、删 `spine` 与 `static`；两个都开则这一步空转 |
 | 6 | `scripts/subset-fonts.ts` | 扫 `dist/` 所有 HTML，收集真正用到的字符，为标记 `subset: true` 的本地字体生成轻量 woff2 子集 |
 | 7 | `scripts/minify-inline-scripts.ts` | Astro 不会压缩 `is:inline` 脚本，这一步用 esbuild 过一遍 `dist/` 里的内联 JS |
 | 8 | `scripts/run-pagefind.ts` | 对真实站点根目录跑 `pagefind --site <root>`，索引输出到 `<root>/pagefind` 并随站点一起部署（排除选择器在 `pagefind.yml`） |
 
 > 站点根目录由 `scripts/site-root.ts` 决定：有 `dist/client` 就用它（Cloudflare Pages 形态），否则用 `dist`（本仓库的实际形态）。
 
-示例输出（形态如下；**页数会随文章数变化**——本仓库当前 `dist/` 里有 30 个 `.html`，所以是 `30 page(s) built`；耗时随机器与图片数量变化）：
+示例输出（2026-11-08 实跑；**页数会随文章与静态页变化**——Astro 只统计路由页，当前是 32 条；`dist/` 里的 34 个 `.html` 还多出 `public/tools/` 下两个站内工具镜像；耗时随机器与图片数量变化）：
 
 ```text
 ▶ src/pages/index.astro
@@ -184,16 +184,16 @@ pnpm preview
 ...
 ▶ src/pages/posts/[...slug].astro
   └─ /posts/hello-world/index.html
-[build] 30 page(s) built in 12.4s
+[build] 32 page(s) built in 6.2s
 [build] Complete!
 
 Running Pagefind v1.5.2
 Running on directory dist
-Found 30 files matching **/*.{html}
-Indexed 9 pages
+Found 34 files matching **/*.{html}
+Indexed 10 pages
 ```
 
-> 上例是**格式示意**：本机沙箱环境跑 `astro build` 时会因为本地 `node_modules` 与 lockfile 不一致而报 `require is not defined`（picomatch），所以这里给出的不是本次实跑日志；页数 30 与 `dist/` 的实际 `.html` 数量一致。修复办法见 FAQ。
+> 上面的数字是本次实跑（`pnpm build` 全 8 步通过）。两个数不一样不是错误：`32 page(s)` 是 Astro 的路由页数，`Found 34 files` 是 `dist/` 里实际的 HTML 数（`public/tools/abracadabra/`、`public/tools/gjgjxweb/` 两个静态镜像页也会被拷进去）。如果本地报 `require is not defined`（picomatch），那是 `node_modules` 与 lockfile 不一致，双击 `重建依赖.cmd` 或见 [FAQ](#11-常见问题-faq)。
 
 ## 5. 目录结构
 
@@ -224,7 +224,8 @@ firefly/
 │   ├── assets/music/          # 本地歌单：音频 + cover/ + lrc/（另有 README.md 说明）
 │   ├── assets/images/         # 头像、广告位、打赏码等站点级图片
 │   ├── favicon/               # 站点图标（siteConfig.favicon 指向 firefly-32.png）
-│   ├── pio/                   # 看板娘模型（Live2D snow_miku；Spine 未启用）
+│   ├── pio/                   # 看板娘模型（Live2D snow_miku；两个开关都关，构建时整目录被 prune 掉）
+│   ├── tools/                 # 站内托管的网页工具镜像：abracadabra/、gjgjxweb/（各带 ATTRIBUTION.md 与许可证）
 │   └── gallery/               # 相册图片
 ├── scripts/                   # 构建期脚本（tsx/node 直跑，不是浏览器代码）
 │   ├── generate-github-card-data.ts / generate-lqips.ts / generate-vndb-covers.ts
