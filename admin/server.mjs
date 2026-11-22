@@ -674,6 +674,27 @@ function clearSessionCookie() {
 }
 
 /**
+ * 保存 / 删除文章之后，顺手把文档里的「已发布文章数」刷新一遍（docs/PROJECT-CONTEXT.md 的
+ * §1.3 / §2.3 / §3.2 三处，由 scripts/post-count.mjs 统一负责）。
+ *
+ * 为什么放在这里：这个数字以前靠人工维护，加一篇忘一次；而面板是本站最主要的发文入口，
+ * 写完就刷新才不会漂。为什么不 import 到顶层：统计属于「顺手的事」，模块缺失 / 写盘失败
+ * 都不该让保存文章失败，所以动态 import + 全捕获，失败就静默跳过。
+ *
+ * @returns {Promise<string>} 给界面 toast 用的一句话；没变化或失败时返回空串
+ */
+async function syncPostCountNote() {
+	try {
+		const { syncPostCountDoc } = await import("../scripts/post-count.mjs");
+		const result = syncPostCountDoc({ root: REPO_ROOT, write: true });
+		if (!result?.ok || !result.written) return "";
+		return `已同步文档里的已发布文章数（${result.count} 篇）`;
+	} catch {
+		return "";
+	}
+}
+
+/**
  * 写操作之前的快照：把原文件另存到 admin-backups/（已 gitignore，不会提交也不会发布）。
  * 备份失败不阻断保存，但会把警告返回给前端。
  */
@@ -2046,6 +2067,9 @@ const server = createServer(async (req, res) => {
 				// 把「这次顺手规整掉的坏写法」告诉用户（例如历史遗留的 published: "2026-10-11"）——
 				// 面板只在 toast 里提示，不做任何静默改写之外的额外动作
 				const notes = dateNormalizeNotes(baseRaw, content);
+				// 新增 / 删除文章都会改变「已发布文章数」：让文档自己跟上（失败不影响保存）
+				const countNote = await syncPostCountNote();
+				if (countNote) notes.push(countNote);
 				sendJson(res, 200, { ok: true, file: `${POSTS_DIR}/${slug}.md`, notes });
 				return;
 			}
@@ -2063,7 +2087,8 @@ const server = createServer(async (req, res) => {
 				const file = resolveInside(`${POSTS_DIR}/${slug}.md`, [POSTS_DIR]);
 				await snapshotBefore(`${POSTS_DIR}/${slug}.md`, "删除文章");
 				if (await exists(file)) await fs.rm(file, { force: true });
-				sendJson(res, 200, { ok: true });
+				const countNote = await syncPostCountNote();
+				sendJson(res, 200, { ok: true, notes: countNote ? [countNote] : [] });
 				return;
 			}
 

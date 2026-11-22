@@ -83,7 +83,7 @@
 | 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
 | `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
-| 已发布文章 | 6 篇 | `src/content/posts/*.md` 实测（2026-10-31 核对） |
+| 已发布文章 | 7 篇 | `src/content/posts/*.md` 实测（2026-11-22；`pnpm posts:count` 自动维护） |
 
 ### 1.4 最容易踩的 5 条（背下来）
 
@@ -175,7 +175,7 @@ firefly/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
 │   ├── config/                 # ③ 配置区（35 个文件：25 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 6 个 JSON）★ 第 4 章
-│   ├── content/                # ③ 内容：posts/（6 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
+│   ├── content/                # ③ 内容：posts/（7 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
 │   ├── pages/                  # ① 文件路由（34 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
@@ -251,7 +251,7 @@ firefly/
 | `dynamic` | `src/content/dynamic` | **只认 `.md`**（`content.config.ts:100`） | `published` |
 | `projects` | `src/content/projects` | `.md` / `.mdx` | `title`、`published` |
 
-当前内容实况（实测）：`posts/` 6 篇（`deploy-to-cloudflare.md`、`hello-world.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`、`common-file-formats.md`、`install-archlinux-in-vmware.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
+当前内容实况（实测）：`posts/` 7 篇（`common-file-formats.md`、`deploy-to-cloudflare.md`、`hello-world.md`、`install-archlinux-in-vmware.md`、`keepassxc-monica-pass-password.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
 
 ### 3.3 `posts` frontmatter 全字段（逐个核对 `src/content.config.ts:64-90`）
 
@@ -1144,7 +1144,7 @@ published: Expected type `"date"`, received `"string"`
 
 ### 10.3 ⭐ 发布只提交 `PUBLISH_SCOPE`（必须记住）
 
-`admin/publish-scope.mjs:14-20`：
+`admin/publish-scope.mjs:14-22`：
 
 ```js
 export const PUBLISH_SCOPE = [
@@ -1155,6 +1155,7 @@ export const PUBLISH_SCOPE = [
   "public/vendor", // 自托管第三方脚本（如 giscus）
   "public/tools",  // 站内托管的网页工具静态镜像（如 Abracadabra）
   "src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，须随文章一起发布
+  "docs/PROJECT-CONTEXT.md", // 文档统计：面板保存/删除文章后由 scripts/post-count.mjs 自动维护「已发布文章数」
 ];
 ```
 
@@ -1165,6 +1166,9 @@ export const PUBLISH_SCOPE = [
 | 为什么不用 `git add -A` | 会把工作区**所有**改动一起提交推送，包括改到一半的在制品；`admin/` 的半成品无害，但 `src/**` 的半成品会**直接让构建失败** | `publish-scope.mjs:4-11` |
 | 为什么必须 `--untracked-files=all` | 否则 git 会把**整个未跟踪目录**折叠成一条 `public/`，导致新上传的媒体文件根本不会被暂存 | `publish-scope.mjs:62-64`（`09b0634` 实测踩到） |
 | 演练模式 | `ADMIN_PUBLISH_DRY_RUN=1` 时 `DRY_RUN_PUBLISH` 为真：照常 commit，但跳过 push 并 `git reset --soft HEAD~1` 撤销提交 | `server.mjs:74,1306-1311` |
+| **为什么 `docs/PROJECT-CONTEXT.md` 在白名单里** | 面板保存 / 删除文章后会调用 `scripts/post-count.mjs`，把 §1.3 / §2.3 / §3.2 的「已发布文章数」改成实际篇数（手动入口 `pnpm posts:count`）；不纳入白名单，这个改动就永远发布不上去，数字照样漂 | `server.mjs` 的 `syncPostCountNote`、`scripts/post-count.mjs` |
+
+> ⚠️ 这条白名单的代价：**你手工改到一半的这份文档，也会随下一次「发布」一起被提交**。改文档时别在工作区留半成品；改完先自己 `git add -- docs/PROJECT-CONTEXT.md` 提交一次，再回面板发布文章。
 
 > 🔴 **给 agent 的推论**：如果你用文本工具改了 `src/styles/variables.styl`、`worker/index.mjs`、`admin/*.mjs`、`README.md`、`AGENTS.md` 等**范围外**文件，**面板的发布按钮不会提交它们**。必须用 git 命令逐个 `git add -- <file>` 后自己提交（并遵守第 1.4 节第 1 条：不要 `git add -A`）。
 

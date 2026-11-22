@@ -22,6 +22,7 @@
     "format": "biome format --write ./src ./scripts",
     "lint": "biome check --write ./src ./scripts",
     "check-docs": "node scripts/check-docs-sync.mjs",
+    "posts:count": "node scripts/post-count.mjs",
     "preinstall": "npx only-allow pnpm",
     "lqips": "npx tsx scripts/generate-lqips.ts",
     "github-cards": "npx tsx scripts/generate-github-card-data.ts"

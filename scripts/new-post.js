@@ -94,4 +94,12 @@ slug: ${slug}
 
 fs.writeFileSync(path.join(targetDir, fileName), content);
 
+// 新文章会让文档里的「已发布文章数」过期：顺手刷新（统计失败不影响创建）
+try {
+	const { syncPostCountDoc } = await import("./post-count.mjs");
+	syncPostCountDoc({ write: true });
+} catch {
+	// 文档统计是顺手的事，静默跳过
+}
+
 console.log(`Post ${fullPath} created`);

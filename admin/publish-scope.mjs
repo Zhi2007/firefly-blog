@@ -19,6 +19,7 @@ export const PUBLISH_SCOPE = [
 	"public/vendor", // 自托管第三方脚本（如 giscus）
 	"public/tools", // 站内托管的网页工具静态镜像（如 Abracadabra）
 	"src/constants", // 构建产物数据：LQIP 占位图（lqips.json）等，必须随文章一起发布，否则线上少了封面占位数据
+	"docs/PROJECT-CONTEXT.md", // 文档统计：面板保存/删除文章后由 scripts/post-count.mjs 自动维护「已发布文章数」
 ];
 
 /** 把 git 输出的路径归一化成 / 分隔、去掉可能的引号 */

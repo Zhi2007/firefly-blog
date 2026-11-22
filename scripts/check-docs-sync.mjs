@@ -6,7 +6,7 @@
  *   给站点加了新功能，却忘了同步「管理面板 + 文档」，文档就开始说谎 ——
  *   下一个 agent 按旧文档去改代码，就会改错地方。附录 E 是人工清单，
  *   本脚本是机器兜底：从**代码**里算出事实（路由数 / 页签数 / 配置数 /
- *   字段数 / 构建步骤 / 发布白名单 / CSP），再和文档里的声明逐项比对。
+ *   字段数 / 构建步骤 / 发布白名单 / 文章篇数 / CSP），再和文档里的声明逐项比对。
  *
  * 用法：
  *   node scripts/check-docs-sync.mjs                # 检查默认文档 docs/PROJECT-CONTEXT.md
@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { scanPublishedPosts } from "./post-count.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_DOC = "docs/PROJECT-CONTEXT.md";
@@ -602,6 +603,49 @@ function checkPostFields(r, lines, docLabel) {
 			`§3.3 表格里的字段已不在 schema 里：${docExtra.join("、")}，请从 ${docLabel}:${region.offset + 1} 起的表格删除`,
 		);
 	}
+
+	// 已发布文章数：文档里写死在三处（§1.3 关键事实表 / §2.3 目录树 / §3.2 当前内容实况 + 文件名清单）。
+	// 事实只从 src/content/posts 数（draft: true 不算），维护入口是 scripts/post-count.mjs。
+	const posts = scanPublishedPosts(path.resolve(ROOT, "src/content/posts"));
+	r.info(
+		`代码事实：已发布文章 ${posts.count} 篇（${posts.files.join("、") || "（空）"}）`,
+	);
+	r.compare(
+		"§1.3「已发布文章」声明的篇数",
+		posts.count,
+		findNumberClaim(lines, /\| 已发布文章 \| (\d+) 篇 \|/),
+		"§1.3 关键事实表；改完跑 `pnpm posts:count`",
+	);
+	r.compare(
+		"§2.3 目录树里的 posts 篇数",
+		posts.count,
+		findNumberClaim(lines, /posts\/（(\d+) 篇 \+ images\/）/),
+		"§2.3 目录树；改完跑 `pnpm posts:count`",
+	);
+	const region32 = sectionRegion(lines, /^###\s*3\.2/);
+	const listClaim = region32
+		? region32.lines.join("\n").match(/`posts\/` (\d+) 篇（([^）]*)）/)
+		: null;
+	if (!listClaim) {
+		r.warn("未找到声明，跳过：§3.2 的「`posts/` N 篇（文件名清单）」");
+	} else {
+		r.compare(
+			"§3.2 声明的已发布篇数",
+			posts.count,
+			{ value: Number(listClaim[1]), line: region32.offset + 1 },
+			"§3.2 当前内容实况；改完跑 `pnpm posts:count`",
+		);
+		const docFiles = sorted(
+			[...listClaim[2].matchAll(/`([^`]+)`/g)].map((m) => m[1]),
+		);
+		r.compare(
+			"§3.2 列出的文章文件名",
+			posts.files,
+			{ value: docFiles, line: region32.offset + 1 },
+			"§3.2 当前内容实况；改完跑 `pnpm posts:count`",
+			sameList,
+		);
+	}
 }
 
 function checkBuildSteps(r, lines, docLabel) {
@@ -870,7 +914,7 @@ function main() {
 		],
 		[
 			"5/8",
-			"posts frontmatter 字段（src/content.config.ts ↔ §3.3 / 附录 C.3）",
+			"posts 字段与已发布篇数（src/content.config.ts + src/content/posts ↔ §3.3 / §1.3 / §2.3 / §3.2）",
 			checkPostFields,
 		],
 		[
