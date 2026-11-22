@@ -136,13 +136,6 @@
 		"lrc": "/assets/music/lrc/Rivers In the Desert.lrc"
 	},
 	{
-		"name": "Take Over",
-		"artist": "Lyn / 目黒将司",
-		"url": "/assets/music/Take Over.mp3?v=2fbfafbb",
-		"cover": "/assets/music/cover/Take Over.jpg?v=2b710eb3",
-		"lrc": "/assets/music/lrc/Take Over.lrc"
-	},
-	{
 		"name": "Wake Up, Get Up, Get Out There",
 		"artist": "Lyn / 目黒将司",
 		"url": "/assets/music/Wake Up， Get Up， Get Out There.mp3?v=be1dae81",
@@ -162,5 +155,32 @@
 		"url": "/assets/music/今天不是明天.mp3?v=19c8de69",
 		"cover": "/assets/music/cover/今天不是明天.jpg?v=7f510134",
 		"lrc": "/assets/music/lrc/今天不是明天.lrc"
+	},
+	{
+		"name": "A Little Story",
+		"artist": "Valentin",
+		"url": "/assets/music/A Little Story.mp3?v=5680094d",
+		"cover": "/assets/music/cover/A Little Story.jpg?v=73e5b45e"
+	},
+	{
+		"name": "Clickbait",
+		"artist": "T.T. STAR / Sunnie / Chaerin / ZENA",
+		"url": "/assets/music/Clickbait.mp3?v=7f93dc94",
+		"cover": "/assets/music/cover/Clickbait.jpg?v=0e5ed2bd",
+		"lrc": "/assets/music/lrc/Clickbait.lrc"
+	},
+	{
+		"name": "下一秒",
+		"artist": "兰音Reine",
+		"url": "/assets/music/下一秒.mp3?v=4cdad507",
+		"cover": "/assets/music/cover/下一秒.jpg?v=5922e741",
+		"lrc": "/assets/music/lrc/下一秒.lrc"
+	},
+	{
+		"name": "无中生有 Ex Nihilo",
+		"artist": "當山みれい",
+		"url": "/assets/music/无中生有.mp3?v=46e1beaa",
+		"cover": "/assets/music/cover/无中生有.jpg?v=8b792763",
+		"lrc": "/assets/music/lrc/无中生有.lrc"
 	}
 ]
