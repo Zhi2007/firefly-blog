@@ -614,13 +614,13 @@ function checkPostFields(r, lines, docLabel) {
 		"§1.3「已发布文章」声明的篇数",
 		posts.count,
 		findNumberClaim(lines, /\| 已发布文章 \| (\d+) 篇 \|/),
-		"§1.3 关键事实表；改完跑 `pnpm posts:count`",
+		"§1.3 关键事实表；改完跑 `node scripts/post-count.mjs`",
 	);
 	r.compare(
 		"§2.3 目录树里的 posts 篇数",
 		posts.count,
 		findNumberClaim(lines, /posts\/（(\d+) 篇 \+ images\/）/),
-		"§2.3 目录树；改完跑 `pnpm posts:count`",
+		"§2.3 目录树；改完跑 `node scripts/post-count.mjs`",
 	);
 	const region32 = sectionRegion(lines, /^###\s*3\.2/);
 	const listClaim = region32
@@ -633,7 +633,7 @@ function checkPostFields(r, lines, docLabel) {
 			"§3.2 声明的已发布篇数",
 			posts.count,
 			{ value: Number(listClaim[1]), line: region32.offset + 1 },
-			"§3.2 当前内容实况；改完跑 `pnpm posts:count`",
+			"§3.2 当前内容实况；改完跑 `node scripts/post-count.mjs`",
 		);
 		const docFiles = sorted(
 			[...listClaim[2].matchAll(/`([^`]+)`/g)].map((m) => m[1]),
@@ -642,7 +642,7 @@ function checkPostFields(r, lines, docLabel) {
 			"§3.2 列出的文章文件名",
 			posts.files,
 			{ value: docFiles, line: region32.offset + 1 },
-			"§3.2 当前内容实况；改完跑 `pnpm posts:count`",
+			"§3.2 当前内容实况；改完跑 `node scripts/post-count.mjs`",
 			sameList,
 		);
 	}

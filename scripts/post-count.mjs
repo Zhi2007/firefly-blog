@@ -16,7 +16,8 @@
  *   node scripts/post-count.mjs --check    # 只校验不写盘；不一致退出码 1
  *
  * 调用方（一处实现，四处复用）：
- *   - package.json 的 `pnpm posts:count`
+ *   - 手动：`node scripts/post-count.mjs`（不注册 npm script 别名：package.json 一改，pnpm 就会
+ *     判定依赖过期并要求重装 node_modules，为一条快捷方式不值得）
  *   - admin/server.mjs 的 /api/save-post、/api/delete-post（保存成功后 best-effort 刷新）
  *   - scripts/new-post.js（脚手架生成文件后刷新）
  *   - scripts/check-docs-sync.mjs（只借 scanPublishedPosts() 取事实，自己比对）
@@ -166,7 +167,7 @@ export function patchDocText(text, facts, date = today()) {
 		.replace(
 			RE_TABLE,
 			(_m, head, _n, mid, _old, tail) =>
-				`${head}${facts.count}${mid}${date}；\`pnpm posts:count\` 自动维护${tail}`,
+				`${head}${facts.count}${mid}${date}；\`node scripts/post-count.mjs\` 自动维护${tail}`,
 		)
 		.replace(RE_TREE, (_m, head, _n, tail) => `${head}${facts.count}${tail}`)
 		.replace(
@@ -243,7 +244,9 @@ function main(argv) {
 	if (check) {
 		console.error("\n❌ 文档已过期：");
 		for (const where of result.changed) console.error(`   · ${where}`);
-		console.error("\n修法：`pnpm posts:count`（会就地改成上面的篇数与清单）");
+		console.error(
+			"\n修法：`node scripts/post-count.mjs`（会就地改成上面的篇数与清单）",
+		);
 		return 1;
 	}
 	console.log(`\n✅ 已更新：${result.changed.join("、")}`);

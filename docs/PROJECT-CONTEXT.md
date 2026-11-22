@@ -83,7 +83,7 @@
 | 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
 | `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
-| 已发布文章 | 7 篇 | `src/content/posts/*.md` 实测（2026-11-22；`pnpm posts:count` 自动维护） |
+| 已发布文章 | 7 篇 | `src/content/posts/*.md` 实测（2026-11-22；`node scripts/post-count.mjs` 自动维护） |
 
 ### 1.4 最容易踩的 5 条（背下来）
 
@@ -1166,7 +1166,7 @@ export const PUBLISH_SCOPE = [
 | 为什么不用 `git add -A` | 会把工作区**所有**改动一起提交推送，包括改到一半的在制品；`admin/` 的半成品无害，但 `src/**` 的半成品会**直接让构建失败** | `publish-scope.mjs:4-11` |
 | 为什么必须 `--untracked-files=all` | 否则 git 会把**整个未跟踪目录**折叠成一条 `public/`，导致新上传的媒体文件根本不会被暂存 | `publish-scope.mjs:62-64`（`09b0634` 实测踩到） |
 | 演练模式 | `ADMIN_PUBLISH_DRY_RUN=1` 时 `DRY_RUN_PUBLISH` 为真：照常 commit，但跳过 push 并 `git reset --soft HEAD~1` 撤销提交 | `server.mjs:74,1306-1311` |
-| **为什么 `docs/PROJECT-CONTEXT.md` 在白名单里** | 面板保存 / 删除文章后会调用 `scripts/post-count.mjs`，把 §1.3 / §2.3 / §3.2 的「已发布文章数」改成实际篇数（手动入口 `pnpm posts:count`）；不纳入白名单，这个改动就永远发布不上去，数字照样漂 | `server.mjs` 的 `syncPostCountNote`、`scripts/post-count.mjs` |
+| **为什么 `docs/PROJECT-CONTEXT.md` 在白名单里** | 面板保存 / 删除文章后会调用 `scripts/post-count.mjs`，把 §1.3 / §2.3 / §3.2 的「已发布文章数」改成实际篇数（手动入口 `node scripts/post-count.mjs`）；不纳入白名单，这个改动就永远发布不上去，数字照样漂 | `server.mjs` 的 `syncPostCountNote`、`scripts/post-count.mjs` |
 
 > ⚠️ 这条白名单的代价：**你手工改到一半的这份文档，也会随下一次「发布」一起被提交**。改文档时别在工作区留半成品；改完先自己 `git add -- docs/PROJECT-CONTEXT.md` 提交一次，再回面板发布文章。
 

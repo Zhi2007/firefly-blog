@@ -249,7 +249,7 @@ published: Expected type `"date"`, received `"string"`
 
 **接口返回**：`POST /api/save-post` 仍然只接受 `slug` / `originalSlug` / `frontmatter` / `body` 四个字段（多余字段 → 400），成功返回 `{ ok: true, file, notes }`：`notes` 是这次顺手规整掉的日期写法说明（没规整就是空数组）。
 
-**顺手维护「已发布文章数」**：保存 / 删除文章成功后，面板会调用 `scripts/post-count.mjs` 把 `docs/PROJECT-CONTEXT.md` 里 §1.3 / §2.3 / §3.2 三处的篇数与文件名清单改成实际值（草稿不计入）；真的改了会让 `notes` 多一条「已同步文档里的已发布文章数（N 篇）」。这一步是 **best-effort**：模块缺失或写盘失败都只静默跳过，绝不影响文章保存。该文档已在 `PUBLISH_SCOPE` 内，所以点「发布」时这个改动会随文章一起提交；手动入口是 `pnpm posts:count`，漂移会被 `pnpm check-docs` 抓出来。
+**顺手维护「已发布文章数」**：保存 / 删除文章成功后，面板会调用 `scripts/post-count.mjs` 把 `docs/PROJECT-CONTEXT.md` 里 §1.3 / §2.3 / §3.2 三处的篇数与文件名清单改成实际值（草稿不计入）；真的改了会让 `notes` 多一条「已同步文档里的已发布文章数（N 篇）」。这一步是 **best-effort**：模块缺失或写盘失败都只静默跳过，绝不影响文章保存。该文档已在 `PUBLISH_SCOPE` 内，所以点「发布」时这个改动会随文章一起提交；手动入口是 `node scripts/post-count.mjs`（没注册成 npm script：`package.json` 一改，pnpm 就判定依赖过期、要求重装 `node_modules`），漂移会被 `pnpm check-docs` 抓出来。
 
 ## 自动同步到 GitHub
 
