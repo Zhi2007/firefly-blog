@@ -26,9 +26,9 @@ const description = toolsPageConfig.description || "";
   <div
     class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32"
   >
-    <div class="card-base z-10 px-9 py-6 relative w-full">
+    <div class="card-base z-10 px-5 py-6 sm:px-9 relative w-full">
       <!-- 页面标题与简介 -->
-      <div class="mb-5">
+      <div class="mb-4">
         <div class="page-heading">
           <div class="page-icon" aria-hidden="true">
             <Icon name="material-symbols:handyman" />
@@ -43,14 +43,14 @@ const description = toolsPageConfig.description || "";
       <!-- 数量概览 -->
       {
         toolCount > 0 && (
-          <div class="tools-meta mb-6">
+          <div class="tools-meta mb-5">
             <span class="page-count">
               <Icon name="material-symbols:widgets" aria-hidden="true" />
               <strong>{toolCount}</strong>
               <span>个工具 · {categories.length} 个分类</span>
             </span>
             <span class="tools-meta-hint">
-              点击分类可直接跳到对应区块；卡片里的「打开工具」会在新标签页打开。
+              点分类直接跳转 · 卡片里的按钮在新标签页打开
             </span>
           </div>
         )
@@ -59,7 +59,7 @@ const description = toolsPageConfig.description || "";
       <!-- 分类锚点 -->
       {
         categories.length > 1 && (
-          <nav class="tools-toc mb-8" aria-label="工具分类">
+          <nav class="tools-toc mb-6" aria-label="工具分类">
             {categories.map((category) => (
               <a href={`#${category.id}`} class="tools-pill">
                 {category.icon && (
@@ -89,7 +89,7 @@ const description = toolsPageConfig.description || "";
         {categories.map((category) => (
           <section
             id={category.id}
-            class="tools-group mb-10 last:mb-2 scroll-mt-24"
+            class="tools-group mb-8 last:mb-2 scroll-mt-24"
           >
             <div class="tools-group-heading">
               {category.icon && (

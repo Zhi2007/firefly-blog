@@ -4,14 +4,22 @@
 .tools-meta {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 0.5rem 1rem;
+	align-items: center;
+	gap: 0.45rem 0.9rem;
 }
 
 .tools-meta-hint {
+	flex-basis: 100%;
 	color: var(--content-meta);
-	font-size: 0.8rem;
+	font-size: 0.76rem;
 	line-height: 1.6;
+}
+
+/* 窄屏下这行提示会被挤成两行，直接收起来 */
+@media (max-width: 720px) {
+	.tools-meta-hint {
+		display: none;
+	}
 }
 
 /* 分类锚点胶囊 */
@@ -108,14 +116,21 @@
 	line-height: 1.7;
 }
 
-/* 卡片网格：移动端单列，宽屏两列，保证每行文字不过长 */
+/* 卡片网格：默认单列，按**容器**宽度切换到两列。
+   注意不能用视口宽度判断——本站带侧栏，1280px 视口下内容区只有约 480px，
+   用 `@media (min-width: 900px)` 会在 480px 的容器里硬排两列，每张卡被压到 200px，
+   文字疯狂折行、按钮掉行。容器查询让「窄就单列」在任何屏幕/z侧栏组合下都成立。 */
+.tools-groups {
+	container-type: inline-size;
+}
+
 .tools-grid {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
-	gap: 1rem;
+	gap: 0.9rem;
 }
 
-@media (min-width: 900px) {
+@container (min-width: 52rem) {
 	.tools-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
@@ -124,9 +139,9 @@
 .tool-card {
 	display: flex;
 	flex-direction: column;
-	gap: 0.65rem;
+	gap: 0.55rem;
 	min-width: 0;
-	padding: 1.2rem 1.35rem;
+	padding: 1.1rem 1.2rem;
 	border: 1px solid var(--line-divider);
 	border-radius: var(--radius-large);
 	background: var(--card-bg);
@@ -205,7 +220,7 @@
 	margin: 0;
 	color: var(--content-meta);
 	font-size: 0.88rem;
-	line-height: 1.85;
+	line-height: 1.78;
 }
 
 /* 亮点列表 */
@@ -244,9 +259,8 @@
 .tool-tags span {
 	padding: 0.2em 0.55em;
 	border-radius: 0.45rem;
-	background: var(--card-bg);
-	border: 1px solid var(--line-divider);
-	color: var(--content-meta);
+	background: color-mix(in srgb, var(--primary) 9%, transparent);
+	color: color-mix(in srgb, var(--primary) 82%, var(--content-meta));
 	font-size: 0.68rem;
 	line-height: 1.5;
 }
@@ -272,7 +286,8 @@
 	font-size: 0.95rem;
 }
 
-/* 操作按钮：贴在卡片底部，多张卡片高度不齐时也整齐 */
+/* 操作按钮：贴卡片底部。主按钮独占一行，其余按钮均分——按钮数量变化时不会出现
+   「第三颗按钮被挤到下一行只剩半截」的参差感 */
 .tool-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -283,7 +298,9 @@
 
 .tool-btn {
 	display: inline-flex;
+	flex: 1 1 7.5rem;
 	align-items: center;
+	justify-content: center;
 	gap: 0.35rem;
 	padding: 0.42rem 0.85rem;
 	border: 1px solid var(--line-divider);
@@ -300,6 +317,7 @@
 }
 
 .tool-btn svg {
+	flex: 0 0 auto;
 	font-size: 1rem;
 }
 
@@ -311,6 +329,7 @@
 }
 
 .tool-btn-primary {
+	flex-basis: 100%;
 	border-color: transparent;
 	background: var(--primary);
 	color: white;
