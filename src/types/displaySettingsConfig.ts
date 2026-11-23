@@ -29,6 +29,9 @@ export type DisplaySettingsConfig = {
 	// 卡片风格跟随主题色开关
 	cardFollowThemeSwitchable: boolean;
 
+	// 正文字号调节开关（90% ~ 140%，默认 105%）
+	fontSizeSwitchable: boolean;
+
 	// ── 壁纸 (Wallpaper) ──────────────────────────────────
 
 	// 壁纸模式切换开关

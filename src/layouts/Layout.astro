@@ -39,6 +39,11 @@ import type { Favicon } from "@/types/config";
 import { isHomePage } from "@/utils/layout-utils";
 import { getAuthorAvatarUrl, getSiteLogo } from "@/utils/schema-image";
 import { buildSiteGraph, toAbsoluteUrl } from "@/utils/schema-utils";
+import {
+	DEFAULT_CONTENT_FONT_SCALE,
+	MAX_CONTENT_FONT_SCALE,
+	MIN_CONTENT_FONT_SCALE,
+} from "@/utils/setting-utils";
 import { getOgLocale } from "@/utils/site-config-utils";
 import { getCanonicalUrl, url } from "@/utils/url-utils";
 
@@ -366,6 +371,10 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
         baseUrl: import.meta.env.BASE_URL,
         cardTransparentOpacity: backgroundWallpaper.overlay?.cardOpacity ?? 0.6,
         fullscreenLayout,
+        defaultContentFontScale: DEFAULT_CONTENT_FONT_SCALE,
+        minContentFontScale: MIN_CONTENT_FONT_SCALE,
+        maxContentFontScale: MAX_CONTENT_FONT_SCALE,
+        isFontSizeSwitchable: displaySettingsConfig.fontSizeSwitchable,
       }}
     >
       // 主题初始化 - 与setting-utils.ts保持一致
@@ -410,6 +419,27 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       // Load the hue from local storage
       const hue = localStorage.getItem("hue") || configHue;
       document.documentElement.style.setProperty("--hue", hue);
+
+      // 正文字号：首屏就应用，避免文章显示到一半突然跳字号。
+      // 规则与 setting-utils.ts 的 clamp 保持一致；开关关闭时忽略并清掉访客偏好，始终用默认值
+      const storedFontScale = isFontSizeSwitchable
+        ? localStorage.getItem("contentFontScale")
+        : null;
+      if (!isFontSizeSwitchable) {
+        localStorage.removeItem("contentFontScale");
+      }
+      const parsedFontScale =
+        storedFontScale === null ? Number.NaN : Number.parseFloat(storedFontScale);
+      const resolvedFontScale = Number.isFinite(parsedFontScale)
+        ? Math.min(
+            maxContentFontScale,
+            Math.max(minContentFontScale, parsedFontScale),
+          )
+        : defaultContentFontScale;
+      document.documentElement.style.setProperty(
+        "--content-font-scale",
+        String(resolvedFontScale),
+      );
 
       // 设置卡片透明度（全屏透明模式下使用），优先使用用户自定义值
       const storedCardOpacity = localStorage.getItem("overlayCardOpacity");

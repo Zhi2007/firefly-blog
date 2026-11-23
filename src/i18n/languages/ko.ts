@@ -412,6 +412,7 @@ export const ko: Translation = {
 
 	// 카드 스타일
 	[Key.cardSettings]: "카드 스타일",
+	[Key.fontSize]: "글자 크기",
 	[Key.cardBorder]: "카드 테두리와 그림자",
 	[Key.cardFollowTheme]: "카드 테마 색상 따르기",
 

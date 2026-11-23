@@ -411,6 +411,7 @@ export const ja: Translation = {
 
 	// カードスタイル
 	[Key.cardSettings]: "カードスタイル",
+	[Key.fontSize]: "文字サイズ",
 	[Key.cardBorder]: "カードのボーダーと影",
 	[Key.cardFollowTheme]: "カードのテーマカラー追随",
 

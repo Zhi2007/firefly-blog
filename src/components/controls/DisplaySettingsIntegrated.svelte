@@ -12,6 +12,7 @@ import {
 	getDefaultBannerTitleEnabled,
 	getDefaultCardBorderEnabled,
 	getDefaultCardFollowThemeEnabled,
+	getDefaultContentFontScale,
 	getDefaultFullscreenLayout,
 	getDefaultGradientEnabled,
 	getDefaultHue,
@@ -25,6 +26,7 @@ import {
 	getStoredBannerTitleEnabled,
 	getStoredCardBorderEnabled,
 	getStoredCardFollowThemeEnabled,
+	getStoredContentFontScale,
 	getStoredFullscreenLayout,
 	getStoredGradientEnabled,
 	getStoredOverlayBlur,
@@ -37,6 +39,7 @@ import {
 	setBannerTitleEnabled,
 	setCardBorderEnabled,
 	setCardFollowThemeEnabled,
+	setContentFontScale,
 	setFullscreenLayout,
 	setGradientEnabled,
 	setHue,
@@ -114,6 +117,9 @@ let cardBorderEnabled = $state(false);
 const defaultCardBorderEnabled = getDefaultCardBorderEnabled();
 let cardFollowThemeEnabled = $state(false);
 const defaultCardFollowThemeEnabled = getDefaultCardFollowThemeEnabled();
+// 正文字号用百分比整数保存（108 = 108%），避免浮点在滑块上出现 104.99999 这类脏值
+let fontSizePercent = $state(Math.round(getStoredContentFontScale() * 100));
+const defaultFontSizePercent = Math.round(getDefaultContentFontScale() * 100);
 
 const isWallpaperSwitchable = displaySettingsConfig.wallpaperModeSwitchable;
 const isFullscreenLayoutSwitchable = $derived(
@@ -138,6 +144,10 @@ const isSakuraSwitchable = displaySettingsConfig.sakuraSwitchable;
 const isCardBorderSwitchable = displaySettingsConfig.cardBorderSwitchable;
 const isCardFollowThemeSwitchable =
 	displaySettingsConfig.cardFollowThemeSwitchable;
+const isFontSizeSwitchable = displaySettingsConfig.fontSizeSwitchable;
+let fontSizeIsDefault = $derived(
+	Math.round(fontSizePercent) === defaultFontSizePercent,
+);
 // 是否有任何横幅设置可显示（后续添加新设置时在此处添加条件）
 const hasBannerSettings =
 	isWavesSwitchable ||
@@ -197,6 +207,7 @@ const hasAnyContent = $derived(
 		isWallpaperSwitchable ||
 		isFullscreenLayoutSwitchable ||
 		allowLayoutSwitch ||
+		isFontSizeSwitchable ||
 		hasBannerSettings ||
 		hasOverlaySettings ||
 		isSakuraSwitchable,
@@ -207,7 +218,8 @@ const hasAppearanceTab = $derived(
 	showThemeColor ||
 		allowLayoutSwitch ||
 		isCardBorderSwitchable ||
-		isCardFollowThemeSwitchable,
+		isCardFollowThemeSwitchable ||
+		isFontSizeSwitchable,
 );
 const hasWallpaperTab = $derived(
 	isWallpaperSwitchable ||
@@ -349,6 +361,12 @@ function resetLayout() {
 		detail: { layout: effectiveDefaultLayout },
 	});
 	window.dispatchEvent(event);
+}
+
+function resetFontSize() {
+	// 只改 state：下面的 $effect 会把默认值写回 CSS 变量与 localStorage
+	fontSizePercent = defaultFontSizePercent;
+	requestAnimationFrame(refreshAllRangeProgress);
 }
 
 function resetWavesEnabled() {
@@ -631,6 +649,14 @@ $effect(() => {
 	}
 });
 
+// 字号：滑块一变就写 CSS 变量（同时落 localStorage），正文立即重排
+$effect(() => {
+	if (!isFontSizeSwitchable) return;
+	const percent = Math.round(fontSizePercent);
+	if (!Number.isFinite(percent)) return;
+	setContentFontScale(percent / 100);
+});
+
 $effect(() => {
 	if (wallpaperMode === WALLPAPER_OVERLAY) {
 		if (isOverlayOpacitySwitchable) {
@@ -749,6 +775,30 @@ $effect(() => {
 					</svg>
 					<span class="text-xs font-medium">{i18n(I18nKey.postListLayoutGrid)}</span>
 				</button>
+			</div>
+		</div>
+		{/if}
+
+		<!-- Font Size Section -->
+		{#if isFontSizeSwitchable}
+		<div class="">
+			<div class="section-title">
+				{i18n(I18nKey.fontSize)}
+				<button aria-label="Reset to Default" class="btn-regular rounded-md active:scale-90"
+						class:opacity-0={fontSizeIsDefault} class:pointer-events-none={fontSizeIsDefault}
+						disabled={fontSizeIsDefault} aria-hidden={fontSizeIsDefault ? "true" : undefined} onclick={resetFontSize}>
+					<div class="text-(--btn-content)">
+						<Icon icon="fa7-solid:arrow-rotate-left" class="text-[0.75rem]"></Icon>
+					</div>
+				</button>
+				<div id="fontSizeValue" class="transition bg-(--btn-regular-bg) rounded-md flex justify-center
+				font-bold items-center text-(--btn-content)">
+					{Math.round(fontSizePercent)}%
+				</div>
+			</div>
+			<div class="w-full h-6 px-1 bg-(--btn-regular-bg) rounded-md select-none flex items-center">
+				<input aria-label={i18n(I18nKey.fontSize)} type="range" min="90" max="140" step="1"
+					   bind:value={fontSizePercent} class="slider" style="width: 100%">
 			</div>
 		</div>
 		{/if}

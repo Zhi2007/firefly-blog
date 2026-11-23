@@ -175,3 +175,16 @@
 	align-items: center;
 	justify-content: center;
 }
+
+/* 字号百分比标签：数值可能三位数（140%），用 min-width 而不是定宽 */
+#display-setting .section-title #fontSizeValue {
+	margin-left: auto;
+	min-width: 2.75rem;
+	height: 1.5rem;
+	padding: 0 0.375rem;
+	font-size: 0.75rem;
+	border-radius: 0.375rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}

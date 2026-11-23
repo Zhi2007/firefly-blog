@@ -3,6 +3,11 @@
 .custom-md {
   overflow-wrap: break-word;
 
+  /* 正文字号：--content-font-scale 由显示设置面板写入（默认 1.08，见 setting-utils.ts）。
+     prose 的子元素尺寸都是 em，所以改这里等于整篇正文等比缩放；
+     .custom-md 与 .prose 在同一元素上，这条未分层规则会覆盖 Tailwind 的分层工具类。 */
+  font-size: calc(1rem * var(--content-font-scale, 1.08));
+
   body.sticky-navbar & {
     [id] {
       scroll-margin-top: 5.5rem;
@@ -16,7 +21,10 @@
   }
 
   h1 {
-    @apply text-3xl;
+    /* 原本是 text-3xl（1.875rem）：rem 不随字号设置变化，改用 em 才能跟正文一起缩放；
+       1.2 的行高与原来的 2.25rem/1.875rem 完全一致 */
+    font-size: 1.875em;
+    line-height: 1.2;
   }
 
   h1,

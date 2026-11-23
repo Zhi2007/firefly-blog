@@ -956,3 +956,72 @@ export function setCardFollowThemeEnabled(enabled: boolean): void {
 		document.body.classList.remove("card-follow-theme-hue");
 	}
 }
+
+// ── 文章正文字号（显示设置面板） ─────────────────────────────
+// 只缩放正文容器（.custom-md）的字号，不动侧栏与控件：
+// 读文章时最需要调字号，而 UI 字号跟随主题更稳，避免把整站布局撑坏。
+// 缩放比例写在 <html> 的 CSS 变量 --content-font-scale 上，由 markdown.css 消费。
+
+/** 默认缩放：1.08 ≈ 在 16px 基准上放大到 17.3px（"默认字号再调大一点"） */
+export const DEFAULT_CONTENT_FONT_SCALE = 1.08;
+/** 可调范围：90% ~ 140% */
+export const MIN_CONTENT_FONT_SCALE = 0.9;
+export const MAX_CONTENT_FONT_SCALE = 1.4;
+
+function clampContentFontScale(scale: number): number {
+	return Math.min(
+		MAX_CONTENT_FONT_SCALE,
+		Math.max(MIN_CONTENT_FONT_SCALE, scale),
+	);
+}
+
+export function getDefaultContentFontScale(): number {
+	return DEFAULT_CONTENT_FONT_SCALE;
+}
+
+/** 读取访客保存的字号（非法值 / 未保存时回落到默认值，并夹在合法区间内） */
+export function getStoredContentFontScale(): number {
+	if (
+		typeof localStorage === "undefined" ||
+		typeof localStorage.getItem !== "function"
+	) {
+		return DEFAULT_CONTENT_FONT_SCALE;
+	}
+	const raw = localStorage.getItem("contentFontScale");
+	const parsed = raw === null ? Number.NaN : Number.parseFloat(raw);
+	return Number.isFinite(parsed)
+		? clampContentFontScale(parsed)
+		: DEFAULT_CONTENT_FONT_SCALE;
+}
+
+/** 把字号写到 CSS 变量上（Layout.astro 的首屏内联脚本也做同样的事，避免闪烁） */
+export function applyContentFontScaleToDocument(scale: number): void {
+	if (typeof document === "undefined") return;
+	document.documentElement.style.setProperty(
+		"--content-font-scale",
+		String(clampContentFontScale(scale)),
+	);
+}
+
+export function setContentFontScale(scale: number): void {
+	if (!Number.isFinite(scale)) return;
+	const safe = clampContentFontScale(scale);
+	applyContentFontScaleToDocument(safe);
+	if (
+		typeof localStorage !== "undefined" &&
+		typeof localStorage.setItem === "function"
+	) {
+		localStorage.setItem("contentFontScale", String(safe));
+	}
+}
+
+/** 恢复默认字号：清掉存储值，并立即把 CSS 变量改回默认 */
+export function resetContentFontScale(): void {
+	if (
+		typeof localStorage !== "undefined" &&
+		typeof localStorage.removeItem === "function"
+	) {
+		localStorage.removeItem("contentFontScale");
+	}
+	applyContentFontScaleToDocument(DEFAULT_CONTENT_FONT_SCALE);
+}

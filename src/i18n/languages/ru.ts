@@ -415,6 +415,7 @@ export const ru: Translation = {
 
 	// Стиль карточек
 	[Key.cardSettings]: "Стиль карточек",
+	[Key.fontSize]: "Размер текста",
 	[Key.cardBorder]: "Рамка и тень карточек",
 	[Key.cardFollowTheme]: "Карточки跟随主题色",
 

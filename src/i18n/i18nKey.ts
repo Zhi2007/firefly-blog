@@ -405,6 +405,9 @@ enum I18nKey {
 	cardBorder = "cardBorder",
 	cardFollowTheme = "cardFollowTheme",
 
+	// 正文字号
+	fontSize = "fontSize",
+
 	// 文章布局
 	postListLayout = "postListLayout",
 	postListLayoutList = "postListLayoutList",

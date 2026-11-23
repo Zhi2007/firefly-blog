@@ -37,6 +37,9 @@ export const displaySettingsConfig: DisplaySettingsConfig =
 		// 卡片风格跟随主题色开关
 		cardFollowThemeSwitchable: true,
 
+		// 正文字号调节开关（访客可在 90% ~ 140% 之间调，默认 108% 见 setting-utils.ts）
+		fontSizeSwitchable: true,
+
 		// ── 壁纸 (Wallpaper) ──────────────────────────────────
 
 		// 壁纸模式切换开关
