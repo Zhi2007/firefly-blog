@@ -50,10 +50,10 @@
 
 /* 确保平滑滚动 */
 html {
-    /* 访客字号：--content-font-size 由「显示设置」面板写入（单位 rem，默认 1.125rem = 18px）。
+    /* 访客字号：--content-font-size 由「显示设置」面板写入（单位 rem，默认 1rem = 16px）。
        设在根元素上，全站用 rem 排版的文字（正文 / 侧栏 / 导航 / 面板控件）会一起缩放，
        和浏览器「默认字号」是同一条机制；固定 px 的容器宽度不受影响。 */
-    font-size: var(--content-font-size, 1.125rem);
+    font-size: var(--content-font-size, 1rem);
     scroll-behavior: smooth;
 }
 

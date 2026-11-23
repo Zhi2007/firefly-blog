@@ -966,8 +966,8 @@ export function setCardFollowThemeEnabled(enabled: boolean): void {
 /** 主题的正文基准（Tailwind 的 1rem = 16px），px → rem 用它换算 */
 const REM_BASE_PX = 16;
 
-/** 默认 18px（浏览器默认 16px；整体调大一档） */
-export const DEFAULT_CONTENT_FONT_SIZE_PX = 18;
+/** 默认 16px（与浏览器默认一致；访客可自行调大，上限 18px） */
+export const DEFAULT_CONTENT_FONT_SIZE_PX = 16;
 /** 可调范围：14px ~ 18px（再大 1280 宽度下导航会挤不下，故封顶 18） */
 export const MIN_CONTENT_FONT_SIZE_PX = 14;
 export const MAX_CONTENT_FONT_SIZE_PX = 18;

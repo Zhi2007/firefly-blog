@@ -598,7 +598,7 @@ export const navBarConfig: NavBarConfig = applyNavOverrides(
 
 ### 7.6 `displaySettingsConfig.ts`
 
-> 字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把**全站字号**在 **14px ~ 18px** 之间调（步进 1px），默认 **18px**（原来是 16px）。实现是把 px 换算成 rem 写到 `--content-font-size`，由 `main.css` 的 `html { font-size: var(--content-font-size) }` 消费 —— 所以正文、侧栏、面板控件这些用 rem 排版的文字会一起缩放；导航栏是「框架」，字号与内边距在 `navbar.css` 里钉成 px（否则 1280 宽度下菜单会被挤成竖排）。默认值与夹取规则在 `DEFAULT_CONTENT_FONT_SIZE_PX` / `getStoredContentFontSizePx()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
+> 字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把**全站字号**在 **14px ~ 18px** 之间调（步进 1px），默认 **16px**（与浏览器默认一致，访客自己调大）。实现是把 px 换算成 rem 写到 `--content-font-size`，由 `main.css` 的 `html { font-size: var(--content-font-size) }` 消费 —— 正文、侧栏、面板控件这些用 rem 排版的文字会一起缩放；导航栏是「框架」，字号与内边距在 `navbar.css` 里钉成 px（否则 1280 宽度下菜单会被挤成竖排）。默认值与夹取规则在 `DEFAULT_CONTENT_FONT_SIZE_PX` / `getStoredContentFontSizePx()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
 
 ```ts
 		// 生产环境建议默认关闭，只在开发调试环境开启用来预览效果

@@ -2,10 +2,48 @@
 
 #display-setting input[type="range"] {
 	-webkit-appearance: none;
+	appearance: none;
 	height: 1.5rem;
+	padding: 0;
+	border: 0;
 	border-radius: 999px;
 	background-image: linear-gradient(90deg, var(--primary) 0 var(--range-progress, 50%), hsla(var(--hue), 22%, 28%, 0.18) var(--range-progress, 50%) 100%);
 	transition: background-image 0.15s ease-in-out;
+}
+
+/* 滑块默认会带一层 UA 自己的 track/thumb：track 不透明、还自带内缩，
+   于是我们自己画的渐变轨道两侧会露出一圈白边（「字号」滑块当年就栽在这）。
+   把 track 显式设为透明、thumb 自己画，渐变轨道才能铺满整个控件。 */
+#display-setting input[type="range"]::-webkit-slider-runnable-track {
+	height: 100%;
+	border-radius: 999px;
+	background: transparent;
+}
+
+#display-setting input[type="range"]::-moz-range-track {
+	height: 100%;
+	border-radius: 999px;
+	background: transparent;
+}
+
+#display-setting input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 1.25rem;
+	height: 1.25rem;
+	margin-top: calc((1.5rem - 1.25rem) / 2);
+	border: 0;
+	border-radius: 999px;
+	background: #fff;
+	box-shadow: 0 1px 3px rgb(0 0 0 / 0.28);
+}
+
+#display-setting input[type="range"]::-moz-range-thumb {
+	width: 1.25rem;
+	height: 1.25rem;
+	border: 0;
+	border-radius: 999px;
+	background: #fff;
+	box-shadow: 0 1px 3px rgb(0 0 0 / 0.28);
 }
 
 #display-setting input[type="range"].overlay-slider {
