@@ -136,6 +136,41 @@
 	}
 }
 
+/* 分类里只有一个工具时，让卡片占满整行——否则第二列永远空着，卡片被挤在左半边 */
+.tools-grid > .tool-card:only-child {
+	grid-column: 1 / -1;
+}
+
+/* 卡片内部再分「说明区 / 操作区」：窄卡片上下堆叠，宽卡片左右并排 */
+.tool-card-main,
+.tool-card-side {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	min-width: 0;
+}
+
+/* 只有「单工具分类铺满整行」时卡片才会这么宽；此时把标签、提示和按钮收到右侧一栏，
+   正文保持 ~40 字的舒适行宽，右栏也不会再空着 */
+@container (min-width: 54rem) {
+	.tools-grid > .tool-card:only-child {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 15rem;
+		align-items: start;
+		gap: 1.4rem;
+	}
+
+	.tools-grid > .tool-card:only-child .tool-card-side {
+		align-self: stretch;
+		padding-left: 1.2rem;
+		border-left: 1px solid var(--line-divider);
+	}
+
+	.tools-grid > .tool-card:only-child .tool-card-side .tool-actions {
+		margin-top: auto;
+	}
+}
+
 .tool-card {
 	display: flex;
 	flex-direction: column;

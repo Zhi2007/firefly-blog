@@ -106,6 +106,7 @@ const description = toolsPageConfig.description || "";
             <div class="tools-grid">
               {category.tools.map((tool) => (
                 <article class="tool-card">
+                  <div class="tool-card-main">
                   <div class="tool-card-head">
                     <h4>
                       <a
@@ -141,7 +142,9 @@ const description = toolsPageConfig.description || "";
                       ))}
                     </ul>
                   )}
+                  </div>
 
+                  <div class="tool-card-side">
                   {tool.tags && tool.tags.length > 0 && (
                     <div class="tool-tags" aria-label="标签">
                       {tool.tags.map((tag) => (
@@ -200,6 +203,7 @@ const description = toolsPageConfig.description || "";
                         源码
                       </a>
                     )}
+                  </div>
                   </div>
                 </article>
               ))}
