@@ -957,20 +957,20 @@ export function setCardFollowThemeEnabled(enabled: boolean): void {
 	}
 }
 
-// ── 文章正文字号（显示设置面板） ─────────────────────────────
-// 只缩放正文容器（.custom-md）的字号，不动侧栏与控件：
-// 读文章时最需要调字号，而 UI 字号跟随主题更稳，避免把整站布局撑坏。
-// 面板按 px 调（"18px" 这种说法最直观），落到 CSS 上用 rem 变量 --content-font-size，
-// 仍然尊重访客浏览器的默认字号设置。
+// ── 全站字号（显示设置面板） ─────────────────────────────────
+// 面板按 px 调（"18px" 这种说法最直观），落到 CSS 上写成 rem 变量 --content-font-size，
+// 由 main.css 的 `html { font-size: var(--content-font-size) }` 消费：
+// 全站用 rem 排版的文字（正文 / 侧栏 / 导航 / 面板控件）一起缩放，
+// 和浏览器「默认字号」是同一条机制；固定 px 的容器宽度不受影响。
 
 /** 主题的正文基准（Tailwind 的 1rem = 16px），px → rem 用它换算 */
 const REM_BASE_PX = 16;
 
-/** 默认正文 18px（原来是 16px，整体调大一档） */
+/** 默认 18px（浏览器默认 16px；整体调大一档） */
 export const DEFAULT_CONTENT_FONT_SIZE_PX = 18;
-/** 可调范围：14px ~ 22px */
+/** 可调范围：14px ~ 18px（再大 1280 宽度下导航会挤不下，故封顶 18） */
 export const MIN_CONTENT_FONT_SIZE_PX = 14;
-export const MAX_CONTENT_FONT_SIZE_PX = 22;
+export const MAX_CONTENT_FONT_SIZE_PX = 18;
 
 function clampContentFontSizePx(sizePx: number): number {
 	return Math.min(

@@ -796,9 +796,10 @@ $effect(() => {
 					{fontSizePx}px
 				</div>
 			</div>
-			<div class="w-full h-6 px-1 bg-(--btn-regular-bg) rounded-md select-none flex items-center">
+			<!-- 与「全屏透明」那几个滑块同一套结构：底色卡片 + 通栏细滑块，不留左右内边距 -->
+			<div class="rounded-md bg-(--btn-regular-bg) py-2">
 				<input aria-label={i18n(I18nKey.fontSize)} type="range" min={MIN_CONTENT_FONT_SIZE_PX} max={MAX_CONTENT_FONT_SIZE_PX} step="1"
-					   bind:value={fontSizePx} class="slider" style="width: 100%">
+					   bind:value={fontSizePx} class="slider w-full">
 			</div>
 		</div>
 		{/if}

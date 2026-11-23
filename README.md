@@ -62,7 +62,7 @@
 | 全屏壁纸布局与下滑模糊渐变 | `backgroundWallpaper.ts` → `fullscreen.layout: "classic"`、`fullscreen.blurRamp.enable.{desktop,mobile}` |
 | 首页横幅下方社交图标（GitHub / B 站 / RSS） | `backgroundWallpaper.ts` → `common.homeText.links`（`linksEnable: true`） |
 | 深浅色主题 + 主题色相 | `siteConfig.ts` → `themeColor: { hue: 250, defaultMode: "system" }` |
-| 显示设置面板（🎨，可切换主题色/壁纸模式/正文字号/樱花等） | `src/config/displaySettingsConfig.ts` → `enable: true`；各分项 `themeColorSwitchable` / `wallpaperModeSwitchable` / `fontSizeSwitchable` / `sakuraSwitchable` … |
+| 显示设置面板（🎨，可切换主题色/壁纸模式/全站字号/樱花等） | `src/config/displaySettingsConfig.ts` → `enable: true`；各分项 `themeColorSwitchable` / `wallpaperModeSwitchable` / `fontSizeSwitchable` / `sakuraSwitchable` … |
 | 樱花特效（Web Worker 渲染） | `src/config/effectsConfig.ts` → `sakuraConfig.enable`（**当前 `false`**）；前端开关见 `displaySettingsConfig.sakuraSwitchable` |
 | 页脚时间进度（今日 / 本月 / 本年） | `effectsConfig.ts` → `timeProgressConfig.enable: true`；组件挂在 `sidebarConfig.ts` 的 `leftComponents`（`type: "timeProgress"`） |
 | 切换标签页时轮播标题 | `effectsConfig.ts` → `tabTitleConfig.enable: true`、`titles`、`intervalMs` |
@@ -422,7 +422,7 @@ flowchart LR
 | `navBarConfig.ts` | 导航菜单项（增删改都在这；每项建议写显式 `id`）与搜索方式 |
 | `sidebarConfig.ts` | 侧边栏开关/位置/平板显示哪侧，以及左、右、移动端底部三组组件的顺序与开关 |
 | `backgroundWallpaper.ts` | 壁纸模式、桌面/移动壁纸列表、主页横幅文字与打字机、轮播、水波纹、渐变、横幅/全屏各自的导航栏透明与模糊配置 |
-| `displaySettingsConfig.ts` | 前台 🎨 设置面板总开关与每个可切换项（主题色、布局、卡片样式、正文字号、壁纸模式、水波纹、樱花…） |
+| `displaySettingsConfig.ts` | 前台 🎨 设置面板总开关与每个可切换项（主题色、布局、卡片样式、全站字号、壁纸模式、水波纹、樱花…） |
 | `effectsConfig.ts` | 樱花特效参数、页脚时间进度、切换标签页时的标题轮播 |
 | `commentConfig.ts` | 评论系统类型与各自参数（本站用 Giscus） |
 | `analyticsConfig.ts` | GA / Clarity / Umami / 51la / Cloudflare Web Analytics |
@@ -598,7 +598,7 @@ export const navBarConfig: NavBarConfig = applyNavOverrides(
 
 ### 7.6 `displaySettingsConfig.ts`
 
-> 正文字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把文章正文在 **14px ~ 22px** 之间调（步进 1px），默认 **18px**（原来是 16px）。实现只改正文容器 `.custom-md` 的字号（CSS 变量 `--content-font-size`，px 由 `setting-utils.ts` 换算成 rem 写入，定义见 `markdown.css`），侧栏与控件字号不受影响；默认值与夹取规则在 `DEFAULT_CONTENT_FONT_SIZE_PX` / `getStoredContentFontSizePx()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
+> 字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把**全站字号**在 **14px ~ 18px** 之间调（步进 1px），默认 **18px**（原来是 16px）。实现是把 px 换算成 rem 写到 `--content-font-size`，由 `main.css` 的 `html { font-size: var(--content-font-size) }` 消费 —— 所以正文、侧栏、面板控件这些用 rem 排版的文字会一起缩放；导航栏是「框架」，字号与内边距在 `navbar.css` 里钉成 px（否则 1280 宽度下菜单会被挤成竖排）。默认值与夹取规则在 `DEFAULT_CONTENT_FONT_SIZE_PX` / `getStoredContentFontSizePx()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
 
 ```ts
 		// 生产环境建议默认关闭，只在开发调试环境开启用来预览效果
@@ -622,7 +622,7 @@ export const navBarConfig: NavBarConfig = applyNavOverrides(
 
 - 改 `enable`：前台是否显示 🎨 设置面板；**打开后设置面板及其依赖会打进客户端产物，约 +33 KB/页**（文件注释原话），首屏 JS 变多。生产环境想省体积可以关掉，只在本地调试时开。
 - 也可用环境变量覆盖：`PUBLIC_DISPLAY_SETTINGS=true`（注释里写明"环境变量优先级更高"，取值 `true/1/on/yes` 开、`false/0/off/no` 关）。
-- 各分项开关：主题色、列表布局、卡片边框/跟随主题、正文字号、壁纸模式、全屏布局、水波纹、渐变、横幅标题、壁纸轮播、透明度/模糊/卡片透明度滑块、樱花。关掉某一项 = 前台不出现该控件（但已保存的访客偏好仍会生效）。
+- 各分项开关：主题色、列表布局、卡片边框/跟随主题、全站字号、壁纸模式、全屏布局、水波纹、渐变、横幅标题、壁纸轮播、透明度/模糊/卡片透明度滑块、樱花。关掉某一项 = 前台不出现该控件（但已保存的访客偏好仍会生效）。
 
 ### 7.7 `effectsConfig.ts`
 
