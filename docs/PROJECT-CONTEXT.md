@@ -83,7 +83,7 @@
 | 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
 | `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
-| 已发布文章 | 8 篇 | `src/content/posts/*.md` 实测（2026-11-23；`node scripts/post-count.mjs` 自动维护） |
+| 已发布文章 | 9 篇 | `src/content/posts/*.md` 实测（2026-11-23；`node scripts/post-count.mjs` 自动维护） |
 
 ### 1.4 最容易踩的 5 条（背下来）
 
@@ -175,7 +175,7 @@ firefly/
 │   ├── content.config.ts       # ① 内容集合 schema（第 3 章的唯一依据）
 │   ├── config/                 # ③ 配置区（35 个文件：25 个 *Config.ts + backgroundWallpaper.ts
 │   │                           #    + index.ts + README.md + FooterConfig.html + 6 个 JSON）★ 第 4 章
-│   ├── content/                # ③ 内容：posts/（8 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
+│   ├── content/                # ③ 内容：posts/（9 篇 + images/）、spec/（4 个页面）、dynamic/、projects/
 │   ├── layouts/                # ① Layout.astro（HTML 外壳）、MainGridLayout.astro（栅格）
 │   ├── components/             # ① 组件（comment/Giscus.astro 是唯一被本地化改造过的热点；② features/PostSearch.svelte 文章内搜索）
 │   ├── pages/                  # ① 文件路由（34 个文件；`/` 与 `/page/N/` 由 [...page].astro 提供）
@@ -251,7 +251,7 @@ firefly/
 | `dynamic` | `src/content/dynamic` | **只认 `.md`**（`content.config.ts:100`） | `published` |
 | `projects` | `src/content/projects` | `.md` / `.mdx` | `title`、`published` |
 
-当前内容实况（实测）：`posts/` 8 篇（`android-adb-root-beginner.md`、`common-file-formats.md`、`deploy-to-cloudflare.md`、`hello-world.md`、`install-archlinux-in-vmware.md`、`keepassxc-monica-pass-password.md`、`markdown-cheatsheet.md`、`vmware-workstation-pro-26h1u1.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
+当前内容实况（实测）：`posts/` 9 篇（`android-adb-root-beginner.md`、`common-file-formats.md`、`deploy-to-cloudflare.md`、`hello-world.md`、`install-archlinux-in-vmware.md`、`keepassxc-monica-pass-password.md`、`markdown-cheatsheet.md`、`shizuku-wireless-adb-guide.md`、`vmware-workstation-pro-26h1u1.md`）+ `images/`；`spec/` 4 个（`about.md`、`announcement.md`、`friends.mdx`、`guestbook.md`）；`dynamic/`、`projects/` 为空目录。
 
 ### 3.3 `posts` frontmatter 全字段（逐个核对 `src/content.config.ts:64-90`）
 
