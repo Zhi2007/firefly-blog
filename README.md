@@ -598,7 +598,7 @@ export const navBarConfig: NavBarConfig = applyNavOverrides(
 
 ### 7.6 `displaySettingsConfig.ts`
 
-> 正文字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把文章正文在 **90% ~ 140%** 之间调（步进 1%），默认 **108%**（比原来的 16px 大约 8%）。实现只改正文容器 `.custom-md` 的字号（`--content-font-scale`，定义在 `markdown.css`），侧栏与控件字号不受影响；默认值与夹取规则在 `src/utils/setting-utils.ts` 的 `DEFAULT_CONTENT_FONT_SCALE` / `getStoredContentFontScale()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
+> 正文字号（`fontSizeSwitchable`）是 2026-11 新增：访客可在 🎨 面板的外观页把文章正文在 **14px ~ 22px** 之间调（步进 1px），默认 **18px**（原来是 16px）。实现只改正文容器 `.custom-md` 的字号（CSS 变量 `--content-font-size`，px 由 `setting-utils.ts` 换算成 rem 写入，定义见 `markdown.css`），侧栏与控件字号不受影响；默认值与夹取规则在 `DEFAULT_CONTENT_FONT_SIZE_PX` / `getStoredContentFontSizePx()`，首屏由 `Layout.astro` 的内联脚本提前写入，避免闪一下。关掉这个开关会清掉访客已保存的字号，始终用默认值。
 
 ```ts
 		// 生产环境建议默认关闭，只在开发调试环境开启用来预览效果

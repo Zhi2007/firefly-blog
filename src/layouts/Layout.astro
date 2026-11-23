@@ -40,9 +40,9 @@ import { isHomePage } from "@/utils/layout-utils";
 import { getAuthorAvatarUrl, getSiteLogo } from "@/utils/schema-image";
 import { buildSiteGraph, toAbsoluteUrl } from "@/utils/schema-utils";
 import {
-	DEFAULT_CONTENT_FONT_SCALE,
-	MAX_CONTENT_FONT_SCALE,
-	MIN_CONTENT_FONT_SCALE,
+	DEFAULT_CONTENT_FONT_SIZE_PX,
+	MAX_CONTENT_FONT_SIZE_PX,
+	MIN_CONTENT_FONT_SIZE_PX,
 } from "@/utils/setting-utils";
 import { getOgLocale } from "@/utils/site-config-utils";
 import { getCanonicalUrl, url } from "@/utils/url-utils";
@@ -371,9 +371,9 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
         baseUrl: import.meta.env.BASE_URL,
         cardTransparentOpacity: backgroundWallpaper.overlay?.cardOpacity ?? 0.6,
         fullscreenLayout,
-        defaultContentFontScale: DEFAULT_CONTENT_FONT_SCALE,
-        minContentFontScale: MIN_CONTENT_FONT_SCALE,
-        maxContentFontScale: MAX_CONTENT_FONT_SCALE,
+        defaultContentFontSizePx: DEFAULT_CONTENT_FONT_SIZE_PX,
+        minContentFontSizePx: MIN_CONTENT_FONT_SIZE_PX,
+        maxContentFontSizePx: MAX_CONTENT_FONT_SIZE_PX,
         isFontSizeSwitchable: displaySettingsConfig.fontSizeSwitchable,
       }}
     >
@@ -421,24 +421,26 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       document.documentElement.style.setProperty("--hue", hue);
 
       // 正文字号：首屏就应用，避免文章显示到一半突然跳字号。
-      // 规则与 setting-utils.ts 的 clamp 保持一致；开关关闭时忽略并清掉访客偏好，始终用默认值
-      const storedFontScale = isFontSizeSwitchable
-        ? localStorage.getItem("contentFontScale")
+      // 面板按 px 存，CSS 变量用 rem（16px = 1rem），规则与 setting-utils.ts 保持一致；
+      // 开关关闭时忽略并清掉访客偏好，始终用默认值。旧的百分比键顺手清掉，免留垃圾
+      const storedFontSize = isFontSizeSwitchable
+        ? localStorage.getItem("contentFontSizePx")
         : null;
       if (!isFontSizeSwitchable) {
-        localStorage.removeItem("contentFontScale");
+        localStorage.removeItem("contentFontSizePx");
       }
-      const parsedFontScale =
-        storedFontScale === null ? Number.NaN : Number.parseFloat(storedFontScale);
-      const resolvedFontScale = Number.isFinite(parsedFontScale)
+      localStorage.removeItem("contentFontScale");
+      const parsedFontSize =
+        storedFontSize === null ? Number.NaN : Number.parseFloat(storedFontSize);
+      const resolvedFontSizePx = Number.isFinite(parsedFontSize)
         ? Math.min(
-            maxContentFontScale,
-            Math.max(minContentFontScale, parsedFontScale),
+            maxContentFontSizePx,
+            Math.max(minContentFontSizePx, Math.round(parsedFontSize)),
           )
-        : defaultContentFontScale;
+        : defaultContentFontSizePx;
       document.documentElement.style.setProperty(
-        "--content-font-scale",
-        String(resolvedFontScale),
+        "--content-font-size",
+        `${resolvedFontSizePx / 16}rem`,
       );
 
       // 设置卡片透明度（全屏透明模式下使用），优先使用用户自定义值

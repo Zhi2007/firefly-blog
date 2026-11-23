@@ -12,7 +12,7 @@ import {
 	getDefaultBannerTitleEnabled,
 	getDefaultCardBorderEnabled,
 	getDefaultCardFollowThemeEnabled,
-	getDefaultContentFontScale,
+	getDefaultContentFontSizePx,
 	getDefaultFullscreenLayout,
 	getDefaultGradientEnabled,
 	getDefaultHue,
@@ -26,7 +26,7 @@ import {
 	getStoredBannerTitleEnabled,
 	getStoredCardBorderEnabled,
 	getStoredCardFollowThemeEnabled,
-	getStoredContentFontScale,
+	getStoredContentFontSizePx,
 	getStoredFullscreenLayout,
 	getStoredGradientEnabled,
 	getStoredOverlayBlur,
@@ -35,11 +35,13 @@ import {
 	getStoredSakuraEnabled,
 	getStoredWallpaperMode,
 	getStoredWavesEnabled,
+	MAX_CONTENT_FONT_SIZE_PX,
+	MIN_CONTENT_FONT_SIZE_PX,
 	setBannerCarouselEnabled,
 	setBannerTitleEnabled,
 	setCardBorderEnabled,
 	setCardFollowThemeEnabled,
-	setContentFontScale,
+	setContentFontSize,
 	setFullscreenLayout,
 	setGradientEnabled,
 	setHue,
@@ -117,9 +119,9 @@ let cardBorderEnabled = $state(false);
 const defaultCardBorderEnabled = getDefaultCardBorderEnabled();
 let cardFollowThemeEnabled = $state(false);
 const defaultCardFollowThemeEnabled = getDefaultCardFollowThemeEnabled();
-// 正文字号用百分比整数保存（108 = 108%），避免浮点在滑块上出现 104.99999 这类脏值
-let fontSizePercent = $state(Math.round(getStoredContentFontScale() * 100));
-const defaultFontSizePercent = Math.round(getDefaultContentFontScale() * 100);
+// 正文字号按 px 存（14~22），比百分比直观，也不会出现小数脏值
+let fontSizePx = $state(getStoredContentFontSizePx());
+const defaultFontSizePx = getDefaultContentFontSizePx();
 
 const isWallpaperSwitchable = displaySettingsConfig.wallpaperModeSwitchable;
 const isFullscreenLayoutSwitchable = $derived(
@@ -145,9 +147,7 @@ const isCardBorderSwitchable = displaySettingsConfig.cardBorderSwitchable;
 const isCardFollowThemeSwitchable =
 	displaySettingsConfig.cardFollowThemeSwitchable;
 const isFontSizeSwitchable = displaySettingsConfig.fontSizeSwitchable;
-let fontSizeIsDefault = $derived(
-	Math.round(fontSizePercent) === defaultFontSizePercent,
-);
+let fontSizeIsDefault = $derived(fontSizePx === defaultFontSizePx);
 // 是否有任何横幅设置可显示（后续添加新设置时在此处添加条件）
 const hasBannerSettings =
 	isWavesSwitchable ||
@@ -365,7 +365,7 @@ function resetLayout() {
 
 function resetFontSize() {
 	// 只改 state：下面的 $effect 会把默认值写回 CSS 变量与 localStorage
-	fontSizePercent = defaultFontSizePercent;
+	fontSizePx = defaultFontSizePx;
 	requestAnimationFrame(refreshAllRangeProgress);
 }
 
@@ -652,9 +652,9 @@ $effect(() => {
 // 字号：滑块一变就写 CSS 变量（同时落 localStorage），正文立即重排
 $effect(() => {
 	if (!isFontSizeSwitchable) return;
-	const percent = Math.round(fontSizePercent);
-	if (!Number.isFinite(percent)) return;
-	setContentFontScale(percent / 100);
+	const sizePx = Math.round(fontSizePx);
+	if (!Number.isFinite(sizePx)) return;
+	setContentFontSize(sizePx);
 });
 
 $effect(() => {
@@ -793,12 +793,12 @@ $effect(() => {
 				</button>
 				<div id="fontSizeValue" class="transition bg-(--btn-regular-bg) rounded-md flex justify-center
 				font-bold items-center text-(--btn-content)">
-					{Math.round(fontSizePercent)}%
+					{fontSizePx}px
 				</div>
 			</div>
 			<div class="w-full h-6 px-1 bg-(--btn-regular-bg) rounded-md select-none flex items-center">
-				<input aria-label={i18n(I18nKey.fontSize)} type="range" min="90" max="140" step="1"
-					   bind:value={fontSizePercent} class="slider" style="width: 100%">
+				<input aria-label={i18n(I18nKey.fontSize)} type="range" min={MIN_CONTENT_FONT_SIZE_PX} max={MAX_CONTENT_FONT_SIZE_PX} step="1"
+					   bind:value={fontSizePx} class="slider" style="width: 100%">
 			</div>
 		</div>
 		{/if}

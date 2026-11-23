@@ -960,68 +960,73 @@ export function setCardFollowThemeEnabled(enabled: boolean): void {
 // ── 文章正文字号（显示设置面板） ─────────────────────────────
 // 只缩放正文容器（.custom-md）的字号，不动侧栏与控件：
 // 读文章时最需要调字号，而 UI 字号跟随主题更稳，避免把整站布局撑坏。
-// 缩放比例写在 <html> 的 CSS 变量 --content-font-scale 上，由 markdown.css 消费。
+// 面板按 px 调（"18px" 这种说法最直观），落到 CSS 上用 rem 变量 --content-font-size，
+// 仍然尊重访客浏览器的默认字号设置。
 
-/** 默认缩放：1.08 ≈ 在 16px 基准上放大到 17.3px（"默认字号再调大一点"） */
-export const DEFAULT_CONTENT_FONT_SCALE = 1.08;
-/** 可调范围：90% ~ 140% */
-export const MIN_CONTENT_FONT_SCALE = 0.9;
-export const MAX_CONTENT_FONT_SCALE = 1.4;
+/** 主题的正文基准（Tailwind 的 1rem = 16px），px → rem 用它换算 */
+const REM_BASE_PX = 16;
 
-function clampContentFontScale(scale: number): number {
+/** 默认正文 18px（原来是 16px，整体调大一档） */
+export const DEFAULT_CONTENT_FONT_SIZE_PX = 18;
+/** 可调范围：14px ~ 22px */
+export const MIN_CONTENT_FONT_SIZE_PX = 14;
+export const MAX_CONTENT_FONT_SIZE_PX = 22;
+
+function clampContentFontSizePx(sizePx: number): number {
 	return Math.min(
-		MAX_CONTENT_FONT_SCALE,
-		Math.max(MIN_CONTENT_FONT_SCALE, scale),
+		MAX_CONTENT_FONT_SIZE_PX,
+		Math.max(MIN_CONTENT_FONT_SIZE_PX, Math.round(sizePx)),
 	);
 }
 
-export function getDefaultContentFontScale(): number {
-	return DEFAULT_CONTENT_FONT_SCALE;
+export function getDefaultContentFontSizePx(): number {
+	return DEFAULT_CONTENT_FONT_SIZE_PX;
 }
 
 /** 读取访客保存的字号（非法值 / 未保存时回落到默认值，并夹在合法区间内） */
-export function getStoredContentFontScale(): number {
+export function getStoredContentFontSizePx(): number {
 	if (
 		typeof localStorage === "undefined" ||
 		typeof localStorage.getItem !== "function"
 	) {
-		return DEFAULT_CONTENT_FONT_SCALE;
+		return DEFAULT_CONTENT_FONT_SIZE_PX;
 	}
-	const raw = localStorage.getItem("contentFontScale");
+	const raw = localStorage.getItem("contentFontSizePx");
 	const parsed = raw === null ? Number.NaN : Number.parseFloat(raw);
 	return Number.isFinite(parsed)
-		? clampContentFontScale(parsed)
-		: DEFAULT_CONTENT_FONT_SCALE;
+		? clampContentFontSizePx(parsed)
+		: DEFAULT_CONTENT_FONT_SIZE_PX;
 }
 
 /** 把字号写到 CSS 变量上（Layout.astro 的首屏内联脚本也做同样的事，避免闪烁） */
-export function applyContentFontScaleToDocument(scale: number): void {
+export function applyContentFontSizeToDocument(sizePx: number): void {
 	if (typeof document === "undefined") return;
+	const safe = clampContentFontSizePx(sizePx);
 	document.documentElement.style.setProperty(
-		"--content-font-scale",
-		String(clampContentFontScale(scale)),
+		"--content-font-size",
+		`${safe / REM_BASE_PX}rem`,
 	);
 }
 
-export function setContentFontScale(scale: number): void {
-	if (!Number.isFinite(scale)) return;
-	const safe = clampContentFontScale(scale);
-	applyContentFontScaleToDocument(safe);
+export function setContentFontSize(sizePx: number): void {
+	if (!Number.isFinite(sizePx)) return;
+	const safe = clampContentFontSizePx(sizePx);
+	applyContentFontSizeToDocument(safe);
 	if (
 		typeof localStorage !== "undefined" &&
 		typeof localStorage.setItem === "function"
 	) {
-		localStorage.setItem("contentFontScale", String(safe));
+		localStorage.setItem("contentFontSizePx", String(safe));
 	}
 }
 
 /** 恢复默认字号：清掉存储值，并立即把 CSS 变量改回默认 */
-export function resetContentFontScale(): void {
+export function resetContentFontSize(): void {
 	if (
 		typeof localStorage !== "undefined" &&
 		typeof localStorage.removeItem === "function"
 	) {
-		localStorage.removeItem("contentFontScale");
+		localStorage.removeItem("contentFontSizePx");
 	}
-	applyContentFontScaleToDocument(DEFAULT_CONTENT_FONT_SCALE);
+	applyContentFontSizeToDocument(DEFAULT_CONTENT_FONT_SIZE_PX);
 }

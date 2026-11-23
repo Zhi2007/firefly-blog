@@ -3,10 +3,10 @@
 .custom-md {
   overflow-wrap: break-word;
 
-  /* 正文字号：--content-font-scale 由显示设置面板写入（默认 1.08，见 setting-utils.ts）。
-     prose 的子元素尺寸都是 em，所以改这里等于整篇正文等比缩放；
+  /* 正文字号：--content-font-size 由显示设置面板写入（px 换算成 rem，默认 18px = 1.125rem，
+     见 setting-utils.ts）。prose 的子元素尺寸都是 em，所以改这里等于整篇正文等比缩放；
      .custom-md 与 .prose 在同一元素上，这条未分层规则会覆盖 Tailwind 的分层工具类。 */
-  font-size: calc(1rem * var(--content-font-scale, 1.08));
+  font-size: var(--content-font-size, 1.125rem);
 
   body.sticky-navbar & {
     [id] {
