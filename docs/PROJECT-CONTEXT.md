@@ -80,8 +80,8 @@
 | 发布链路 | 面板 stage → commit → push → Actions → `wrangler-action@v4` → CF 边缘 | `admin/server.mjs:1263-1324`、`.github/workflows/deploy.yml:58-63` |
 | 上线耗时 | 约 1 分钟 | `admin/README.md:174`、`admin/server.mjs:1321` |
 | 管理面板 | 优先双击根目录 `firefly-admin.exe`（单窗口：隐藏 node + Chrome/Edge `--app` 窗口 + 后台日志）；也可 `node admin/server.mjs`，监听 `127.0.0.1:8799` | `admin-launcher/FireflyAdminLauncher.cs`、`admin/server.mjs` |
-| 面板页签数 | **11 个** | `admin/index.html` 的 `nav button[data-tab]` |
-| `/api/*` 路由数 | **37**（36 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
+| 面板页签数 | **12 个** | `admin/index.html` 的 `nav button[data-tab]` |
+| `/api/*` 路由数 | **42**（41 个在 switch 内 + `/api/logout` 前置处理） | 静态提取脚本，见第 9.2 节 |
 | 内容集合 | `posts` / `spec` / `dynamic` / `projects` | `src/content.config.ts:133-143` |
 | 已发布文章 | 10 篇 | `src/content/posts/*.md` 实测（2026-11-23；`node scripts/post-count.mjs` 自动维护） |
 
@@ -135,7 +135,7 @@
 firefly/
 ├── admin/                      # ② 零依赖本地管理面板（19 个文件，只用 node: 内置模块）
 │   ├── server.mjs              #    HTTP 服务 + 全部 /api 路由（2904 行）
-│   ├── index.html              #    单页 UI（11 个页签，内联 JS/CSS，现代侧边栏外壳）
+│   ├── index.html              #    单页 UI（12 个页签，内联 JS/CSS，现代侧边栏外壳）
 │   ├── README.md               #    面板完整用法（开头有目录）★ 改面板前必读
 │   ├── publish-scope.mjs       #    发布范围白名单 PUBLISH_SCOPE（防 git add -A）
 │   ├── settings.mjs            #    「站点设置」白名单表单（33 条 SETTINGS_DEFS）
@@ -780,9 +780,9 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 请求体上限 | 64 MB（`readBody` 内累计超过即 400） | `admin/server.mjs` `readBody` |
 | 前端抹除令牌 | 页面加载后 `history.replaceState` 清掉地址栏 `?token=`；刷新靠 HttpOnly Cookie | `admin/index.html` 脚本开头 |
 
-### 9.3 全部 `/api/*` 路由表（37 条）
+### 9.3 全部 `/api/*` 路由表（42 条）
 
-**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **36** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **37** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1564-1602`）登记 **35** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
+**统计方式（可复现）**：用正则 `case\s+"(\/api\/[^"]+)"` 从 `admin/server.mjs` 提取 → **41** 条；再用 `(?:route|pathname)\s*===\s*"(\/api\/[^"]+)"` 提取 switch 之外的**前置处理** → **1** 条（`/api/logout`）；两者并集去重 → **42** 条。另有 1 条非 `/api` 的 `case`：`/media-file`。`POST_BODY_FIELDS`（`admin/server.mjs:1564-1602`）登记 **40** 条：没登记的只有 `/api/post`（只需 `GET` + query）与 `/api/logout`（在进入 switch 之前就处理完了），两条都没有 POST body，语义上不需要登记。
 
 > ⚠️ 新增 `/api/*` 路由时**必须同时往 `POST_BODY_FIELDS` 加一行**：未登记的接口跳过字段校验（`assertPostBody` 里 `if (!allowed) return body;`，`admin/server.mjs:1592`），等于放弃「字段打错不许静默执行」这道保护。
 
@@ -800,10 +800,10 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 3 | `/api/posts` | GET | 否 | 否 | 文章列表；另返回 `dir` / `imagesDir` / `imagesUrlPrefix`（面板显示「文章存在哪、图片放哪」） | `:1681-1691` |
 | 4 | `/api/post` | GET（读 query `slug`） | 否 | 否 | **slug 先过 `POST_SLUG_RE` 再拼路径**（`M1`）；返回 `file` / `dir` / `imagesDir`（= `images/<slug>/`）/ `imagesUrlPrefix`（= `./images/<slug>/`）/ `images[]`（正文引用的本地图片 + 逐个 `stat` 过的真实路径） | `:1692-1733` |
 | 5 | `/api/save-post` | POST | **是** | **是**（新文件 + 改名前的旧文件） | `slug` 与 `originalSlug` **都**过正则（`M2`）；**frontmatter 外科式改写**：日期落盘为不带引号的 `YYYY-MM-DD`、非法日期或空 `title` 一律 400（不落盘）、没编辑的行逐字节保留（**9.12 节**）；返回 `file` / `notes[]`（本次顺手规整了哪一行日期） | `:1745-1780` |
-| 6 | `/api/delete-post` | POST | 是（删除） | 是 | slug 正则 + `resolveInside([POSTS_DIR])` | `:1762-1778` |
+| 6 | `/api/delete-post` | POST | 是（**整组移入回收站**：`.md` + `images/<slug>/`） | 否（回收站本身就是恢复手段） | slug 正则 + `resolveInside([POSTS_DIR])`；返回 `trash`（条目 id）与 `files[]`；之后同步「已发布文章数」 | `admin/server.mjs` 的 `/api/delete-post` 分支 |
 | 7 | `/api/media` | GET | 否 | 否 | 返回目录表（`dirs`）与文件列表（每项含 `repoPath` 仓库相对路径） | `:1779-1782` |
 | 8 | `/api/upload` | POST | **是** | 覆盖同名文件时 | `dir` ∈ `MEDIA_DIRS`；扩展名白名单 `UPLOAD_EXT`；`resolveInside`；`dir=post-images` 时可带 `postSlug` → 落 `images/<文章名>/` 并返回 `./images/<文章名>/<文件名>`（不带则落 `images/` 根目录）；音频额外抽封面/歌词；返回 `repoPath` / `dir` / `path` | `:1783-1825` |
-| 9 | `/api/delete-media` | POST | 是（删除） | **是**（删除不可逆，必留快照） | `resolveInside` 到全部 `MEDIA_DIRS` | `:1826-1845` |
+| 9 | `/api/delete-media` | POST | 是（**移入回收站**） | 否 | `resolveInside` 到全部 `MEDIA_DIRS`；返回 `{ ok, trash }` | `admin/server.mjs` 的 `/api/delete-media` 分支 |
 | 10 | `/api/announcements` | GET 读 / POST 写 | **是** | 是（`writeJsonData` 内） | `body.items` 必须是数组；GET 返回数据文件路径 `file` | `:1846-1866` |
 | 11 | `/api/announcement-draft` | **仅 GET** | 否（只读 git 历史，不碰任何文件） | 否（设计如此：只产草稿） | 未认证 403；`since` 支持「提交 sha / YYYY-MM-DD / 最近天数」，非法一律 400；git 失败降级为 502 并给中文原因；**只生成草稿、不自动发布**；见 9.9 节 | `:1867-1882` |
 | 12 | `/api/playlist` | GET 读 / POST 写 | **是** | 是 | `body.songs` 必须是数组；GET 返回数据文件路径 `file` 与每首歌 `paths:{url,cover,lrc}`（站内路径逐个 `stat` 过）；**POST 会拒绝重复 url**（见 9.14） | `:1883-1911` |
@@ -831,10 +831,15 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 34 | `/api/run` | POST | 否 | 否 | `script ∈ {build, dev, check}`；找不到 pnpm 时返回**可读提示**（不是报错） | `:2339-2366` |
 | 35 | `/api/avatar` | 非 POST 读状态 / POST 换图或恢复默认 | **是**（新图片 + 改写 `profileConfig.ts` 的 `avatar`） | 是（同名图片覆盖时 + 配置改写前） | 扩展名白名单 + **魔数校验**（改扩展名骗不过）+ 25 MB 上限 + 只写 `public/assets/images`；`{restore:true}` 改回默认；GET 返回 `dir` / `repoPath` / `config:{file,key}`；见 9.8 节 | `:2367-2411` |
 | 36 | `/api/reveal` | **仅 POST** | 否（拉起资源管理器，不碰仓库） | 否 | 「打开所在文件夹」：`path` 必须**落在仓库内**且真实存在（越界 400 / 不存在 404）；只在 Windows 上执行（其它平台 200 + `ok:false` 说明）；文件用 `spawn("explorer.exe", ["/select,", abs], {detached, stdio:"ignore"}).unref()`、目录直接传 `[abs]`，**`/select,` 与路径必须分开传**（合并时含空格路径会被整体加引号，Explorer 会退回「文档」目录），**不阻塞请求**；`POST_BODY_FIELDS` 只放行 `path`；见 9.10 节 | `:2517-2552` |
+| — | `/api/trash` | **仅 GET**（否则 405） | 否 | 否 | 回收站列表：`items[]` 按删除时间倒序，`dir` 为 `admin-backups/trash`；每条含 `kind` / `label` / `files[{rel,size}]` / `totalSize`；`POST_BODY_FIELDS` 登记空数组 | `admin/server.mjs` 的 `/api/trash` 分支 |
+| — | `/api/trash/restore` | **仅 POST** `{id}` | 是（按记录里的相对路径搬回原位） | 否（源就是回收站） | 目标路径已存在 → **409** 且不覆盖；`kind=post` 恢复后同步「已发布文章数」 | `admin/server.mjs` 的 `/api/trash/restore` 分支 |
+| — | `/api/trash/purge` | **仅 POST** `{id}` | 是（**永久删除** `admin-backups/trash/<id>/`） | 否 | 唯一真正 `rm` 文件的接口；前端必须二次确认后才调用 | `admin/server.mjs` 的 `/api/trash/purge` 分支 |
+| — | `/api/trash/empty` | **仅 POST** | 是（清空全部条目） | 否 | 逐条删除，返回 `removed` 数量；前端同样二次确认 | `admin/server.mjs` 的 `/api/trash/empty` 分支 |
+| — | `/api/delete-music` | **仅 POST** `{repoPath}` | 是（**移入回收站**） | 否 | 只接受 `public/assets/music` 下的音频；同名封面 / 歌词一起移动；并从歌单里移除指向它的条目（返回 `playlistRemoved`） | `admin/server.mjs` 的 `/api/delete-music` 分支 |
 | — | `/api/diff` | GET/POST | 否 | 否 | `git diff --stat` + 结构化的 `files[{code,path,origin}]`（面板据此显示待提交文件的真实路径） | `:2412-2433` |
 | — | 未知 `/api/*` | 任意 | 否 | 否 | `404 {"error":"未知接口: <route>"}` | `:2469-2471` |
 
-### 9.4 页签清单（11 个，实测 `admin/index.html` 的 `nav button[data-tab]`）
+### 9.4 页签清单（12 个，实测 `admin/index.html` 的 `nav button[data-tab]`）
 
 | # | 页签 | `data-tab` | 能做什么（摘要） |
 | --- | --- | --- | --- |
@@ -843,14 +848,15 @@ default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:/
 | 3 | 公告 | `announce` | 公告增删改（含固定为弹窗的那一条）与弹窗版本号；**「生成草稿」**（读 git log → 填表单，只产草稿、不自动发布，见 9.9 节）；显示数据文件 `src/config/announcements.json` |
 | 4 | 音乐 | `music` | 上传音频/封面/歌词、编辑歌曲、排序、本地试听；一键压缩（试算/只压封面/全压）；显示歌单文件 `src/config/music-playlist.json` 与每首歌音频/封面/歌词的真实路径 |
 | 5 | 友链 | `friends` | 24 条友链的增删改排序 + 启停；「从网址抓取」自动猜标题/简介/图标（只填表单，需人工确认）；显示 `src/config/friends.json` 与每个图标的 `public/friends/<文件名>` |
-| 6 | 媒体 | `media` | 分类查看/上传/复制路径/删除；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
-| 7 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
-| 8 | 站点设置 | `settings` | 33 条可视化字段（+ **12 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
-| 9 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**保留份数可改为任意正整数**（`keep.json`，保存后立即清理旧快照）；CI 失败横幅与「回滚该提交」 |
-| 10 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
-| 11 | 后台 | `runtime` | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；**后台日志**（读 `logs/admin-server.log` 尾部，2 秒自动刷新、复制、📂 打开文件）；**重启后台**（仅启动器托管时可用，重启后页面自动重连）；**刷新界面**；见 9.13 节 |
+| 6 | 媒体 | `media` | 分类查看/上传/复制路径；**删除改为移入回收站**；**批量转 WebP**（默认先试算，只新增不删原图）；每条显示 `public/assets/...` 下的仓库相对路径 + 体积，卡片上显示当前目录路径 |
+| 7 | 回收站 | `trash` | 列出被删除的文章 / 媒体 / 音乐（含条目 id、类型、文件清单、大小、删除时间）；**恢复**按原路径搬回（目标已存在则拒绝）；**永久删除**与**清空**都需二次确认才会真正删文件；显示 `admin-backups/trash/` |
+| 8 | 配置 | `config` | 直接编辑 `CONFIG_FILES`（15 个，含 `FooterConfig.html` 与 3 个 JSON） |
+| 9 | 站点设置 | `settings` | 33 条可视化字段（+ **12 个页面开关**） + 导航菜单隐藏/改名/排序 + **站点头像卡片**（缩略图 / 上传新头像 / 恢复默认，见 9.8 节）；**每一项都显示「写进哪个文件的哪个块/字段」**（`file → within.key`，见 9.10 节），导航卡片显示 `src/config/nav-overrides.json`（+ 只读来源 `navBarConfig.ts`） |
+| 10 | 体检 / 备份 | `doctor` | 一键体检（**10 项**，含「文章 frontmatter（YAML 速查）」与「文章 schema（真实构建校验）」两项，见 9.11）；快照列表 + 恢复 + 导出 ZIP（显示 `admin-backups/<id>/` 与每个文件的真实路径）；**保留份数可改为任意正整数**（`keep.json`，保存后立即清理旧快照）；CI 失败横幅与「回滚该提交」 |
+| 11 | 发布 | `publish` | 同步状态、自动同步开关、一键 commit+push、从 GitHub 拉取、部署状态与日志；「待提交的改动」按 `git status` 逐条显示真实路径与状态码，发布后列出本次提交的文件（见 9.10 节） |
+| 12 | 后台 | `runtime` | 后台状态（PID / 端口 / 运行时长 / 是否启动器托管）；**后台日志**（读 `logs/admin-server.log` 尾部，2 秒自动刷新、复制、📂 打开文件）；**重启后台**（仅启动器托管时可用，重启后页面自动重连）；**刷新界面**；见 9.13 节 |
 
-> 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），后来改成 **10 个**；2026-10-19 新增「后台」页签后为 **11 个**。`admin/README.md` 的功能表也同步为 11 行。
+> 📌 **历史不一致（已修）**：`README.md` 第 8.3 节的标题与目录树注释曾写「九个页签」（无 `publish` 页签那会儿），后来改成 **10 个**；2026-10-19 新增「后台」页签后为 **11 个**；2026-11-23 新增「回收站」页签后为 **12 个**。`admin/README.md` 的功能表也同步为 11 行。
 
 ### 9.5 写入安全链（所有写接口共用）
 
@@ -1640,7 +1646,7 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | --- | --- |
 | switch 内 `case "/api/..."` | 36 |
 | switch 之外前置处理 | 1（`/api/logout`） |
-| **唯一 `/api/*` 路由总数** | **37** ← 本文 9.3 节表格逐行列出，数量一致 |
+| **唯一 `/api/*` 路由总数** | **42** ← 本文 9.3 节表格逐行列出，数量一致 |
 | `POST_BODY_FIELDS` 登记 | 35（未登记的是 `/api/post` 与 `/api/logout`：前者只读 query、后者在 switch 之前处理，都没有 POST body 语义） |
 | 非 `/api` 的 case | 1（`/media-file`，本文 9.3 节第 15 行同样列出） |
 
@@ -1724,8 +1730,8 @@ const preSwitch = [...new Set([...src.matchAll(/(?:route|pathname)\s*===\s*"(\/a
 | # | 改动的类型 | 必须同步的文件与章节 | 检查器 |
 | --- | --- | --- | --- |
 | 1 | **新增 `src/config` 字段**（尤其要能被面板调） | ① 本文档 4.2 配置表（该文件行的「控制什么 / 关键字段 / 面板」列）；② `admin/settings.mjs` 的 `SETTINGS_DEFS`（要能被面板调就必须加 def；条数变了要同步 4.1、9.4、2.3 里写的「33 条」）；③ 若是数据类（JSON）→ 加到 `admin/server.mjs:86-111` 的 `CONFIG_FILES` 白名单（当前 15 个）；④ 必要时同步 `src/types/*.ts` 与 `src/config/index.ts` 的导出 | ⚠️ 部分（`*Config.ts` 文件数 ↔ 4.2 表、`SETTINGS_DEFS` 条数 ↔ 文档声明、`src/config` 总文件数；**字段语义不覆盖**） |
-| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（37 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
-| 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 11 个）；② `admin/README.md` 的功能表；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
+| 2 | **新增 / 改名 / 删除 `/api/*` 路由** | ① 本文档 9.3 路由全表（42 条，逐行列出，含「写盘 / 写前快照」列）；② `POST_BODY_FIELDS`（`admin/server.mjs:1543`，**接受 POST body 就必须登记**；只读的 GET 接口也建议登记空数组，这样「带字段 POST」会 400 而不是静默执行）；③ 面板前端的调用点（`admin/index.html` 内联 JS）；④ 既有约定：**除 `/api/logout` 外未认证一律 403**（`admin/server.mjs:1657-1660`）；⑤ 用户向说明（`README.md` 第 8 章 / `admin/README.md`） | ✅（路由总数 + 9.3 表格逐行集合；POST 登记与 403 行为不检查） |
+| 3 | **新增面板页签** | ① 本文档 9.4 页签清单（当前 12 个）；② `admin/README.md` 的功能表；③ `README.md` 第 8 章 | ✅（`data-tab` 去重数 + 9.4 表格） |
 | 4 | **新增页面 / 路由（`src/pages/**`）** | ① `siteConfig.pages` 页面开关（`src/config/siteConfig.ts:10-46` + `:369`；关掉会同时隐藏导航项并返回 404）；② `navBarConfig.ts` 的 `getDynamicNavBarConfig()` —— **新增菜单项只能改它**，且必须写显式 `id`（`nav-overrides.json` 只能隐藏 / 改名 / 排序，面板不支持新增）；③ 本文档第 2 章目录树 + 第 3 章相关内容；④ `README.md` 特性表 | ❌（页面 / 路由清单不在检查范围，改完必须人工核对文档第 2 / 3 章） |
 | 5 | **新增内容集合或 frontmatter 字段** | ① `src/content.config.ts`（schema 是唯一权威）；② 本文档 3.2 集合表 + 3.3 `posts` 全字段表（当前 23 个）；③ `admin/server.mjs` 的文章解析 / 校验；④ 面板编辑器（`admin/index.html` 文章页、`admin/import-doc.mjs`） | ✅ `posts` 字段集合 ↔ 3.3 表（其它集合、解析与编辑器不覆盖） |
 | 6 | **新增构建步骤（`package.json` 的 `build`）** | ① 本文档 11.2 的 8 步链路与「8 步」说法（§1.3 也有一处）；② `CLAUDE.md` / `AGENTS.md` 里的构建说明（上游文件，改动要就地标注「本仓库修正」） | ✅（步骤序列逐条比对 + 三处「N 步」声明，含 `CLAUDE.md`） |

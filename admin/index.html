@@ -458,6 +458,7 @@
 			<symbol id="ic-doctor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
 			<symbol id="ic-publish" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3h16v-3"/></symbol>
 			<symbol id="ic-runtime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+			<symbol id="ic-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v5M14 11v5"/></symbol>
 		</svg>
 
 		<div id="topBanner" role="alert"></div>
@@ -498,6 +499,7 @@
 						<button data-tab="music"><svg class="nav-ico"><use href="#ic-music"/></svg><span>音乐</span></button>
 						<button data-tab="friends"><svg class="nav-ico"><use href="#ic-friends"/></svg><span>友链</span></button>
 						<button data-tab="media"><svg class="nav-ico"><use href="#ic-media"/></svg><span>媒体</span></button>
+				<button data-tab="trash"><svg class="nav-ico"><use href="#ic-trash"/></svg><span>回收站</span></button>
 					</div>
 					<div class="nav-group">
 						<div class="nav-group-title">站点</div>
@@ -739,7 +741,8 @@
 						<span style="flex:1"></span>
 						<button class="action ghost" id="btnCancelSong">关闭</button>
 						<button class="action ghost" id="btnExtractAudio">从音频重新提取</button>
-						<button class="action danger" id="btnDeleteSong">删除</button>
+						<button class="action danger ghost" id="btnDeleteMusicFile" title="把音频、同名封面与歌词一起移入回收站">删除音频文件</button>
+						<button class="action danger" id="btnDeleteSong">从歌单移除</button>
 						<button class="action" id="btnSaveSong">保存</button>
 					</div>
 					<div class="grid" style="margin-top:12px">
@@ -903,6 +906,30 @@
 							<tr><th>原文件</th><th>新文件</th><th>压缩前</th><th>压缩后</th><th>节省</th><th>状态</th></tr>
 						</thead>
 						<tbody id="webpBody"></tbody>
+					</table>
+				</div>
+			</section>
+
+			<!-- 回收站 -->
+			<section class="panel" id="panel-trash">
+				<div class="card">
+					<div class="row">
+						<h2 style="margin:0">回收站</h2>
+						<span style="flex:1"></span>
+						<button class="action ghost" id="btnTrashReload">刷新</button>
+						<button class="action danger" id="btnTrashEmpty">清空回收站</button>
+					</div>
+					<div class="hint">
+						删除文章 / 媒体 / 音乐时，文件只是被<b>移动到这里</b>（<code>admin-backups/trash/</code>），
+						不会立刻从磁盘删除；只有在这里点「永久删除」或「清空回收站」并<b>再次确认</b>，才会真正删掉文件。
+						恢复会按原路径搬回；目标位置已有同名文件时会拒绝覆盖。
+					</div>
+					<div class="path-block" id="trashDirPath"></div>
+					<table style="margin-top:12px">
+						<thead>
+							<tr><th>条目</th><th>类型</th><th>文件</th><th>大小</th><th>删除时间</th><th>操作</th></tr>
+						</thead>
+						<tbody id="trashBody"></tbody>
 					</table>
 				</div>
 			</section>
@@ -1147,6 +1174,7 @@
 				music: "音乐",
 				friends: "友链",
 				media: "媒体",
+				trash: "回收站",
 				config: "配置",
 				settings: "站点设置",
 				doctor: "体检 / 备份",
@@ -1879,10 +1907,18 @@
 				// 复制 / 已复制反馈由文档级委托统一处理（见 filePathBadge 附近的注释），这里只绑删除
 				$("mediaBody").querySelectorAll("[data-del]").forEach((btn) =>
 					btn.addEventListener("click", async () => {
-						if (!confirm(`确定删除 ${btn.dataset.del} ？删除后需要发布才会生效。`)) return;
+						if (
+							!confirm(
+								`确定删除 ${btn.dataset.del} ？\n\n会先移入「回收站」，之后可以在那里恢复；不会立刻从磁盘删除。`,
+							)
+						)
+							return;
 						try {
-							await api("/api/delete-media", { method: "POST", body: { repoPath: btn.dataset.del } });
-							toast("已删除", "ok");
+							const result = await api("/api/delete-media", {
+								method: "POST",
+								body: { repoPath: btn.dataset.del },
+							});
+							toast(result.message || "已移入回收站", "ok");
 							await loadMedia();
 						} catch (error) {
 							toast(error.message, "err");
@@ -1890,6 +1926,135 @@
 					}),
 				);
 			}
+
+			// ── 回收站 ────────────────────────────────────────────────────────
+			// 约定：删除动作只「移入回收站」；真正删文件（purge / empty）必须在这里二次确认。
+			let trashItems = [];
+
+			function trashKindLabel(kind) {
+				if (kind === "post") return "文章";
+				if (kind === "music") return "音乐";
+				return "媒体";
+			}
+
+			function renderTrash() {
+				$("trashBody").innerHTML = trashItems.length
+					? trashItems
+							.map((item) => {
+								const files = (item.files || [])
+									.map((file) => `<code>${escapeHtml(file.rel)}</code>`)
+									.join("<br>");
+								return `<tr>
+									<td>${escapeHtml(item.label || item.id)}
+										<div class="muted small">${escapeHtml(item.id)}</div>
+									</td>
+									<td class="small">${trashKindLabel(item.kind)}</td>
+									<td class="small">${files || '<span class="muted">-</span>'}</td>
+									<td>${humanSize(item.totalSize || 0)}</td>
+									<td class="small muted">${item.deletedAt ? new Date(item.deletedAt).toLocaleString() : "-"}</td>
+									<td>
+										<button class="action small" data-trash-restore="${escapeHtml(item.id)}">恢复</button>
+										<button class="action danger small" data-trash-purge="${escapeHtml(item.id)}">永久删除</button>
+									</td>
+								</tr>`;
+							})
+							.join("")
+					: '<tr><td colspan="6" class="muted">回收站是空的</td></tr>';
+
+				$("trashBody").querySelectorAll("[data-trash-restore]").forEach((btn) =>
+					btn.addEventListener("click", async () => {
+						const id = btn.dataset.trashRestore;
+						const item = trashItems.find((entry) => entry.id === id);
+						if (
+							!confirm(
+								`把「${item?.label || id}」恢复到原位置？\n\n如果原位置已经有同名文件，会拒绝恢复并提示你先处理。`,
+							)
+						)
+							return;
+						try {
+							const result = await api("/api/trash/restore", {
+								method: "POST",
+								body: { id },
+							});
+							toast(result.message || "已恢复", "ok");
+							await loadTrash();
+							await loadPosts();
+							await loadMedia();
+							await loadDiff();
+						} catch (error) {
+							toast(error.message, "err");
+						}
+					}),
+				);
+
+				$("trashBody").querySelectorAll("[data-trash-purge]").forEach((btn) =>
+					btn.addEventListener("click", async () => {
+						const id = btn.dataset.trashPurge;
+						const item = trashItems.find((entry) => entry.id === id);
+						const count = item?.files?.length || 0;
+						// 二次确认：第一次说明后果，第二次确认「真的不回头的删除」
+						if (
+							!confirm(
+								`永久删除「${item?.label || id}」？\n\n会真正删掉磁盘上的 ${count} 个文件，无法恢复。`,
+							)
+						)
+							return;
+						if (!confirm("再确认一次：永久删除后没有任何办法找回。")) return;
+						try {
+							await api("/api/trash/purge", { method: "POST", body: { id } });
+							toast("已永久删除", "ok");
+							await loadTrash();
+						} catch (error) {
+							toast(error.message, "err");
+						}
+					}),
+				);
+			}
+
+			async function loadTrash() {
+				try {
+					const data = await api("/api/trash");
+					trashItems = Array.isArray(data.items) ? data.items : [];
+					$("trashDirPath").innerHTML = data.dir
+						? filePathBadge(data.dir, { label: "回收站目录：" })
+						: "";
+					renderTrash();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			}
+
+			$("btnTrashReload").addEventListener("click", () => {
+				void loadTrash();
+			});
+
+			$("btnTrashEmpty").addEventListener("click", async () => {
+				if (!trashItems.length) {
+					toast("回收站已经是空的");
+					return;
+				}
+				const fileCount = trashItems.reduce(
+					(sum, item) => sum + (item.files?.length || 0),
+					0,
+				);
+				if (
+					!confirm(
+						`清空回收站里的 ${trashItems.length} 条记录？\n\n会真正删掉 ${fileCount} 个文件，无法恢复。`,
+					)
+				)
+					return;
+				if (!confirm("再确认一次：清空后没有任何办法找回。")) return;
+				try {
+					const result = await api("/api/trash/empty", {
+						method: "POST",
+						body: {},
+					});
+					toast(`已清空 ${result.removed ?? 0} 条记录`, "ok");
+					await loadTrash();
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
 
 			/** 当前正在编辑的文章文件名（slug）；编辑器没开或文件名不合法时返回空串 */
 			function currentEditorPostSlug() {
@@ -3032,6 +3197,7 @@
 					if (tab === "music") await loadPlaylist();
 					if (tab === "friends") await loadFriends();
 					if (tab === "media") await loadMedia();
+				if (tab === "trash") await loadTrash();
 					if (tab === "config") await loadConfigList();
 					if (tab === "settings") {
 						await loadSettings();
@@ -3194,10 +3360,22 @@
 				}
 			});
 			$("btnDeletePost").addEventListener("click", async () => {
-				if (!currentSlug || !confirm(`确定删除文章 ${currentSlug}.md ？`)) return;
+				if (
+					!currentSlug ||
+					!confirm(
+						`确定删除文章 ${currentSlug}.md ？\n\n会先移入「回收站」，之后可以在那里恢复；文章自带的图片目录也会一起进去。`,
+					)
+				)
+					return;
 				try {
-					await api("/api/delete-post", { method: "POST", body: { slug: currentSlug } });
-					toast("已删除", "ok");
+					const result = await api("/api/delete-post", {
+						method: "POST",
+						body: { slug: currentSlug },
+					});
+					toast(
+						(result.notes && result.notes.join("；")) || "已移入回收站",
+						"ok",
+					);
 					$("editorCard").style.display = "none";
 					await loadPosts();
 					await loadDiff();
@@ -3560,6 +3738,9 @@
 				$("songEditor").style.display = "";
 				$("songEditorTitle").textContent = index >= 0 ? `编辑歌曲：${song.name || ""}` : "新增歌曲";
 				$("btnDeleteSong").style.display = index >= 0 ? "" : "none";
+			// 「删除音频文件」只在「编辑已有歌曲且音频确实落在站内」时出现
+			const hasLocalAudio = Boolean(index >= 0 && songPaths[index]?.url?.repoPath);
+			$("btnDeleteMusicFile").style.display = hasLocalAudio ? "" : "none";
 				updateSongPreview();
 				$("songEditor").scrollIntoView({ behavior: "smooth", block: "start" });
 			}
@@ -3790,6 +3971,42 @@
 						songCache.filter((_, i) => i !== songIndex),
 						"已从歌单移除",
 					);
+				} catch (error) {
+					toast(error.message, "err");
+				}
+			});
+
+			// 删除音频文件：音频 + 同名封面 + 同名歌词一起移入回收站，并移除歌单里的这一条
+			$("btnDeleteMusicFile").addEventListener("click", async () => {
+				if (songIndex < 0) return;
+				const song = songCache[songIndex];
+				const repoPath = songPaths[songIndex]?.url?.repoPath;
+				if (!repoPath) {
+					toast("这首歌的音频不是站内文件（或路径不对），无法删除", "err");
+					return;
+				}
+				if (
+					!confirm(
+						`把「${song.name}」的音频文件移入回收站？\n\n同名的封面与歌词也会一起移入，歌单里的这一条会一并移除。\n之后可以在「回收站」页恢复。`,
+					)
+				)
+					return;
+				try {
+					const result = await api("/api/delete-music", {
+						method: "POST",
+						body: { repoPath },
+					});
+					toast(
+						result.warning ||
+							(result.playlistRemoved
+								? "已移入回收站，并从歌单移除"
+								: "已移入回收站"),
+						result.warning ? "err" : "ok",
+					);
+					$("songEditor").style.display = "none";
+					songIndex = -1;
+					await loadPlaylist();
+					await loadDiff();
 				} catch (error) {
 					toast(error.message, "err");
 				}

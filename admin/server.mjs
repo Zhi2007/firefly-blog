@@ -135,6 +135,12 @@ const MEDIA_DIRS = {
 };
 
 const POSTS_DIR = "src/content/posts";
+
+// 回收站：删除文章 / 媒体 / 音乐时**不直接删文件**，而是整组移动到
+// admin-backups/trash/<id>/files/<原相对路径>，面板「回收站」页可恢复。
+// 只有用户在回收站里二次确认「永久删除」才会真正 rm。
+// admin-backups 已在 .gitignore 里：不会提交、不会发布，也不在 PUBLISH_SCOPE 内。
+const TRASH_DIR = "admin-backups/trash";
 // 文章 slug 的唯一合法形态：字母 / 数字 / 点 / 下划线 / 连字符。
 // 它会被拼进 `src/content/posts/<slug>.md`，所以**任何**拼路径的接口都必须先用它卡一遍
 // （只要放行 `/` 或 `..`，就等于允许读写任意外部路径）。
@@ -721,6 +727,161 @@ async function exists(p) {
 	} catch {
 		return false;
 	}
+}
+
+// ── 回收站 ────────────────────────────────────────────────────────────────
+// 设计：一条回收站记录 = admin-backups/trash/<id>/，里面是
+//   meta.json                     { id, kind, label, deletedAt, files[], totalSize }
+//   files/<原仓库相对路径>          原样保留目录结构，恢复时按相对路径搬回去
+// 「删除」= 移动进这里；「恢复」= 搬回原位；「永久删除」= rm 整个 <id> 目录。
+// 之所以按相对路径保存：文章会带一个 images/<slug>/ 目录，音乐可能带封面与歌词，
+// 一组文件必须能一起回来，否则恢复出来的东西是残的。
+
+/** 生成条目 id：时间戳（人肉可读）+ 随机后缀（同秒多次删除不撞） */
+function newTrashId() {
+	const d = new Date();
+	const p = (n) => String(n).padStart(2, "0");
+	const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+	return `${stamp}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 文件或目录的总字节数（目录递归；读不到就按 0 算，只用于展示） */
+async function sizeOf(abs) {
+	try {
+		const stat = await fs.stat(abs);
+		if (stat.isFile()) return stat.size;
+		if (!stat.isDirectory()) return 0;
+		let total = 0;
+		for (const entry of await fs.readdir(abs, { withFileTypes: true })) {
+			total += await sizeOf(path.join(abs, entry.name));
+		}
+		return total;
+	} catch {
+		return 0;
+	}
+}
+
+/** 移动文件/目录；跨卷（EXDEV）时退化成「复制 + 删除」 */
+async function movePath(from, to) {
+	try {
+		await fs.rename(from, to);
+	} catch (error) {
+		if (error?.code !== "EXDEV") throw error;
+		await fs.cp(from, to, { recursive: true });
+		await fs.rm(from, { recursive: true, force: true });
+	}
+}
+
+/**
+ * 把一组文件/目录移入回收站。
+ * @param kind  "post" | "media" | "music"
+ * @param label 面板上显示的名字
+ * @param rels  仓库相对路径（/ 分隔）；不存在的会被跳过
+ * @returns meta 对象；没有任何文件被移动时返回 null（不留下空条目）
+ */
+async function moveToTrash(kind, label, rels) {
+	const id = newTrashId();
+	const entryAbs = safeResolve(`${TRASH_DIR}/${id}`);
+	const filesRoot = path.join(entryAbs, "files");
+	await fs.mkdir(filesRoot, { recursive: true });
+	const moved = [];
+	for (const rel of rels) {
+		const abs = safeResolve(rel); // 越界直接抛错
+		if (!(await exists(abs))) continue;
+		const dest = path.join(filesRoot, rel.split("/").join(path.sep));
+		await fs.mkdir(path.dirname(dest), { recursive: true });
+		const size = await sizeOf(abs);
+		await movePath(abs, dest);
+		moved.push({ rel, size });
+	}
+	if (moved.length === 0) {
+		await fs.rm(entryAbs, { recursive: true, force: true });
+		return null;
+	}
+	const meta = {
+		id,
+		kind,
+		label,
+		deletedAt: new Date().toISOString(),
+		files: moved,
+		totalSize: moved.reduce((sum, file) => sum + file.size, 0),
+	};
+	await fs.writeFile(
+		path.join(entryAbs, "meta.json"),
+		`${JSON.stringify(meta, null, 2)}\n`,
+		"utf-8",
+	);
+	return meta;
+}
+
+/** 列出回收站（按删除时间倒序）；坏掉的条目直接跳过，不让它拖垮整页 */
+async function listTrash() {
+	const root = safeResolve(TRASH_DIR);
+	if (!(await exists(root))) return [];
+	const items = [];
+	for (const name of await fs.readdir(root)) {
+		const metaPath = path.join(root, name, "meta.json");
+		if (!(await exists(metaPath))) continue;
+		try {
+			const meta = JSON.parse(await fs.readFile(metaPath, "utf-8"));
+			items.push({ ...meta, id: name });
+		} catch {
+			// meta.json 坏掉：跳过（文件还在，可以手工去 admin-backups/trash 找）
+		}
+	}
+	items.sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt)));
+	return items;
+}
+
+/** 校验 id 并返回条目绝对路径（id 只允许时间戳形态，杜绝 ../ 之类） */
+function trashEntryAbs(id) {
+	if (!/^[0-9]{8}-[0-9]{6}-[0-9a-z]{2,8}$/i.test(String(id ?? ""))) {
+		throw httpError(400, "无效的回收站条目 id");
+	}
+	return safeResolve(`${TRASH_DIR}/${id}`);
+}
+
+/** 读 meta.json；条目不存在 → 404 */
+async function readTrashMeta(id) {
+	const entryAbs = trashEntryAbs(id);
+	const metaPath = path.join(entryAbs, "meta.json");
+	if (!(await exists(metaPath))) throw httpError(404, "回收站条目不存在（可能已被恢复或删除）");
+	return JSON.parse(await fs.readFile(metaPath, "utf-8"));
+}
+
+/**
+ * 恢复：按记录里的相对路径原样搬回去。
+ * 目标已存在时**不覆盖**，直接报冲突（让用户先处理，避免把新文件冲掉）。
+ */
+async function restoreTrash(id) {
+	const entryAbs = trashEntryAbs(id);
+	const meta = await readTrashMeta(id);
+	const conflicts = [];
+	for (const file of meta.files ?? []) {
+		if (await exists(safeResolve(file.rel))) conflicts.push(file.rel);
+	}
+	if (conflicts.length > 0) {
+		throw httpError(
+			409,
+			`目标位置已有同名文件，未恢复：${conflicts.join("、")}。请先移走或重命名它们。`,
+		);
+	}
+	for (const file of meta.files ?? []) {
+		const source = path.join(entryAbs, "files", file.rel.split("/").join(path.sep));
+		if (!(await exists(source))) continue;
+		const dest = safeResolve(file.rel);
+		await fs.mkdir(path.dirname(dest), { recursive: true });
+		await movePath(source, dest);
+	}
+	await fs.rm(entryAbs, { recursive: true, force: true });
+	return meta;
+}
+
+/** 永久删除一条记录（不可恢复） */
+async function purgeTrash(id) {
+	const entryAbs = trashEntryAbs(id);
+	await readTrashMeta(id); // 不存在就 404，避免「删了个不存在的还返回成功」
+	await fs.rm(entryAbs, { recursive: true, force: true });
 }
 
 // ── 「这个值落在哪个真实文件里」─────────────────────────────────────────────
@@ -1797,6 +1958,13 @@ const POST_BODY_FIELDS = {
 	"/api/delete-post": ["slug"],
 	"/api/upload": ["dir", "filename", "dataBase64", "postSlug"],
 	"/api/delete-media": ["repoPath"],
+	// 音乐页「删除音频文件」：只接受音乐目录下的音频，封面/歌词由后端按同名推导
+	"/api/delete-music": ["repoPath"],
+	// 回收站：列表是 GET-only；恢复 / 永久删除要显式 id，清空空数组
+	"/api/trash": [],
+	"/api/trash/restore": ["id"],
+	"/api/trash/purge": ["id"],
+	"/api/trash/empty": [],
 	"/api/announcements": ["items"],
 	// 草稿是 GET-only：登记空数组不是为了接收字段，而是让「往只读接口 POST 带字段」也走 400 而不是静默执行
 	"/api/announcement-draft": [],
@@ -2084,11 +2252,21 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "slug 只能包含字母、数字、点、下划线和连字符" });
 					return;
 				}
-				const file = resolveInside(`${POSTS_DIR}/${slug}.md`, [POSTS_DIR]);
-				await snapshotBefore(`${POSTS_DIR}/${slug}.md`, "删除文章");
-				if (await exists(file)) await fs.rm(file, { force: true });
+				const rels = [`${POSTS_DIR}/${slug}.md`];
+				// 文章自带的图片目录一起进回收站：恢复时文章与配图同时回来，不会剩一堆孤儿图
+				const imagesDir = `${POSTS_DIR}/images/${slug}`;
+				if (await exists(safeResolve(imagesDir))) rels.push(imagesDir);
+				// 删除 = 移入回收站（可恢复），不再直接 rm，也不再多存一份快照
+				const entry = await moveToTrash("post", `${slug}.md`, rels);
 				const countNote = await syncPostCountNote();
-				sendJson(res, 200, { ok: true, notes: countNote ? [countNote] : [] });
+				const notes = countNote ? [countNote] : [];
+				notes.push("已移入回收站，可在「回收站」页恢复或永久删除");
+				sendJson(res, 200, {
+					ok: true,
+					trash: entry?.id ?? null,
+					files: entry?.files?.map((file) => file.rel) ?? [],
+					notes,
+				});
 				return;
 			}
 
@@ -2196,10 +2374,115 @@ const server = createServer(async (req, res) => {
 					sendJson(res, 400, { error: "只能删除媒体目录里的文件" });
 					return;
 				}
-				// 删除是不可逆的，删之前一定留一份快照（超限的会跳过并在 warning 里说明）
-				const snapshot = await snapshotBefore(repoPath, `删除媒体 ${path.basename(repoPath)}`);
-				if (await exists(target)) await fs.rm(target, { force: true });
-				sendJson(res, 200, { ok: true, backup: snapshot?.id ?? null, snapshot });
+				// 删除 = 移入回收站（可恢复）；只有回收站里的「永久删除」才真正 rm
+				const entry = await moveToTrash(
+					"media",
+					path.basename(repoPath),
+					[path.relative(REPO_ROOT, target).split(path.sep).join("/")],
+				);
+				sendJson(res, 200, {
+					ok: true,
+					trash: entry?.id ?? null,
+					message: "已移入回收站，可在「回收站」页恢复",
+				});
+				return;
+			}
+
+			case "/api/delete-music": {
+				let target;
+				try {
+					target = resolveInside(body.repoPath, [MEDIA_DIRS.music]);
+				} catch {
+					sendJson(res, 400, { error: "只能删除音乐目录里的音频文件" });
+					return;
+				}
+				if (!/\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i.test(target)) {
+					sendJson(res, 400, { error: "只能删除音频文件（mp3 / m4a / flac / wav …）" });
+					return;
+				}
+				const audioRel = path.relative(REPO_ROOT, target).split(path.sep).join("/");
+				const base = path.basename(target).replace(/\.[^.]+$/, "");
+				const rels = [audioRel];
+				// 同名封面 / 歌词一起入回收站：否则歌删了、封面和歌词还留在目录里
+				for (const ext of ["jpg", "jpeg", "png", "webp", "avif", "gif"]) {
+					const coverRel = `${MEDIA_DIRS["music-cover"]}/${base}.${ext}`;
+					if (await exists(safeResolve(coverRel))) rels.push(coverRel);
+				}
+				const lrcRel = `${MEDIA_DIRS["music-lrc"]}/${base}.lrc`;
+				if (await exists(safeResolve(lrcRel))) rels.push(lrcRel);
+
+				const entry = await moveToTrash("music", path.basename(target), rels);
+
+				// 歌单里指向这条音频的条目一起移除，否则前台会去请求一个已不存在的文件
+				let playlistRemoved = 0;
+				try {
+					const songs = await readJsonData("playlist");
+					const keep = songs.filter((song) => {
+						const repoPath = publicUrlToRepoPath(song?.url);
+						if (!repoPath) return true;
+						return safeResolve(repoPath) !== target;
+					});
+					if (keep.length !== songs.length) {
+						await writeJsonData("playlist", keep);
+						playlistRemoved = songs.length - keep.length;
+					}
+				} catch (error) {
+					// 歌单写失败不该让「文件已入回收站」变成报错：把情况如实带回去
+					sendJson(res, 200, {
+						ok: true,
+						trash: entry?.id ?? null,
+						playlistRemoved: 0,
+						warning: `音频已移入回收站，但歌单更新失败：${error?.message ?? error}`,
+					});
+					return;
+				}
+
+				sendJson(res, 200, {
+					ok: true,
+					trash: entry?.id ?? null,
+					files: entry?.files?.map((file) => file.rel) ?? [],
+					playlistRemoved,
+					message: "已移入回收站，可在「回收站」页恢复",
+				});
+				return;
+			}
+
+			case "/api/trash": {
+				if (req.method !== "GET") {
+					sendJson(res, 405, { error: "请用 GET 调用 /api/trash" });
+					return;
+				}
+				sendJson(res, 200, { items: await listTrash(), dir: TRASH_DIR });
+				return;
+			}
+
+			case "/api/trash/restore": {
+				const meta = await restoreTrash(body.id);
+				if (meta.kind === "post") await syncPostCountNote();
+				sendJson(res, 200, {
+					ok: true,
+					restored: meta.files?.map((file) => file.rel) ?? [],
+					message: "已恢复原位",
+				});
+				return;
+			}
+
+			case "/api/trash/purge": {
+				// 永久删除：这是唯一真正 rm 文件的地方，前端必须二次确认后才调
+				await purgeTrash(body.id);
+				sendJson(res, 200, { ok: true, message: "已永久删除" });
+				return;
+			}
+
+			case "/api/trash/empty": {
+				const items = await listTrash();
+				for (const item of items) {
+					await fs.rm(safeResolve(`${TRASH_DIR}/${item.id}`), {
+						recursive: true,
+						force: true,
+					});
+				}
+				sendJson(res, 200, { ok: true, removed: items.length });
 				return;
 			}
 
