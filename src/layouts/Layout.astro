@@ -16,7 +16,7 @@ import SakuraEffect from "@components/features/SakuraEffect.astro";
 import TabTitleEffect from "@components/features/TabTitleEffect.astro";
 import WavesEffect from "@components/features/WavesEffect.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
-
+import { Icon } from "astro-icon/components";
 import {
 	analyticsConfig,
 	backgroundWallpaper,
@@ -37,6 +37,7 @@ import {
 import { defaultFavicons } from "@/constants/icon";
 import type { Favicon } from "@/types/config";
 import { isHomePage } from "@/utils/layout-utils";
+import { resolveNavMenuLinks } from "@/utils/nav-menu-utils";
 import { getAuthorAvatarUrl, getSiteLogo } from "@/utils/schema-image";
 import { buildSiteGraph, toAbsoluteUrl } from "@/utils/schema-utils";
 import {
@@ -125,6 +126,21 @@ const favicons: Favicon[] =
 // apple-touch-icon：优先取 favicon 中的 png，否则取第一个
 const appleTouchIcon =
 	favicons.find((f) => f.src.toLowerCase().endsWith(".png")) ?? favicons[0];
+
+// 导航栏用到的全部图标名（含下拉子项）。
+// 用途见 <body> 开头的「图标 symbol 预渲染」块：astro-icon 只把**本页第一次出现**的图标
+// 渲染成 <symbol>，其余位置是 `<use href="#...">`；如果这次「第一次」恰好落在隐藏的移动端
+// 抽屉里，桌面导航的 <use> 就会指空——「工具」图标曾经就是这样只在工具页正常显示。
+const navIconNames: string[] = [
+	...new Set(
+		resolveNavMenuLinks()
+			.flatMap((link) => [
+				link.icon,
+				...(link.children ?? []).map((child) => child.icon),
+			])
+			.filter((name): name is string => Boolean(name)),
+	),
+];
 
 // const siteLang = siteConfig.lang.replace('_', '-')
 if (!lang) {
@@ -561,6 +577,16 @@ const ogImageAlt = propsOgImageAlt ?? pageTitle;
       },
     ]}
   >
+    {/* 图标 symbol 预渲染：把导航栏要用的图标在 <body> 最前面先渲染一遍，
+        让每个图标的 <symbol> 一定落在「已渲染且可见」的树里（容器零尺寸、不占位、不可点），
+        后面的 <use href="#..."> 才有定义。否则首现落在隐藏抽屉里时，桌面图标会消失。 */}
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
+    >
+      {navIconNames.map((name) => <Icon name={name} />)}
+    </div>
+
     <!-- 首帧前按运行时壁纸模式翻转卡片透明类（布局已由 data-wallpaper-mode 属性规则接管） -->
     <script is:inline>
       (function () {
